@@ -11,4 +11,11 @@ router.get(
     accountController.getAllAccounts,
 );
 
+router.post(
+  "/accounts",
+  authMiddleware,
+  requireRole("admin"),
+  accountController.createAccount,
+);
+
 module.exports = router;
