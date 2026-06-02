@@ -18,4 +18,11 @@ router.post(
   accountController.createAccount,
 );
 
+router.put(
+  "/accounts/:id",
+  authMiddleware,
+  requireRole("admin"),
+  accountController.updateAccount,
+);
+
 module.exports = router;

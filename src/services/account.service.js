@@ -69,7 +69,75 @@ async function createAccount({ username, email, phone, password, role_name, stat
     return data;
 }
 
+async function updateAccount(accountId, { username, email, phone, password, role_name, status }) {
+    ensureSupabase();
+
+    const updateFields = {};
+
+    if (username !== undefined) {
+        const { data: existing } = await supabase
+            .from("account")
+            .select("account_id")
+            .eq("username", username)
+            .neq("account_id", accountId)
+            .maybeSingle();
+
+        if (existing) {
+            throw new AppError("Username already exists.", 409, "DUPLICATE_USERNAME");
+        }
+        updateFields.username = username;
+    }
+
+    if (email !== undefined) {
+        updateFields.email = email;
+    }
+
+    if (phone !== undefined) {
+        updateFields.phone = phone;
+    }
+
+    if (password !== undefined) {
+        updateFields.password = await bcrypt.hash(password, 10);
+        updateFields.password_hash = updateFields.password;
+    }
+
+    if (role_name !== undefined) {
+        const { data: role, error: roleError } = await supabase
+            .from("role")
+            .select("role_id")
+            .ilike("role_name", role_name)
+            .single();
+
+        if (roleError || !role) {
+            throw new AppError(`Role '${role_name}' not found.`, 400, "INVALID_ROLE");
+        }
+        updateFields.role_id = role.role_id;
+    }
+
+    if (status !== undefined) {
+        updateFields.status = status;
+    }
+
+    if (Object.keys(updateFields).length === 0) {
+        throw new AppError("No fields to update.", 400, "NO_UPDATES");
+    }
+
+    const { data, error } = await supabase
+        .from("account")
+        .update(updateFields)
+        .eq("account_id", accountId)
+        .select("account_id, email, username, status, created_date, role(role_name)")
+        .single();
+
+    if (error) {
+        throw new AppError(error.message, 500, "DB_ERROR");
+    }
+
+    return data;
+}
+
 module.exports = {
     getAllAccounts,
-    createAccount
+    createAccount,
+    updateAccount,
 };

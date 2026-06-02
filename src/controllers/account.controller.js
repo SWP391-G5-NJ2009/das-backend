@@ -1,6 +1,6 @@
 const accountService = require("../services/account.service")
 const { sendSuccess } = require("../utils/response")
-const { validateCreateAccount } = require("../validators/account.validator");
+const { validateCreateAccount, validateUpdateAccount } = require("../validators/account.validator");
 
 
 async function getAllAccounts(req, res, next) {
@@ -22,7 +22,19 @@ async function createAccount(req, res, next) {
     }
 }
 
+async function updateAccount(req, res, next) {
+    try {
+        const { id } = req.params;
+        const payload = validateUpdateAccount(req.body);
+        const data = await accountService.updateAccount(id, payload);
+        return sendSuccess(res, 200, data, "Account updated successfully.");
+    } catch (err) {
+        return next(err);
+    }
+}
+
 module.exports = {
     getAllAccounts,
-    createAccount
+    createAccount,
+    updateAccount,
 };
