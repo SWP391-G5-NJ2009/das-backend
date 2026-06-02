@@ -25,4 +25,11 @@ router.put(
   accountController.updateAccount,
 );
 
+router.delete(
+  "/accounts/:id",
+  authMiddleware,
+  requireRole("admin"),
+  accountController.deleteAccount,
+);
+
 module.exports = router;

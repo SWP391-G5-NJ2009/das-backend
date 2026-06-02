@@ -33,8 +33,19 @@ async function updateAccount(req, res, next) {
     }
 }
 
+async function deleteAccount(req, res, next) {
+    try {
+        const { id } = req.params;
+        const data = await accountService.deleteAccount(id);
+        return sendSuccess(res, 200, data, "Account deleted successfully.");
+    } catch (err) {
+        return next(err);
+    }
+}
+
 module.exports = {
     getAllAccounts,
     createAccount,
     updateAccount,
+    deleteAccount,
 };

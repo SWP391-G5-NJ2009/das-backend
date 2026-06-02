@@ -136,8 +136,34 @@ async function updateAccount(accountId, { username, email, phone, password, role
     return data;
 }
 
+async function deleteAccount(accountId) {
+    ensureSupabase();
+
+    const { data: existing } = await supabase
+        .from("account")
+        .select("account_id")
+        .eq("account_id", accountId)
+        .single();
+
+    if (!existing) {
+        throw new AppError("Account not found.", 404, "NOT_FOUND");
+    }
+
+    const { error } = await supabase
+        .from("account")
+        .delete()
+        .eq("account_id", accountId);
+
+    if (error) {
+        throw new AppError(error.message, 500, "DB_ERROR");
+    }
+
+    return { account_id: accountId };
+}
+
 module.exports = {
     getAllAccounts,
     createAccount,
     updateAccount,
+    deleteAccount,
 };
