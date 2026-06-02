@@ -13,7 +13,7 @@ async function getAllAccounts() {
 
     const { data, error } = await supabase
         .from("account")
-        .select("account_id, email, username, status, created_date, role(role_name)")
+        .select("account_id, username, email, phone, status, created_date, role(role_name)")
         .order("created_date", { ascending: false });
 
     if (error) {
