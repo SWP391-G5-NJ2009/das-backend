@@ -13,7 +13,9 @@ function authMiddleware(req, res, next) {
     req.user = verifyJWT(token);
     return next();
   } catch {
-    return next(new AppError("Invalid or expired token.", 401, "TOKEN_INVALID"));
+    return next(
+      new AppError("Invalid or expired token.", 401, "TOKEN_INVALID"),
+    );
   }
 }
 

@@ -24,6 +24,9 @@ async function staffLogin(req, res, next) {
   try {
     const payload = validate(staffLoginSchema, req.body);
     const data = await authService.staffLogin(payload);
+    const token = data.token || data.accessToken;
+    console.log("=== TOKEN OWNER ĐỂ TEST POSTMAN ===");
+    console.log(token); // Hoặc tên biến chứa chuỗi JWT token của nhóm bạn
     return sendSuccess(res, 200, data, "Login successful. Welcome back!");
   } catch (err) {
     return next(err);
@@ -58,7 +61,12 @@ async function resetPassword(req, res, next) {
   try {
     const payload = validate(resetPasswordSchema, req.body);
     const data = await authService.resetPassword(payload);
-    return sendSuccess(res, 200, data, "Your password has been reset successfully.");
+    return sendSuccess(
+      res,
+      200,
+      data,
+      "Your password has been reset successfully.",
+    );
   } catch (err) {
     return next(err);
   }
@@ -71,7 +79,12 @@ async function changePassword(req, res, next) {
       accountId: req.user.id,
       ...payload,
     });
-    return sendSuccess(res, 200, data, "Your password has been changed successfully.");
+    return sendSuccess(
+      res,
+      200,
+      data,
+      "Your password has been changed successfully.",
+    );
   } catch (err) {
     return next(err);
   }
