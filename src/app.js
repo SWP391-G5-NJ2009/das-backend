@@ -15,7 +15,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: "http://localhost:5173", // 👉 Chỉ định đích danh Frontend của bạn
+    origin: "http://localhost:5173",
     credentials: true, // 👉 Cho phép nhận Cookie / Authorization Header
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -28,7 +28,7 @@ app.get("/api/health", (req, res) =>
   sendSuccess(res, 200, { status: "ok" }, "OK"),
 );
 
-app.use("/api/v1/dental-services", dentalServiceRouter);
+app.use("/api/dental-services", dentalServiceRouter);
 
 app.use("/api/admin", adminRoutes);
 app.use("/api/auth", authRoutes);
