@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const dentalServiceController = require("../controllers/dentalService.controller");
-
 const authMiddleware = require("../middlewares/auth.middleware");
 const requireRole = require("../middlewares/role.middleware");
 

@@ -1,6 +1,5 @@
 const AppError = require("../utils/AppError");
-
-const normalizeRole = (role) => String(role || "").toLowerCase();
+const normalizeRole = require("../utils/normalizeRole");
 
 function requireRole(...roles) {
   const allowedRoles = roles.map(normalizeRole);

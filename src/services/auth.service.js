@@ -1,7 +1,6 @@
 const bcrypt = require("bcryptjs");
 const supabase = require("../config/supabase");
 const textbeeService = require("../integrations/textbee/textbee.service");
-const textbeeTemplates = require("../integrations/textbee/textbee.templates");
 const AppError = require("../utils/AppError");
 const { signJWT } = require("../utils/jwt");
 const logger = require("../utils/logger");
@@ -11,6 +10,7 @@ const {
   getOtpExpiry,
   hashOtp,
 } = require("../utils/otp");
+const normalizeRole = require("../utils/normalizeRole");
 
 const ROLE_PROFILE_TABLE = {
   patient: { table: "patient", idColumn: "patient_id" },
@@ -29,14 +29,6 @@ function ensureSupabase() {
   }
 }
 
-function normalizeRole(roleName) {
-  return String(roleName || "").toLowerCase();
-}
-
-function isBcryptHash(value) {
-  return /^\$2[aby]\$/.test(String(value || ""));
-}
-
 async function verifyPassword(account, password) {
   const storedPassword = account.password_hash || account.password;
 
@@ -44,7 +36,7 @@ async function verifyPassword(account, password) {
     return false;
   }
 
-  if (isBcryptHash(storedPassword)) {
+  if (storedPassword) {
     return bcrypt.compare(password, storedPassword);
   }
 
@@ -291,7 +283,7 @@ async function forgotPassword({ identifier }) {
   try {
     smsResult = await textbeeService.sendSms({
       recipient,
-      message: textbeeTemplates.resetPasswordOtp({ otp }),
+      message: textbeeService.resetPasswordOtp({ otp }),
     });
   } catch (smsError) {
     otpDelivery = "textbee_failed";

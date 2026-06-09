@@ -2,18 +2,16 @@ const AppError = require("../../utils/AppError");
 
 const TEXTBEE_API_BASE_URL = "https://api.textbee.dev/api/v1";
 
-function getConfig() {
-  return {
-    apiKey: process.env.TEXTBEE_API_KEY,
-    deviceId: process.env.TEXTBEE_DEVICE_ID,
-  };
-}
-
 function assertConfig() {
-  const { apiKey, deviceId } = getConfig();
+  const apiKey = process.env.TEXTBEE_API_KEY;
+  const deviceId = process.env.TEXTBEE_DEVICE_ID;
 
   if (!apiKey || !deviceId) {
-    throw new AppError("TextBee is not configured.", 500, "TEXTBEE_NOT_CONFIGURED");
+    throw new AppError(
+      "TextBee is not configured.",
+      500,
+      "TEXTBEE_NOT_CONFIGURED",
+    );
   }
 
   return { apiKey, deviceId };
@@ -23,7 +21,11 @@ function normalizeRecipient(recipient) {
   const value = String(recipient || "").trim();
 
   if (!value) {
-    throw new AppError("SMS recipient is required.", 400, "SMS_RECIPIENT_REQUIRED");
+    throw new AppError(
+      "SMS recipient is required.",
+      400,
+      "SMS_RECIPIENT_REQUIRED",
+    );
   }
 
   if (value.startsWith("+")) {
@@ -55,14 +57,7 @@ async function sendSms({ recipient, message }) {
     },
   );
 
-  const text = await response.text();
-  let data = null;
-
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = { raw: text };
-  }
+  const data = await response.text();
 
   if (!response.ok) {
     throw new AppError(
@@ -75,6 +70,11 @@ async function sendSms({ recipient, message }) {
   return data;
 }
 
+function resetPasswordOtp({ otp }) {
+  return `DentalCare: Ma OTP dat lai mat khau cua ban la ${otp}. Ma co hieu luc trong 10 phut.`;
+}
+
 module.exports = {
   sendSms,
+  resetPasswordOtp,
 };
