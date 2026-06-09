@@ -36,6 +36,9 @@ SUPABASE_ANON_KEY=your-anon-key
 JWT_SECRET=replace-with-at-least-32-characters
 JWT_EXPIRES_IN=7d
 
+TEXTBEE_DEVICE_ID=your-textbee-device-id
+TEXTBEE_API_KEY=your-textbee-api-key
+
 FRONTEND_URL=http://localhost:5173
 ```
 
@@ -68,7 +71,7 @@ Current role names supported by the API:
 - `owner`
 - `admin`
 
-Forgot password OTP is stored in `otp_tokens`. SpeedSMS is intentionally not integrated yet; in development, the forgot-password endpoint returns `devOtp` for testing.
+Forgot password OTP is stored in `otp_tokens` and sent by TextBee SMS. SpeedSMS is intentionally not integrated yet. In development, the forgot-password endpoint also returns `devOtp` for testing.
 
 ## Run
 
@@ -144,6 +147,8 @@ Content-Type: application/json
   "identifier": "0901000001"
 }
 ```
+
+In development, this request sends the OTP through TextBee and also returns the OTP in `data.devOtp`. In production, `devOtp` is omitted.
 
 Reset password:
 
@@ -225,3 +230,11 @@ Check that the app can load:
 ```bash
 node -e "require('./src/app'); console.log('backend app loaded')"
 ```
+
+## Troubleshooting
+
+- If login returns `INVALID_CREDENTIALS`, confirm the account has a valid bcrypt `password_hash`.
+- If forgot password returns `TEXTBEE_NOT_CONFIGURED`, confirm `TEXTBEE_DEVICE_ID` and `TEXTBEE_API_KEY`.
+- If TextBee does not deliver SMS, confirm your TextBee device is online and the phone number can receive SMS.
+- If Supabase requests fail, check `SUPABASE_URL` and the service role key.
+- `SUPABASE_URL` should normally be `https://your-project-ref.supabase.co`; do not include `/rest/v1`.

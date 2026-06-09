@@ -1,8 +1,16 @@
 const bcrypt = require("bcryptjs");
 const supabase = require("../config/supabase");
+const textbeeService = require("../integrations/textbee/textbee.service");
+const textbeeTemplates = require("../integrations/textbee/textbee.templates");
 const AppError = require("../utils/AppError");
 const { signJWT } = require("../utils/jwt");
-const { compareOtp, generateOtp, getOtpExpiry, hashOtp } = require("../utils/otp");
+const logger = require("../utils/logger");
+const {
+  compareOtp,
+  generateOtp,
+  getOtpExpiry,
+  hashOtp,
+} = require("../utils/otp");
 
 const ROLE_PROFILE_TABLE = {
   patient: { table: "patient", idColumn: "patient_id" },
@@ -13,7 +21,11 @@ const ROLE_PROFILE_TABLE = {
 
 function ensureSupabase() {
   if (!supabase) {
-    throw new AppError("Supabase is not configured.", 500, "SUPABASE_NOT_CONFIGURED");
+    throw new AppError(
+      "Supabase chưa được cấu hình.",
+      500,
+      "SUPABASE_NOT_CONFIGURED",
+    );
   }
 }
 
@@ -44,12 +56,14 @@ async function getAccountById(accountId) {
 
   const { data, error } = await supabase
     .from("account")
-    .select("account_id, email, username, password, password_hash, role_id, status, role(role_name)")
+    .select(
+      "account_id, email, username, password, password_hash, role_id, status, role(role_name)",
+    )
     .eq("account_id", accountId)
     .single();
 
   if (error || !data) {
-    throw new AppError("Account not found.", 404, "ACCOUNT_NOT_FOUND");
+    throw new AppError("Không tìm thấy tài khoản.", 404, "ACCOUNT_NOT_FOUND");
   }
 
   return data;
@@ -70,7 +84,11 @@ async function getProfile(role, accountId) {
     .maybeSingle();
 
   if (error) {
-    throw new AppError(error.message, 500, "DB_ERROR");
+    throw new AppError(
+      "Không thể xử lý dữ liệu. Vui lòng thử lại sau.",
+      500,
+      "DB_ERROR",
+    );
   }
 
   return data;
@@ -79,7 +97,8 @@ async function getProfile(role, accountId) {
 function createAuthPayload(account, profile) {
   const role = normalizeRole(account.role?.role_name);
   const profileConfig = ROLE_PROFILE_TABLE[role];
-  const profileId = profileConfig && profile ? profile[profileConfig.idColumn] : null;
+  const profileId =
+    profileConfig && profile ? profile[profileConfig.idColumn] : null;
   const fullName = profile?.full_name || account.email;
 
   return {
@@ -108,16 +127,28 @@ async function loginWithAccount(account, password, allowedRoles) {
   const role = normalizeRole(account.role?.role_name);
 
   if (!account || !allowedRoles.includes(role)) {
-    throw new AppError("Incorrect credentials. Please try again.", 401, "INVALID_CREDENTIALS");
+    throw new AppError(
+      "Thông tin đăng nhập không chính xác. Vui lòng thử lại.",
+      401,
+      "INVALID_CREDENTIALS",
+    );
   }
 
   if (String(account.status || "").toLowerCase() !== "active") {
-    throw new AppError("Account is not active.", 403, "ACCOUNT_INACTIVE");
+    throw new AppError(
+      "Tài khoản chưa được kích hoạt.",
+      403,
+      "ACCOUNT_INACTIVE",
+    );
   }
 
   const passwordMatches = await verifyPassword(account, password);
   if (!passwordMatches) {
-    throw new AppError("Incorrect credentials. Please try again.", 401, "INVALID_CREDENTIALS");
+    throw new AppError(
+      "Mật khẩu không chính xác. Vui lòng thử lại.",
+      401,
+      "INVALID_CREDENTIALS",
+    );
   }
 
   return issueAuth(account);
@@ -128,12 +159,18 @@ async function patientLogin({ phone, password }) {
 
   const { data: patient, error } = await supabase
     .from("patient")
-    .select("patient_id, account_id, account(account_id, email, username, password, password_hash, role_id, status, role(role_name))")
+    .select(
+      "patient_id, account_id, account(account_id, email, username, password, password_hash, role_id, status, role(role_name))",
+    )
     .eq("phone", phone)
     .single();
 
   if (error || !patient?.account) {
-    throw new AppError("Phone number not found. Please check and try again.", 404, "PHONE_NOT_FOUND");
+    throw new AppError(
+      "Không tìm thấy số điện thoại. Vui lòng kiểm tra và thử lại.",
+      404,
+      "PHONE_NOT_FOUND",
+    );
   }
 
   return loginWithAccount(patient.account, password, ["patient"]);
@@ -144,26 +181,43 @@ async function staffLogin({ username, password }) {
 
   const { data: account, error } = await supabase
     .from("account")
-    .select("account_id, email, username, password, password_hash, role_id, status, role(role_name)")
+    .select(
+      "account_id, email, username, password, password_hash, role_id, status, role(role_name)",
+    )
     .or(`username.eq.${username},email.eq.${username}`)
     .single();
 
   if (error || !account) {
-    throw new AppError("Incorrect credentials. Please try again.", 401, "INVALID_CREDENTIALS");
+    throw new AppError(
+      "Thông tin đăng nhập không chính xác. Vui lòng thử lại.",
+      401,
+      "INVALID_CREDENTIALS",
+    );
   }
 
-  return loginWithAccount(account, password, ["receptionist", "dentist", "owner", "admin"]);
+  return loginWithAccount(account, password, [
+    "receptionist",
+    "dentist",
+    "owner",
+    "admin",
+  ]);
 }
 
 async function findAccountForIdentifier(identifier) {
   const { data: patient, error: patientError } = await supabase
     .from("patient")
-    .select("phone, account(account_id, email, username, password, password_hash, role_id, status, role(role_name))")
+    .select(
+      "phone, account(account_id, email, username, password, password_hash, role_id, status, role(role_name))",
+    )
     .eq("phone", identifier)
     .maybeSingle();
 
   if (patientError) {
-    throw new AppError(patientError.message, 500, "DB_ERROR");
+    throw new AppError(
+      "Không thể xử lý dữ liệu. Vui lòng thử lại sau.",
+      500,
+      "DB_ERROR",
+    );
   }
 
   if (patient?.account) {
@@ -172,16 +226,26 @@ async function findAccountForIdentifier(identifier) {
 
   const { data: account, error: accountError } = await supabase
     .from("account")
-    .select("account_id, email, username, password, password_hash, role_id, status, role(role_name)")
+    .select(
+      "account_id, email, username, password, password_hash, role_id, status, role(role_name)",
+    )
     .or(`username.eq.${identifier},email.eq.${identifier}`)
     .maybeSingle();
 
   if (accountError) {
-    throw new AppError(accountError.message, 500, "DB_ERROR");
+    throw new AppError(
+      "Không thể xử lý dữ liệu. Vui lòng thử lại sau.",
+      500,
+      "DB_ERROR",
+    );
   }
 
   if (!account) {
-    throw new AppError("Account not found. Please check and try again.", 404, "ACCOUNT_NOT_FOUND");
+    throw new AppError(
+      "Không tìm thấy tài khoản. Vui lòng kiểm tra và thử lại.",
+      404,
+      "ACCOUNT_NOT_FOUND",
+    );
   }
 
   return { account, phone: null };
@@ -191,6 +255,17 @@ async function forgotPassword({ identifier }) {
   ensureSupabase();
 
   const { account, phone } = await findAccountForIdentifier(identifier);
+  const profile = await getProfile(account.role?.role_name, account.account_id);
+  const recipient = phone || profile?.phone;
+
+  if (!recipient) {
+    throw new AppError(
+      "Tài khoản này chưa có số điện thoại để nhận mã OTP.",
+      400,
+      "OTP_PHONE_NOT_FOUND",
+    );
+  }
+
   const otp = generateOtp();
   const otpHash = await hashOtp(otp);
 
@@ -203,11 +278,41 @@ async function forgotPassword({ identifier }) {
   });
 
   if (error) {
-    throw new AppError(error.message, 500, "DB_ERROR");
+    throw new AppError(
+      "Không thể xử lý dữ liệu. Vui lòng thử lại sau.",
+      500,
+      "DB_ERROR",
+    );
+  }
+
+  let otpDelivery = "textbee";
+  let smsResult = null;
+
+  try {
+    smsResult = await textbeeService.sendSms({
+      recipient,
+      message: textbeeTemplates.resetPasswordOtp({ otp }),
+    });
+  } catch (smsError) {
+    otpDelivery = "textbee_failed";
+    logger.error("TextBee OTP delivery failed.", {
+      accountId: account.account_id,
+      error: smsError.message,
+      code: smsError.code,
+    });
+
+    if (process.env.NODE_ENV === "production") {
+      throw new AppError(
+        "Không thể gửi mã OTP ngay bây giờ, hãy thử lại sau.",
+        502,
+        "OTP_DELIVERY_FAILED",
+      );
+    }
   }
 
   return {
-    otpDelivery: "development_stub",
+    otpDelivery,
+    smsMessageId: smsResult?.messageId || smsResult?.id || null,
     devOtp: process.env.NODE_ENV === "production" ? undefined : otp,
   };
 }
@@ -230,7 +335,11 @@ async function getLatestValidOtp(identifier, otp) {
   }
 
   if (!data || !(await compareOtp(otp, data.otp_hash))) {
-    throw new AppError("Invalid OTP. Please try again.", 400, "OTP_INVALID");
+    throw new AppError(
+      "Mã OTP không hợp lệ. Vui lòng thử lại.",
+      400,
+      "OTP_INVALID",
+    );
   }
 
   return { account, otpToken: data };
@@ -254,7 +363,11 @@ async function resetPassword({ identifier, otp, newPassword }) {
     .eq("account_id", account.account_id);
 
   if (updateError) {
-    throw new AppError(updateError.message, 500, "DB_ERROR");
+    throw new AppError(
+      "Không thể cập nhật mật khẩu. Vui lòng thử lại sau.",
+      500,
+      "DB_ERROR",
+    );
   }
 
   const { error: consumeError } = await supabase
@@ -263,7 +376,11 @@ async function resetPassword({ identifier, otp, newPassword }) {
     .eq("otp_id", otpToken.otp_id);
 
   if (consumeError) {
-    throw new AppError(consumeError.message, 500, "DB_ERROR");
+    throw new AppError(
+      "Không thể hoàn tất đặt lại mật khẩu. Vui lòng thử lại sau.",
+      500,
+      "DB_ERROR",
+    );
   }
 
   return { reset: true };
@@ -276,7 +393,11 @@ async function changePassword({ accountId, oldPassword, newPassword }) {
   const passwordMatches = await verifyPassword(account, oldPassword);
 
   if (!passwordMatches) {
-    throw new AppError("Incorrect password. Please try again.", 401, "INVALID_PASSWORD");
+    throw new AppError(
+      "Mật khẩu hiện tại không chính xác. Vui lòng thử lại.",
+      401,
+      "INVALID_PASSWORD",
+    );
   }
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
@@ -286,7 +407,11 @@ async function changePassword({ accountId, oldPassword, newPassword }) {
     .eq("account_id", accountId);
 
   if (error) {
-    throw new AppError(error.message, 500, "DB_ERROR");
+    throw new AppError(
+      "Không thể cập nhật mật khẩu. Vui lòng thử lại sau.",
+      500,
+      "DB_ERROR",
+    );
   }
 
   return { changed: true };
