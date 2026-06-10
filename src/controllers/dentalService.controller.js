@@ -1,23 +1,10 @@
-const supabase = require("../config/supabase");
 const AppError = require("../utils/AppError");
+const dentalServiceService = require("../services/dentalService.service");
 
 async function getAllServices(req, res, next) {
   try {
-    const { data: services, error } = await supabase
-      .from("dental_services")
-      .select(
-        `
-        service_id,
-        category_id,
-        service_name,
-        description,
-        unit_price,
-        slot_occupied,
-        status,
-        service_categories (category_name)
-      `,
-      )
-      .order("service_id", { ascending: true });
+    const { data: services, error } =
+      await dentalServiceService.dbGetAllServices();
 
     if (error) {
       throw new AppError(
@@ -41,11 +28,7 @@ async function deleteService(req, res, next) {
   try {
     const { id } = req.params;
 
-    const { data, error } = await supabase
-      .from("dental_services")
-      .delete()
-      .eq("service_id", id)
-      .select();
+    const { data, error } = await dentalServiceService.dbDeleteService(id);
 
     if (error) {
       throw new AppError(
@@ -74,14 +57,7 @@ async function deleteService(req, res, next) {
 
 async function createService(req, res, next) {
   try {
-    const {
-      service_name,
-      category_id,
-      description,
-      unit_price,
-      slot_occupied,
-      status,
-    } = req.body;
+    const { service_name, category_id, unit_price } = req.body;
 
     if (!service_name || !category_id || !unit_price) {
       throw new AppError(
@@ -91,19 +67,9 @@ async function createService(req, res, next) {
       );
     }
 
-    const { data, error } = await supabase
-      .from("dental_services")
-      .insert([
-        {
-          service_name,
-          category_id,
-          description: description || null,
-          unit_price: Number(unit_price),
-          slot_occupied: Number(slot_occupied) || 1,
-          status: status || "Active",
-        },
-      ])
-      .select();
+    const { data, error } = await dentalServiceService.dbCreateService(
+      req.body,
+    );
 
     if (error) {
       throw new AppError(
@@ -125,10 +91,8 @@ async function createService(req, res, next) {
 
 async function getAllCategories(req, res, next) {
   try {
-    const { data: categories, error } = await supabase
-      .from("service_categories")
-      .select("category_id, category_name, description")
-      .order("category_id", { ascending: true });
+    const { data: categories, error } =
+      await dentalServiceService.dbGetAllCategories();
 
     if (error) {
       throw new AppError(
@@ -168,18 +132,10 @@ async function updateService(req, res, next) {
       );
     }
 
-    const { data, error } = await supabase
-      .from("dental_services")
-      .update({
-        service_name,
-        category_id: Number(category_id),
-        description: description || null,
-        unit_price: Number(unit_price),
-        slot_occupied: Number(slot_occupied) || 1,
-        status: status || "Active",
-      })
-      .eq("service_id", id)
-      .select();
+    const { data, error } = await dentalServiceService.dbUpdateService(
+      id,
+      req.body,
+    );
 
     if (error) {
       throw new AppError(
