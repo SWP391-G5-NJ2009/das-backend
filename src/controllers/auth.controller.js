@@ -24,9 +24,7 @@ async function staffLogin(req, res, next) {
   try {
     const payload = validate(staffLoginSchema, req.body);
     const data = await authService.staffLogin(payload);
-    const token = data.token || data.accessToken;
-    console.log("=== TOKEN OWNER ĐỂ TEST POSTMAN ===");
-    console.log(token);
+    const token = data.token;
     return sendSuccess(res, 200, data, "Login successful. Welcome back!");
   } catch (err) {
     return next(err);

@@ -4,7 +4,7 @@ const authMiddleware = require("../middlewares/auth.middleware");
 const requireRole = require("../middlewares/role.middleware");
 const router = express.Router();
 
-router.post("/consultations", consultationController.createConsultationRequest);
+router.post("/", consultationController.createConsultationRequest);
 router.get(
   "/consultation-requests",
   authMiddleware,
