@@ -1,6 +1,6 @@
-const accountService = require("../services/account.service")
-const { sendSuccess } = require("../utils/response")
-const { validateCreateAccount, validateUpdateAccount } = require("../validators/account.validator");
+const accountService = require("./account.service")
+const { sendSuccess } = require("../../utils/response")
+const { validateCreateAccount, validateUpdateAccount } = require("./account.validator");
 
 
 async function getAllAccounts(req, res, next) {

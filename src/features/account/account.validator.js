@@ -1,5 +1,5 @@
 const Joi = require("joi");
-const { validate } = require("./auth.validator");
+const { validate } = require("../../utils/validation");
 
 const createAccountSchema = Joi.object({
   username: Joi.string().trim().min(2).max(100).required(),

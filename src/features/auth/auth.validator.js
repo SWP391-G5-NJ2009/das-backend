@@ -1,4 +1,5 @@
 const Joi = require("joi");
+const { validate } = require("../../utils/validation");
 
 const patientLoginSchema = Joi.object({
   phone: Joi.string().trim().min(8).max(20).required(),
@@ -35,22 +36,6 @@ const changePasswordSchema = Joi.object({
     .pattern(/^(?=.*[A-Za-z])(?=.*\d).+$/)
     .required(),
 });
-
-function validate(schema, payload) {
-  const { error, value } = schema.validate(payload, {
-    abortEarly: false,
-    stripUnknown: true,
-  });
-
-  if (error) {
-    error.statusCode = 400;
-    error.code = "VALIDATION_ERROR";
-    error.isOperational = true;
-    throw error;
-  }
-
-  return value;
-}
 
 module.exports = {
   changePasswordSchema,

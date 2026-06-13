@@ -1,16 +1,16 @@
 const bcrypt = require("bcryptjs");
-const supabase = require("../config/supabase");
-const textbeeService = require("../integrations/textbee/textbee.service");
-const AppError = require("../utils/AppError");
-const { signJWT } = require("../utils/jwt");
-const logger = require("../utils/logger");
+const authDao = require("./auth.dao");
+const textbeeService = require("../../integrations/textbee/textbee.service");
+const AppError = require("../../utils/AppError");
+const { signJWT } = require("../../utils/jwt");
+const logger = require("../../utils/logger");
 const {
   compareOtp,
   generateOtp,
   getOtpExpiry,
   hashOtp,
-} = require("../utils/otp");
-const normalizeRole = require("../utils/normalizeRole");
+} = require("../../utils/otp");
+const normalizeRole = require("../../utils/normalizeRole");
 
 const ROLE_PROFILE_TABLE = {
   patient: { table: "patient", idColumn: "patient_id" },
@@ -19,16 +19,6 @@ const ROLE_PROFILE_TABLE = {
   owner: { table: "owner", idColumn: "owner_id" },
 };
 
-function ensureSupabase() {
-  if (!supabase) {
-    throw new AppError(
-      "Supabase chưa được cấu hình.",
-      500,
-      "SUPABASE_NOT_CONFIGURED",
-    );
-  }
-}
-
 async function verifyPassword(account, password) {
   const storedPassword = account.password_hash || account.password;
 
@@ -36,26 +26,14 @@ async function verifyPassword(account, password) {
     return false;
   }
 
-  if (storedPassword) {
-    return bcrypt.compare(password, storedPassword);
-  }
-
-  return storedPassword === password;
+  return bcrypt.compare(password, storedPassword);
 }
 
 async function getAccountById(accountId) {
-  ensureSupabase();
-
-  const { data, error } = await supabase
-    .from("account")
-    .select(
-      "account_id, email, username, password, password_hash, role_id, status, role(role_name)",
-    )
-    .eq("account_id", accountId)
-    .single();
+  const { data, error } = await authDao.findAccountById(accountId);
 
   if (error || !data) {
-    throw new AppError("Không tìm thấy tài khoản.", 404, "ACCOUNT_NOT_FOUND");
+    throw new AppError("Account not found.", 404, "ACCOUNT_NOT_FOUND");
   }
 
   return data;
@@ -69,15 +47,14 @@ async function getProfile(role, accountId) {
     return null;
   }
 
-  const { data, error } = await supabase
-    .from(profileConfig.table)
-    .select("*")
-    .eq("account_id", accountId)
-    .maybeSingle();
+  const { data, error } = await authDao.findProfile(
+    profileConfig.table,
+    accountId,
+  );
 
   if (error) {
     throw new AppError(
-      "Không thể xử lý dữ liệu. Vui lòng thử lại sau.",
+      "Unable to process data. Please try again later.",
       500,
       "DB_ERROR",
     );
@@ -116,28 +93,24 @@ async function issueAuth(account) {
 }
 
 async function loginWithAccount(account, password, allowedRoles) {
-  const role = normalizeRole(account.role?.role_name);
+  const role = normalizeRole(account?.role?.role_name);
 
   if (!account || !allowedRoles.includes(role)) {
     throw new AppError(
-      "Thông tin đăng nhập không chính xác. Vui lòng thử lại.",
+      "Invalid credentials. Please try again.",
       401,
       "INVALID_CREDENTIALS",
     );
   }
 
   if (String(account.status || "").toLowerCase() !== "active") {
-    throw new AppError(
-      "Tài khoản chưa được kích hoạt.",
-      403,
-      "ACCOUNT_INACTIVE",
-    );
+    throw new AppError("Account is not active.", 403, "ACCOUNT_INACTIVE");
   }
 
   const passwordMatches = await verifyPassword(account, password);
   if (!passwordMatches) {
     throw new AppError(
-      "Mật khẩu không chính xác. Vui lòng thử lại.",
+      "Invalid credentials. Please try again.",
       401,
       "INVALID_CREDENTIALS",
     );
@@ -147,19 +120,11 @@ async function loginWithAccount(account, password, allowedRoles) {
 }
 
 async function patientLogin({ phone, password }) {
-  ensureSupabase();
-
-  const { data: patient, error } = await supabase
-    .from("patient")
-    .select(
-      "patient_id, account_id, account(account_id, email, username, password, password_hash, role_id, status, role(role_name))",
-    )
-    .eq("phone", phone)
-    .single();
+  const { data: patient, error } = await authDao.findPatientByPhone(phone);
 
   if (error || !patient?.account) {
     throw new AppError(
-      "Không tìm thấy số điện thoại. Vui lòng kiểm tra và thử lại.",
+      "Phone number not found. Please check and try again.",
       404,
       "PHONE_NOT_FOUND",
     );
@@ -169,19 +134,12 @@ async function patientLogin({ phone, password }) {
 }
 
 async function staffLogin({ username, password }) {
-  ensureSupabase();
-
-  const { data: account, error } = await supabase
-    .from("account")
-    .select(
-      "account_id, email, username, password, password_hash, role_id, status, role(role_name)",
-    )
-    .or(`username.eq.${username},email.eq.${username}`)
-    .single();
+  const { data: account, error } =
+    await authDao.findStaffAccountByIdentifier(username);
 
   if (error || !account) {
     throw new AppError(
-      "Thông tin đăng nhập không chính xác. Vui lòng thử lại.",
+      "Invalid credentials. Please try again.",
       401,
       "INVALID_CREDENTIALS",
     );
@@ -196,17 +154,12 @@ async function staffLogin({ username, password }) {
 }
 
 async function findAccountForIdentifier(identifier) {
-  const { data: patient, error: patientError } = await supabase
-    .from("patient")
-    .select(
-      "phone, account(account_id, email, username, password, password_hash, role_id, status, role(role_name))",
-    )
-    .eq("phone", identifier)
-    .maybeSingle();
+  const { data: patient, error: patientError } =
+    await authDao.findPatientAccountByPhone(identifier);
 
   if (patientError) {
     throw new AppError(
-      "Không thể xử lý dữ liệu. Vui lòng thử lại sau.",
+      "Unable to process data. Please try again later.",
       500,
       "DB_ERROR",
     );
@@ -216,17 +169,12 @@ async function findAccountForIdentifier(identifier) {
     return { account: patient.account, phone: patient.phone };
   }
 
-  const { data: account, error: accountError } = await supabase
-    .from("account")
-    .select(
-      "account_id, email, username, password, password_hash, role_id, status, role(role_name)",
-    )
-    .or(`username.eq.${identifier},email.eq.${identifier}`)
-    .maybeSingle();
+  const { data: account, error: accountError } =
+    await authDao.findAccountByIdentifier(identifier);
 
   if (accountError) {
     throw new AppError(
-      "Không thể xử lý dữ liệu. Vui lòng thử lại sau.",
+      "Unable to process data. Please try again later.",
       500,
       "DB_ERROR",
     );
@@ -234,7 +182,7 @@ async function findAccountForIdentifier(identifier) {
 
   if (!account) {
     throw new AppError(
-      "Không tìm thấy tài khoản. Vui lòng kiểm tra và thử lại.",
+      "Account not found. Please check and try again.",
       404,
       "ACCOUNT_NOT_FOUND",
     );
@@ -244,15 +192,13 @@ async function findAccountForIdentifier(identifier) {
 }
 
 async function forgotPassword({ identifier }) {
-  ensureSupabase();
-
   const { account, phone } = await findAccountForIdentifier(identifier);
   const profile = await getProfile(account.role?.role_name, account.account_id);
   const recipient = phone || profile?.phone;
 
   if (!recipient) {
     throw new AppError(
-      "Tài khoản này chưa có số điện thoại để nhận mã OTP.",
+      "This account does not have a phone number for OTP delivery.",
       400,
       "OTP_PHONE_NOT_FOUND",
     );
@@ -261,7 +207,7 @@ async function forgotPassword({ identifier }) {
   const otp = generateOtp();
   const otpHash = await hashOtp(otp);
 
-  const { error } = await supabase.from("otp_tokens").insert({
+  const { error } = await authDao.insertOtpToken({
     account_id: account.account_id,
     phone,
     purpose: "reset_password",
@@ -271,7 +217,7 @@ async function forgotPassword({ identifier }) {
 
   if (error) {
     throw new AppError(
-      "Không thể xử lý dữ liệu. Vui lòng thử lại sau.",
+      "Unable to process data. Please try again later.",
       500,
       "DB_ERROR",
     );
@@ -295,7 +241,7 @@ async function forgotPassword({ identifier }) {
 
     if (process.env.NODE_ENV === "production") {
       throw new AppError(
-        "Không thể gửi mã OTP ngay bây giờ, hãy thử lại sau.",
+        "Unable to send OTP right now. Please try again later.",
         502,
         "OTP_DELIVERY_FAILED",
       );
@@ -311,65 +257,50 @@ async function forgotPassword({ identifier }) {
 
 async function getLatestValidOtp(identifier, otp) {
   const { account } = await findAccountForIdentifier(identifier);
-  const { data, error } = await supabase
-    .from("otp_tokens")
-    .select("*")
-    .eq("account_id", account.account_id)
-    .eq("purpose", "reset_password")
-    .is("consumed_at", null)
-    .gt("expires_at", new Date().toISOString())
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const { data, error } = await authDao.findLatestResetPasswordOtp(
+    account.account_id,
+  );
 
   if (error) {
     throw new AppError(error.message, 500, "DB_ERROR");
   }
 
   if (!data || !(await compareOtp(otp, data.otp_hash))) {
-    throw new AppError(
-      "Mã OTP không hợp lệ. Vui lòng thử lại.",
-      400,
-      "OTP_INVALID",
-    );
+    throw new AppError("Invalid OTP. Please try again.", 400, "OTP_INVALID");
   }
 
   return { account, otpToken: data };
 }
 
 async function verifyOtp({ identifier, otp }) {
-  ensureSupabase();
   await getLatestValidOtp(identifier, otp);
   return { verified: true };
 }
 
 async function resetPassword({ identifier, otp, newPassword }) {
-  ensureSupabase();
-
   const { account, otpToken } = await getLatestValidOtp(identifier, otp);
   const passwordHash = await bcrypt.hash(newPassword, 10);
 
-  const { error: updateError } = await supabase
-    .from("account")
-    .update({ password_hash: passwordHash, password: passwordHash })
-    .eq("account_id", account.account_id);
+  const { error: updateError } = await authDao.updateAccountPassword(
+    account.account_id,
+    passwordHash,
+  );
 
   if (updateError) {
     throw new AppError(
-      "Không thể cập nhật mật khẩu. Vui lòng thử lại sau.",
+      "Unable to update password. Please try again later.",
       500,
       "DB_ERROR",
     );
   }
 
-  const { error: consumeError } = await supabase
-    .from("otp_tokens")
-    .update({ consumed_at: new Date().toISOString() })
-    .eq("otp_id", otpToken.otp_id);
+  const { error: consumeError } = await authDao.consumeOtpToken(
+    otpToken.otp_id,
+  );
 
   if (consumeError) {
     throw new AppError(
-      "Không thể hoàn tất đặt lại mật khẩu. Vui lòng thử lại sau.",
+      "Unable to complete password reset. Please try again later.",
       500,
       "DB_ERROR",
     );
@@ -379,28 +310,23 @@ async function resetPassword({ identifier, otp, newPassword }) {
 }
 
 async function changePassword({ accountId, oldPassword, newPassword }) {
-  ensureSupabase();
-
   const account = await getAccountById(accountId);
   const passwordMatches = await verifyPassword(account, oldPassword);
 
   if (!passwordMatches) {
     throw new AppError(
-      "Mật khẩu hiện tại không chính xác. Vui lòng thử lại.",
+      "Current password is incorrect. Please try again.",
       401,
       "INVALID_PASSWORD",
     );
   }
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  const { error } = await supabase
-    .from("account")
-    .update({ password_hash: passwordHash, password: passwordHash })
-    .eq("account_id", accountId);
+  const { error } = await authDao.updateAccountPassword(accountId, passwordHash);
 
   if (error) {
     throw new AppError(
-      "Không thể cập nhật mật khẩu. Vui lòng thử lại sau.",
+      "Unable to update password. Please try again later.",
       500,
       "DB_ERROR",
     );

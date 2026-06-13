@@ -2,12 +2,11 @@ require("dotenv").config();
 
 const cors = require("cors");
 const express = require("express");
-const adminRoutes = require("./routes/admin.route");
-const authRoutes = require("./routes/auth.route");
-const consultationRoutes = require("./routes/consultation.route");
-const dentalServiceRoutes = require("./routes/dentalService.route");
-const paymentRoutes = require("./routes/payment.routes");
-const receptionistRoutes = require("./routes/receptionist.route");
+const accountRoutes = require("./features/account/account.routes");
+const authRoutes = require("./features/auth/auth.routes");
+const consultationRoutes = require("./features/consultation/consultation.routes");
+const dentalServiceRoutes = require("./features/dentalService/dentalService.routes");
+const paymentRoutes = require("./features/payment/payment.routes");
 const {
   errorMiddleware,
   notFoundMiddleware,
@@ -35,10 +34,9 @@ app.get("/api/health", (req, res) =>
 
 app.use("/api/consultations", consultationRoutes);
 app.use("/api/services", dentalServiceRoutes);
-app.use("/api/admin", adminRoutes);
+app.use("/api/admin", accountRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/payments", paymentRoutes);
-app.use("/api/receptionist", receptionistRoutes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);

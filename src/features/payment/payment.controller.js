@@ -1,6 +1,5 @@
-// das-backend/src/controllers/payment.controller.js
-const paymentService = require("../services/payment.service");
-const { sendSuccess } = require("../utils/response");
+const paymentService = require("./payment.service");
+const { sendSuccess } = require("../../utils/response");
 
 async function getAllPayments(req, res, next) {
   try {

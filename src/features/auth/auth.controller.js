@@ -1,5 +1,5 @@
-const authService = require("../services/auth.service");
-const { sendSuccess } = require("../utils/response");
+const authService = require("./auth.service");
+const { sendSuccess } = require("../../utils/response");
 const {
   changePasswordSchema,
   forgotPasswordSchema,
@@ -8,7 +8,7 @@ const {
   staffLoginSchema,
   validate,
   verifyOtpSchema,
-} = require("../validators/auth.validator");
+} = require("./auth.validator");
 
 async function patientLogin(req, res, next) {
   try {
@@ -24,7 +24,6 @@ async function staffLogin(req, res, next) {
   try {
     const payload = validate(staffLoginSchema, req.body);
     const data = await authService.staffLogin(payload);
-    const token = data.token;
     return sendSuccess(res, 200, data, "Login successful. Welcome back!");
   } catch (err) {
     return next(err);
