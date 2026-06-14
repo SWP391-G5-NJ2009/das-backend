@@ -66,10 +66,32 @@ async function updateService(id, payload) {
     .select();
 }
 
+async function findDentistsByServiceId(serviceId) {
+  ensureSupabase();
+
+  return supabase
+    .from("dentist_services")
+    .select(
+      `
+      dentist:dentist_id (
+        dentist_id,
+        speciality,
+        experience,
+        account:account_id (
+          username,
+          email
+        )
+      )
+    `,
+    )
+    .eq("service_id", serviceId);
+}
+
 module.exports = {
   deleteService,
   findAllCategories,
   findAllServices,
+  findDentistsByServiceId,
   insertService,
   updateService,
 };

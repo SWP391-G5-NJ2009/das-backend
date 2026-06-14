@@ -110,10 +110,34 @@ async function updateService(id, payload) {
   return data[0];
 }
 
+async function getDentistsByServiceId(serviceId) {
+  const { data, error } = await dentalServiceDao.findDentistsByServiceId(serviceId);
+
+  if (error) {
+    throw new AppError(
+      "Failed to load dentists for this service.",
+      500,
+      "DB_ERROR",
+    );
+  }
+
+  // Flatten join: [{ dentist: { dentist_id, speciality, account: { username } } }]
+  return (data || [])
+    .map((row) => row.dentist)
+    .filter(Boolean)
+    .map((d) => ({
+      dentist_id: d.dentist_id,
+      full_name: d.account?.username || d.account?.email || `Dentist #${d.dentist_id}`,
+      specialization: d.speciality || "",
+      experience: d.experience || "",
+    }));
+}
+
 module.exports = {
   createService,
   deleteService,
   getAllCategories,
   getAllServices,
+  getDentistsByServiceId,
   updateService,
 };

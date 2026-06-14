@@ -5,6 +5,8 @@ const authMiddleware = require("../../middlewares/auth.middleware");
 const requireRole = require("../../middlewares/role.middleware");
 
 router.get("/", dentalServiceController.getAllServices);
+router.get("/categories", dentalServiceController.getAllCategories);
+router.get("/:id/dentists", dentalServiceController.getDentistsByService);
 router.delete(
   "/:id",
   authMiddleware,

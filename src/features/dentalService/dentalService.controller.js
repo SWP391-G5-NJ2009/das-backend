@@ -56,10 +56,21 @@ async function updateService(req, res, next) {
   }
 }
 
+async function getDentistsByService(req, res, next) {
+  try {
+    const { id } = req.params;
+    const dentists = await dentalServiceService.getDentistsByServiceId(id);
+    return sendSuccess(res, 200, dentists, "Dentists retrieved successfully.");
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   createService,
   deleteService,
   getAllCategories,
   getAllServices,
+  getDentistsByService,
   updateService,
 };
