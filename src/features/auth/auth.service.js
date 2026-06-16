@@ -69,6 +69,7 @@ function createAuthPayload(account, profile) {
   const profileId =
     profileConfig && profile ? profile[profileConfig.idColumn] : null;
   const fullName = profile?.full_name || account.email;
+  const phone = profile?.phone || null;
 
   return {
     accountId: account.account_id,
@@ -77,6 +78,7 @@ function createAuthPayload(account, profile) {
     role,
     profileId,
     fullName,
+    phone,
   };
 }
 
