@@ -7,6 +7,7 @@ const authRoutes = require("./features/auth/auth.routes");
 const consultationRoutes = require("./features/consultation/consultation.routes");
 const dentalServiceRoutes = require("./features/dentalService/dentalService.routes");
 const paymentRoutes = require("./features/payment/payment.routes");
+const appointmentRoutes = require("./features/appointment/appointment.routes");
 const {
   errorMiddleware,
   notFoundMiddleware,
@@ -20,7 +21,7 @@ app.use(
   cors({
     origin: "http://localhost:5173",
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
@@ -37,6 +38,7 @@ app.use("/api/services", dentalServiceRoutes);
 app.use("/api/admin", accountRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/appointments", appointmentRoutes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
