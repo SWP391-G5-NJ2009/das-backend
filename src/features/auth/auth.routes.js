@@ -8,6 +8,7 @@ const router = express.Router();
 router.post("/patient/login", authController.patientLogin);
 router.post("/staff/login", authController.staffLogin);
 router.post("/forgot-password", authController.forgotPassword);
+router.post("/forgot-password/staff", authController.staffForgotPassword);
 router.post("/verify-otp", authController.verifyOtp);
 router.post("/reset-password", authController.resetPassword);
 

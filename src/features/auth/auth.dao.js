@@ -12,7 +12,7 @@ function ensureSupabase() {
 }
 
 function accountSelect() {
-  return "account_id, email, username, password, password_hash, role_id, status, role(role_name)";
+  return "account_id, email, username, phone, password, password_hash, role_id, status, role(role_name)";
 }
 
 async function findAccountById(accountId) {
@@ -63,6 +63,16 @@ async function findStaffAccountByIdentifier(identifier) {
     .select(accountSelect())
     .or(`username.eq.${identifier},email.eq.${identifier}`)
     .single();
+}
+
+async function findStaffAccountByUsername(username) {
+  ensureSupabase();
+
+  return supabase
+    .from("account")
+    .select(accountSelect())
+    .ilike("username", username)
+    .maybeSingle();
 }
 
 async function findAccountByIdentifier(identifier) {
@@ -122,6 +132,7 @@ module.exports = {
   findPatientAccountByPhone,
   findPatientByPhone,
   findProfile,
+  findStaffAccountByUsername,
   findStaffAccountByIdentifier,
   insertOtpToken,
   updateAccountPassword,

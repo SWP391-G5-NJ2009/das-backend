@@ -19,6 +19,8 @@ const ROLE_PROFILE_TABLE = {
   owner: { table: "owner", idColumn: "owner_id" },
 };
 
+const STAFF_ROLES = ["receptionist", "dentist", "owner", "admin"];
+
 async function verifyPassword(account, password) {
   const storedPassword = account.password_hash || account.password;
 
@@ -193,11 +195,7 @@ async function findAccountForIdentifier(identifier) {
   return { account, phone: null };
 }
 
-async function forgotPassword({ identifier }) {
-  const { account, phone } = await findAccountForIdentifier(identifier);
-  const profile = await getProfile(account.role?.role_name, account.account_id);
-  const recipient = phone || profile?.phone;
-
+async function createPasswordResetOtp({ account, recipient }) {
   if (!recipient) {
     throw new AppError(
       "This account does not have a phone number for OTP delivery.",
@@ -211,7 +209,7 @@ async function forgotPassword({ identifier }) {
 
   const { error } = await authDao.insertOtpToken({
     account_id: account.account_id,
-    phone,
+    phone: recipient,
     purpose: "reset_password",
     otp_hash: otpHash,
     expires_at: getOtpExpiry(),
@@ -251,14 +249,62 @@ async function forgotPassword({ identifier }) {
   }
 
   return {
+    accountId: account.account_id,
     otpDelivery,
     smsMessageId: smsResult?.messageId || smsResult?.id || null,
     devOtp: process.env.NODE_ENV === "production" ? undefined : otp,
   };
 }
 
-async function getLatestValidOtp(identifier, otp) {
-  const { account } = await findAccountForIdentifier(identifier);
+async function forgotPassword({ identifier }) {
+  const { account, phone } = await findAccountForIdentifier(identifier);
+  const profile = await getProfile(account.role?.role_name, account.account_id);
+  const recipient = phone || account.phone || profile?.phone;
+
+  return createPasswordResetOtp({ account, recipient });
+}
+
+async function staffForgotPassword({ username }) {
+  const normalizedUsername = username.trim().toLowerCase();
+  const { data: account, error } =
+    await authDao.findStaffAccountByUsername(normalizedUsername);
+
+  if (error) {
+    const errorMessage = `${error.message || ""} ${error.details || ""}`;
+    const isDuplicateLookup = errorMessage.toLowerCase().includes("multiple");
+
+    throw new AppError(
+      isDuplicateLookup
+        ? "Staff username lookup is not unique. Please contact an administrator."
+        : "Unable to process data. Please try again later.",
+      500,
+      isDuplicateLookup ? "USERNAME_NOT_UNIQUE" : "DB_ERROR",
+    );
+  }
+
+  const role = normalizeRole(account?.role?.role_name);
+  if (
+    !account ||
+    !STAFF_ROLES.includes(role) ||
+    String(account.username || "").toLowerCase() !== normalizedUsername
+  ) {
+    throw new AppError(
+      "Account not found. Please check and try again.",
+      404,
+      "ACCOUNT_NOT_FOUND",
+    );
+  }
+
+  return createPasswordResetOtp({
+    account,
+    recipient: account.phone,
+  });
+}
+
+async function getLatestValidOtp({ accountId, identifier, otp }) {
+  const account = accountId
+    ? await getAccountById(accountId)
+    : (await findAccountForIdentifier(identifier)).account;
   const { data, error } = await authDao.findLatestResetPasswordOtp(
     account.account_id,
   );
@@ -274,13 +320,17 @@ async function getLatestValidOtp(identifier, otp) {
   return { account, otpToken: data };
 }
 
-async function verifyOtp({ identifier, otp }) {
-  await getLatestValidOtp(identifier, otp);
+async function verifyOtp({ accountId, identifier, otp }) {
+  await getLatestValidOtp({ accountId, identifier, otp });
   return { verified: true };
 }
 
-async function resetPassword({ identifier, otp, newPassword }) {
-  const { account, otpToken } = await getLatestValidOtp(identifier, otp);
+async function resetPassword({ accountId, identifier, otp, newPassword }) {
+  const { account, otpToken } = await getLatestValidOtp({
+    accountId,
+    identifier,
+    otp,
+  });
   const passwordHash = await bcrypt.hash(newPassword, 10);
 
   const { error: updateError } = await authDao.updateAccountPassword(
@@ -343,5 +393,6 @@ module.exports = {
   patientLogin,
   resetPassword,
   staffLogin,
+  staffForgotPassword,
   verifyOtp,
 };
