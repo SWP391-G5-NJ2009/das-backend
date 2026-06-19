@@ -11,6 +11,8 @@ async function getMyAppointments(req, res, next) {
     const filters = {
       status: req.query.status || null,
       date: req.query.date || null,
+      month: req.query.month || null,
+      year: req.query.year || null,
       search: req.query.search || null,
     };
     const data = await appointmentService.getMyAppointments(patientId, filters);
@@ -29,6 +31,8 @@ async function getAllAppointments(req, res, next) {
     const filters = {
       status: req.query.status || null,
       date: req.query.date || null,
+      month: req.query.month || null,
+      year: req.query.year || null,
       search: req.query.search || null,
     };
     const data = await appointmentService.getAll(filters);

@@ -61,8 +61,15 @@ function normalize(row) {
 function applyClientFilters(list, filters) {
   let result = list;
 
+  // Exact day takes priority; otherwise fall through to month, then year
   if (filters.date) {
     result = result.filter((a) => a.scheduledDate === filters.date);
+  } else if (filters.month) {
+    // filters.month is "YYYY-MM"
+    result = result.filter((a) => a.scheduledDate?.startsWith(filters.month));
+  } else if (filters.year) {
+    // filters.year is "YYYY"
+    result = result.filter((a) => a.scheduledDate?.startsWith(filters.year));
   }
 
   if (filters.search) {
