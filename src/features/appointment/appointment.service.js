@@ -2,6 +2,54 @@ const appointmentDao = require("./appointment.dao");
 const AppError = require("../../utils/AppError");
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   bookAppointment — Patient or Receptionist creates a new appointment
+───────────────────────────────────────────────────────────────────────────── */
+async function bookAppointment({ patientId, slotId, serviceId, note, actorAccountId }) {
+  // Step 1: Atomic slot claim — guards against concurrent bookings
+  const claimedSlot = await appointmentDao.markSlotUnavailable(slotId);
+  if (!claimedSlot) {
+    throw new AppError(
+      "This time slot has just been booked by another user. Please select a different slot.",
+      409,
+      "SLOT_TAKEN",
+    );
+  }
+
+  // Step 2: Create appointment record
+  const appointment = await appointmentDao.createAppointment({
+    patient_id: patientId,
+    slot_id: slotId,
+    status: "Waiting",
+    note: note || null,
+    book_time: new Date().toISOString(),
+  });
+
+  // Step 3: Look up service price then link service to the appointment
+  const actualPrice = await appointmentDao.getServicePrice(serviceId);
+  await appointmentDao.insertAppointmentServices([
+    { appt_id: appointment.appt_id, service_id: serviceId, actual_price: actualPrice },
+  ]);
+
+  // Step 4: Log to history (non-blocking — failure never rejects the booking)
+  // TODO: trigger SMS/Email notification here (to be implemented by another dev)
+  Promise.allSettled([
+    appointmentDao.insertHistory({
+      appt_id: appointment.appt_id,
+      action_type: "Booked",
+      actor_account_id: actorAccountId,
+      reason: null,
+      created_at: new Date().toISOString(),
+    }),
+  ]).then((results) => {
+    results.forEach(
+      (r) => r.status === "rejected" && console.error("[booking]", r.reason),
+    );
+  });
+
+  return appointment;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    Shape normalizer — maps raw Supabase joined row → clean frontend-ready object.
    Field names mirror the mock data shape used in the frontend hook.
 ───────────────────────────────────────────────────────────────────────────── */
@@ -147,6 +195,7 @@ async function cancelAppointment(apptId, actorAccountId, reason, role, patientId
 }
 
 module.exports = {
+  bookAppointment,
   cancelAppointment,
   getAll,
   getMyAppointments,

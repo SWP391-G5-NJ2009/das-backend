@@ -23,7 +23,7 @@ const APPOINTMENT_SELECT = `
   book_time,
   work_slot:slot_id (
     slot_id,
-    slot_config:slot_config_id (
+    time_slot_config:slot_config_id (
       start_time,
       end_time
     ),
@@ -172,9 +172,89 @@ async function cancelById(apptId, actorAccountId, reason) {
   return data;
 }
 
+/**
+ * Atomically claim a work_slot: set is_available = false only if currently true.
+ * Returns the updated slot row, or null if the slot was already taken.
+ */
+async function markSlotUnavailable(slotId) {
+  ensureSupabase();
+
+  const { data, error } = await supabase
+    .from("work_slot")
+    .update({ is_available: false })
+    .eq("slot_id", slotId)
+    .eq("is_available", true) // atomic guard — only succeeds if still available
+    .select("slot_id")
+    .maybeSingle();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return data; // null means slot was already taken
+}
+
+/**
+ * Insert a new appointment row.
+ */
+async function createAppointment(payload) {
+  ensureSupabase();
+
+  const { data, error } = await supabase
+    .from("appointment")
+    .insert(payload)
+    .select("appt_id, status, book_time, note, total_estimated_amount")
+    .single();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return data;
+}
+
+/**
+ * Insert rows into appointment_service (one per service selected).
+ */
+async function insertAppointmentServices(rows) {
+  ensureSupabase();
+
+  const { error } = await supabase.from("appointment_service").insert(rows);
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+}
+
+/**
+ * Insert a row into appointment_history (best-effort, non-blocking).
+ */
+async function insertHistory(row) {
+  ensureSupabase();
+
+  const { error } = await supabase.from("appointment_history").insert(row);
+  if (error) {
+    console.error("[appointment.dao] history insert failed:", error.message);
+  }
+}
+
+/**
+ * Fetch the price of a dental service by its ID.
+ * Used to populate actual_price in appointment_service.
+ */
+async function getServicePrice(serviceId) {
+  ensureSupabase();
+
+  const { data, error } = await supabase
+    .from("dental_services")
+    .select("unit_price")
+    .eq("service_id", serviceId)
+    .single();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  if (!data) throw new AppError("Service not found.", 404, "NOT_FOUND");
+  return data.unit_price;
+}
+
 module.exports = {
   cancelById,
+  createAppointment,
   findAll,
   findById,
   findByPatientId,
+  getServicePrice,
+  insertAppointmentServices,
+  insertHistory,
+  markSlotUnavailable,
 };

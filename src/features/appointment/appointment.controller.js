@@ -65,7 +65,39 @@ async function cancelAppointment(req, res, next) {
   }
 }
 
+/**
+ * POST /api/appointments
+ * Patient or Receptionist: create a new appointment.
+ */
+async function bookAppointment(req, res, next) {
+  try {
+    const { slotId, serviceId, note, patientId: bodyPatientId } = req.body;
+    const { role, profileId, id: actorAccountId } = req.user;
+
+    // Patient always books for themselves; receptionist supplies patientId in body
+    const patientId = role === "patient" ? profileId : bodyPatientId;
+
+    if (!patientId) {
+      return next(
+        new (require("../../utils/AppError"))("patientId is required.", 400, "VALIDATION_ERROR"),
+      );
+    }
+
+    const data = await appointmentService.bookAppointment({
+      patientId: Number(patientId),
+      slotId: Number(slotId),
+      serviceId: Number(serviceId),
+      note,
+      actorAccountId,
+    });
+    return sendSuccess(res, 201, data, "Appointment booked successfully.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
+  bookAppointment,
   cancelAppointment,
   getAllAppointments,
   getMyAppointments,
