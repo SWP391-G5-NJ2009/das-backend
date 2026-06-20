@@ -54,7 +54,7 @@ async function bookAppointment({ patientId, slotId, serviceId, note, actorAccoun
    Field names mirror the mock data shape used in the frontend hook.
 ───────────────────────────────────────────────────────────────────────────── */
 function normalize(row) {
-  const slotConfig = row.work_slot?.slot_config;
+  const slotConfig = row.work_slot?.time_slot_config;
   const schedule = row.work_slot?.schedules;
   const dentist = schedule?.dentist;
 
@@ -79,7 +79,12 @@ function normalize(row) {
       serviceId: as.dental_service?.service_id,
       serviceName: as.dental_service?.service_name,
       actualPrice: as.actual_price,
+      slotOccupied: as.dental_service?.slot_occupied ?? 1,
     })),
+    slotOccupied: (row.appointment_service || []).reduce(
+      (sum, as) => sum + (as.dental_service?.slot_occupied ?? 1),
+      0,
+    ),
     dentistName: dentist ? `BS. ${dentist.account?.username || dentist.account?.email || "?"}` : null,
     dentistId: dentist?.dentist_id || null,
     dentistSpeciality: dentist?.speciality || null,
