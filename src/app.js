@@ -8,6 +8,7 @@ const consultationRoutes = require("./features/consultation/consultation.routes"
 const dentalServiceRoutes = require("./features/dentalService/dentalService.routes");
 const paymentRoutes = require("./features/payment/payment.routes");
 const appointmentRoutes = require("./features/appointment/appointment.routes");
+const patientRoutes = require("./features/patient/patient.routes");
 const {
   errorMiddleware,
   notFoundMiddleware,
@@ -39,6 +40,7 @@ app.use("/api/admin", accountRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/appointments", appointmentRoutes);
+app.use("/api/patients", patientRoutes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
