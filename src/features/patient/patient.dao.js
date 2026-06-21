@@ -24,4 +24,21 @@ async function searchPatients(q) {
   return data || [];
 }
 
-module.exports = { searchPatients };
+/**
+ * Create a new patient record (walk-in; no account needed).
+ * Only full_name and phone are required.
+ */
+async function createPatient({ fullName, phone }) {
+  ensureSupabase();
+
+  const { data, error } = await supabase
+    .from("patient")
+    .insert({ full_name: fullName, phone })
+    .select("patient_id, full_name, phone")
+    .single();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return data;
+}
+
+module.exports = { createPatient, searchPatients };

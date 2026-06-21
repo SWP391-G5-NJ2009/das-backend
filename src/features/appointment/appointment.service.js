@@ -1,10 +1,21 @@
 const appointmentDao = require("./appointment.dao");
+const patientDao = require("../patient/patient.dao");
 const AppError = require("../../utils/AppError");
 
 /* ─────────────────────────────────────────────────────────────────────────────
    bookAppointment — Patient or Receptionist creates a new appointment
 ───────────────────────────────────────────────────────────────────────────── */
-async function bookAppointment({ patientId, slotId, serviceId, note, actorAccountId, actorRole }) {
+async function bookAppointment({ patientId, newPatient, slotId, serviceId, note, actorAccountId, actorRole }) {
+  // ── Walk-in patient: create patient record on the fly ────────────────────
+  let resolvedPatientId = patientId;
+  if (!resolvedPatientId && newPatient) {
+    const created = await patientDao.createPatient(newPatient);
+    resolvedPatientId = created.patient_id;
+  }
+  if (!resolvedPatientId) {
+    throw new AppError("Patient ID could not be resolved.", 400, "VALIDATION_ERROR");
+  }
+
   // ── BR-14: Validate slot timing before attempting to claim it ────────────
   const slotInfo = await appointmentDao.findSlotInfo(slotId);
   if (!slotInfo) {
@@ -52,7 +63,7 @@ async function bookAppointment({ patientId, slotId, serviceId, note, actorAccoun
 
   // Step 2: Create appointment record
   const appointment = await appointmentDao.createAppointment({
-    patient_id: patientId,
+    patient_id: resolvedPatientId,
     slot_id: slotId,
     status: "Confirmed",
     note: note || null,

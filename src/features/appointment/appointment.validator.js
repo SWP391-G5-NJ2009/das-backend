@@ -19,13 +19,15 @@ const bookAppointmentSchema = Joi.object({
     "number.positive": "serviceId must be a positive number.",
     "any.required": "serviceId is required.",
   }),
-  // patientId is only required when sent by a receptionist;
-  // the controller resolves the actual patientId based on role.
-  patientId: Joi.number().integer().positive().allow(null).optional().messages({
-    "number.base": "patientId must be a number.",
-    "number.integer": "patientId must be an integer.",
-    "number.positive": "patientId must be a positive number.",
-  }),
+  // For receptionist booking an EXISTING patient
+  patientId: Joi.number().integer().positive().allow(null).optional(),
+  // For receptionist booking a WALK-IN patient (not yet in the system)
+  newPatient: Joi.object({
+    fullName: Joi.string().trim().min(2).max(100).required(),
+    phone: Joi.string().trim().pattern(/^[0-9]{9,11}$/).required().messages({
+      "string.pattern.base": "Phone must be 9–11 digits.",
+    }),
+  }).optional(),
   note: Joi.string().trim().max(2000).allow("", null).optional(),
 });
 
