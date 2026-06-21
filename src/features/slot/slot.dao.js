@@ -8,23 +8,25 @@ function ensureSupabase() {
 }
 
 /**
- * Fetch available work_slots for a specific dentist on a given date.
+ * Fetch work_slots for a specific dentist on a given date.
+ * Returns ALL slots (Available, Booked, Unavailable) so the UI can
+ * show unavailable ones greyed-out.
+ *
  * Joins: work_slot → schedules (by schedule_id) → time_slot_config (by slot_config_id)
  *
  * @param {number} dentistId
  * @param {string} date - ISO date string "YYYY-MM-DD"
  */
-async function findAvailableSlots(dentistId, date) {
+async function findSlotsByDentistAndDate(dentistId, date) {
   ensureSupabase();
 
   // Use `!inner` on both joined tables so PostgREST performs an INNER JOIN
   // and correctly applies the embedded filters (work_date, dentist_id).
-  // Without `!inner`, .eq() on related table columns is silently ignored.
   const { data, error } = await supabase
     .from("work_slot")
     .select(`
       slot_id,
-      is_available,
+      status,
       time_slot_config:slot_config_id!inner (
         slot_config_id,
         start_time,
@@ -36,7 +38,6 @@ async function findAvailableSlots(dentistId, date) {
         dentist_id
       )
     `)
-    // Return ALL slots (available + booked) so the UI can show booked ones as grayed-out
     .eq("schedules.work_date", date)
     .eq("schedules.dentist_id", dentistId);
 
@@ -44,4 +45,4 @@ async function findAvailableSlots(dentistId, date) {
   return data || [];
 }
 
-module.exports = { findAvailableSlots };
+module.exports = { findSlotsByDentistAndDate };

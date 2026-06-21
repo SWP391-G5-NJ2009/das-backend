@@ -173,22 +173,40 @@ async function cancelById(apptId, actorAccountId, reason) {
 }
 
 /**
- * Atomically claim a work_slot: set is_available = false only if currently true.
- * Returns the updated slot row, or null if the slot was already taken.
+ * Atomically claim a work_slot: set status = 'Booked' only if currently 'Available'.
+ * Returns the updated slot row, or null if the slot was already taken/unavailable.
  */
-async function markSlotUnavailable(slotId) {
+async function markSlotBooked(slotId) {
   ensureSupabase();
 
   const { data, error } = await supabase
     .from("work_slot")
-    .update({ is_available: false })
+    .update({ status: "Booked" })
     .eq("slot_id", slotId)
-    .eq("is_available", true) // atomic guard — only succeeds if still available
+    .eq("status", "Available") // atomic guard — only succeeds if still Available
     .select("slot_id")
     .maybeSingle();
 
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
-  return data; // null means slot was already taken
+  return data; // null means slot was already taken or unavailable
+}
+
+/**
+ * Release a work_slot back to 'Available' when an appointment is cancelled.
+ * Only transitions from 'Booked' → 'Available' (leaves 'Unavailable' slots untouched).
+ */
+async function releaseSlot(slotId) {
+  ensureSupabase();
+
+  const { error } = await supabase
+    .from("work_slot")
+    .update({ status: "Available" })
+    .eq("slot_id", slotId)
+    .eq("status", "Booked"); // only release if currently Booked
+
+  if (error) {
+    console.error("[appointment.dao] releaseSlot failed:", error.message);
+  }
 }
 
 /**
@@ -256,5 +274,6 @@ module.exports = {
   getServicePrice,
   insertAppointmentServices,
   insertHistory,
-  markSlotUnavailable,
+  markSlotBooked,
+  releaseSlot,
 };

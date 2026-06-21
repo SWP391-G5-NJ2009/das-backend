@@ -6,7 +6,7 @@ const AppError = require("../../utils/AppError");
 ───────────────────────────────────────────────────────────────────────────── */
 async function bookAppointment({ patientId, slotId, serviceId, note, actorAccountId }) {
   // Step 1: Atomic slot claim — guards against concurrent bookings
-  const claimedSlot = await appointmentDao.markSlotUnavailable(slotId);
+  const claimedSlot = await appointmentDao.markSlotBooked(slotId);
   if (!claimedSlot) {
     throw new AppError(
       "This time slot has just been booked by another user. Please select a different slot.",
@@ -196,7 +196,17 @@ async function cancelAppointment(apptId, actorAccountId, reason, role, patientId
     );
   }
 
-  return appointmentDao.cancelById(apptId, actorAccountId, reason);
+  const cancelled = await appointmentDao.cancelById(apptId, actorAccountId, reason);
+
+  // Release the slot back to Available (non-blocking — failure is logged, not thrown)
+  const slotId = existing.work_slot?.slot_id;
+  if (slotId) {
+    appointmentDao.releaseSlot(slotId).catch((err) =>
+      console.error("[appointment.service] releaseSlot failed:", err.message),
+    );
+  }
+
+  return cancelled;
 }
 
 module.exports = {
