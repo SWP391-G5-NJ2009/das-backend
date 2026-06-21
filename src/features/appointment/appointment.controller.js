@@ -1,5 +1,9 @@
 const appointmentService = require("./appointment.service");
 const { sendSuccess } = require("../../utils/response");
+const {
+  validateBookAppointment,
+  validateCancelAppointment,
+} = require("./appointment.validator");
 
 /**
  * GET /api/appointments/my
@@ -49,7 +53,7 @@ async function getAllAppointments(req, res, next) {
 async function cancelAppointment(req, res, next) {
   try {
     const apptId = parseInt(req.params.id, 10);
-    const { reason } = req.body;
+    const { reason } = validateCancelAppointment(req.body);
     const { id: actorAccountId, role, profileId } = req.user;
 
     const data = await appointmentService.cancelAppointment(
@@ -71,7 +75,8 @@ async function cancelAppointment(req, res, next) {
  */
 async function bookAppointment(req, res, next) {
   try {
-    const { slotId, serviceId, note, patientId: bodyPatientId } = req.body;
+    const { slotId, serviceId, note, patientId: bodyPatientId } =
+      validateBookAppointment(req.body);
     const { role, profileId, id: actorAccountId } = req.user;
 
     // Patient always books for themselves; receptionist supplies patientId in body
@@ -79,7 +84,7 @@ async function bookAppointment(req, res, next) {
 
     if (!patientId) {
       return next(
-        new (require("../../utils/AppError"))("patientId is required.", 400, "VALIDATION_ERROR"),
+        new (require("../../utils/AppError"))("patientId is required for receptionist bookings.", 400, "VALIDATION_ERROR"),
       );
     }
 
@@ -89,6 +94,7 @@ async function bookAppointment(req, res, next) {
       serviceId: Number(serviceId),
       note,
       actorAccountId,
+      actorRole: role,
     });
     return sendSuccess(res, 201, data, "Appointment booked successfully.");
   } catch (err) {

@@ -210,6 +210,27 @@ async function releaseSlot(slotId) {
 }
 
 /**
+ * Fetch the date and start time of a slot — used for BR-14 timing validation.
+ * Returns { work_date: "YYYY-MM-DD", start_time: "HH:MM:SS" } or null.
+ */
+async function findSlotInfo(slotId) {
+  ensureSupabase();
+
+  const { data, error } = await supabase
+    .from("work_slot")
+    .select(`
+      slot_id,
+      time_slot_config:slot_config_id (start_time),
+      schedules:schedule_id (work_date)
+    `)
+    .eq("slot_id", slotId)
+    .maybeSingle();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return data;
+}
+
+/**
  * Insert a new appointment row.
  */
 async function createAppointment(payload) {
@@ -271,6 +292,7 @@ module.exports = {
   findAll,
   findById,
   findByPatientId,
+  findSlotInfo,
   getServicePrice,
   insertAppointmentServices,
   insertHistory,

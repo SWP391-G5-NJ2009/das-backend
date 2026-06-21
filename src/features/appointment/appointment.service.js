@@ -4,7 +4,42 @@ const AppError = require("../../utils/AppError");
 /* ─────────────────────────────────────────────────────────────────────────────
    bookAppointment — Patient or Receptionist creates a new appointment
 ───────────────────────────────────────────────────────────────────────────── */
-async function bookAppointment({ patientId, slotId, serviceId, note, actorAccountId }) {
+async function bookAppointment({ patientId, slotId, serviceId, note, actorAccountId, actorRole }) {
+  // ── BR-14: Validate slot timing before attempting to claim it ────────────
+  const slotInfo = await appointmentDao.findSlotInfo(slotId);
+  if (!slotInfo) {
+    throw new AppError("Slot not found.", 404, "NOT_FOUND");
+  }
+
+  const workDate = slotInfo.schedules?.work_date;         // "YYYY-MM-DD"
+  const startTime = slotInfo.time_slot_config?.start_time; // "HH:MM:SS"
+
+  if (workDate && startTime) {
+    // Build the exact start datetime of the slot in server local time
+    const slotDateTime = new Date(`${workDate}T${startTime}`);
+    const now = new Date();
+    const diffMs = slotDateTime.getTime() - now.getTime();
+
+    // Block everyone: slot start time has already passed
+    if (diffMs <= 0) {
+      throw new AppError(
+        "This time slot has already passed and can no longer be booked.",
+        400,
+        "SLOT_PAST",
+      );
+    }
+
+    // Block patients only: slot starts within 30 minutes
+    if (actorRole === "patient" && diffMs < 30 * 60 * 1000) {
+      throw new AppError(
+        "Appointments must be booked at least 30 minutes in advance.",
+        400,
+        "SLOT_TOO_SOON",
+      );
+    }
+  }
+  // ── End BR-14 ────────────────────────────────────────────────────────────
+
   // Step 1: Atomic slot claim — guards against concurrent bookings
   const claimedSlot = await appointmentDao.markSlotBooked(slotId);
   if (!claimedSlot) {
