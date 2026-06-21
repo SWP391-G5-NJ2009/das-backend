@@ -51,6 +51,23 @@ async function bookAppointment({ patientId, newPatient, slotId, serviceId, note,
   }
   // ── End BR-14 ────────────────────────────────────────────────────────────
 
+  // ── BR-15: One active appointment per service per patient (patient only) ──
+  if (actorRole === "patient") {
+    const conflict = await appointmentDao.findConfirmedAppointmentByService(
+      resolvedPatientId,
+      serviceId,
+    );
+    if (conflict) {
+      throw new AppError(
+        "You already have an active appointment for this service. " +
+          "Please wait until your current appointment is checked in, cancelled, or resolved before booking again.",
+        409,
+        "DUPLICATE_SERVICE_BOOKING",
+      );
+    }
+  }
+  // ── End BR-15 ────────────────────────────────────────────────────────────
+
   // Step 1: Atomic slot claim — guards against concurrent bookings
   const claimedSlot = await appointmentDao.markSlotBooked(slotId);
   if (!claimedSlot) {

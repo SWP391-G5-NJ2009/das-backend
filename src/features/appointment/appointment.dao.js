@@ -286,12 +286,36 @@ async function getServicePrice(serviceId) {
   return data.unit_price;
 }
 
+/**
+ * BR-15: Check if patient already has a 'Confirmed' appointment for a given service.
+ * Returns the existing appointment row if found, null otherwise.
+ */
+async function findConfirmedAppointmentByService(patientId, serviceId) {
+  ensureSupabase();
+
+  const { data, error } = await supabase
+    .from("appointment")
+    .select(`
+      appt_id,
+      status,
+      appointment_service!inner (service_id)
+    `)
+    .eq("patient_id", patientId)
+    .eq("status", "Confirmed")
+    .eq("appointment_service.service_id", serviceId)
+    .maybeSingle();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return data; // null if no conflict
+}
+
 module.exports = {
   cancelById,
   createAppointment,
   findAll,
   findById,
   findByPatientId,
+  findConfirmedAppointmentByService,
   findSlotInfo,
   getServicePrice,
   insertAppointmentServices,
