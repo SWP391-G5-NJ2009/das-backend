@@ -19,7 +19,7 @@ async function bookAppointment({ patientId, slotId, serviceId, note, actorAccoun
   const appointment = await appointmentDao.createAppointment({
     patient_id: patientId,
     slot_id: slotId,
-    status: "Waiting",
+    status: "Confirmed",
     note: note || null,
     book_time: new Date().toISOString(),
   });
