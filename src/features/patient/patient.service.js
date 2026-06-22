@@ -81,10 +81,6 @@ async function getMyProfile(patientId) {
   return normalizeProfile(data);
 }
 
-function buildPatientAccountEmail(phone) {
-  return `patient.${phone.replace(/\D/g, "")}@dentalcare.local`;
-}
-
 async function sendPatientPasswordSms({ accountId, phone, password }) {
   try {
     await textbeeService.sendSms({
@@ -123,7 +119,7 @@ async function createPatientAccount({
 
   const account = await accountService.createAccount({
     username: phone,
-    email: buildPatientAccountEmail(phone),
+    email: null,
     phone,
     password,
     role_name: "Patient",
