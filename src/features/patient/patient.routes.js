@@ -13,7 +13,14 @@ router.get(
   requireRole("receptionist"),
   patientController.searchPatients,
 );
-router.use(authMiddleware, requireRole("patient"));
+
+router.post(
+  "/",
+  requireRole("receptionist"),
+  patientController.createPatientAccount,
+);
+
+router.use(requireRole("patient"));
 
 router.get("/me", patientController.getMyProfile);
 router.patch("/me", patientController.updateMyProfile);

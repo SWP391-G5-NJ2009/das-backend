@@ -1,4 +1,8 @@
 const patientService = require("./patient.service");
+const {
+  validateCreatePatientAccount,
+  validateUpdateMyProfile,
+} = require("./patient.validator");
 const { sendSuccess } = require("../../utils/response");
 const AppError = require("../../utils/AppError");
 const { validateUpdateMyProfile } = require("./patient.validator");
@@ -15,6 +19,16 @@ async function searchPatients(req, res, next) {
     }
     const data = await patientService.searchPatients(q);
     return sendSuccess(res, 200, data, "Patients fetched successfully.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function createPatientAccount(req, res, next) {
+  try {
+    const payload = validateCreatePatientAccount(req.body);
+    const data = await patientService.createPatientAccount(payload);
+    return sendSuccess(res, 201, data, "Patient account created successfully.");
   } catch (err) {
     return next(err);
   }
@@ -58,6 +72,7 @@ async function getMyTreatmentHistory(req, res, next) {
 
 module.exports = {
   searchPatients,
+  createPatientAccount,
   getMyProfile,
   getMyTreatmentHistory,
   updateMyProfile,

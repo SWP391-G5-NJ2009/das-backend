@@ -122,7 +122,6 @@ async function getDentistsByServiceId(serviceId) {
     );
   }
 
-  // Flatten join: [{ dentist: { dentist_id, speciality, account: { username } } }]
   return (data || [])
     .map((row) => row.dentist)
     .filter(Boolean)

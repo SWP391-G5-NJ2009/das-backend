@@ -74,7 +74,12 @@ function resetPasswordOtp({ otp }) {
   return `DentalCare: Ma OTP dat lai mat khau cua ban la ${otp}. Ma co hieu luc trong 10 phut.`;
 }
 
+function patientAccountPassword({ password }) {
+  return `DentalCare: Mat khau mac dinh cua ban la: ${password}. Vui long thay doi mat khau sau khi dang nhap.`;
+}
+
 module.exports = {
+  patientAccountPassword,
   sendSms,
   resetPasswordOtp,
 };

@@ -1,5 +1,8 @@
 const patientDao = require("./patient.dao");
+const accountService = require("../account/account.service");
+const textbeeService = require("../../integrations/textbee/textbee.service");
 const AppError = require("../../utils/AppError");
+const logger = require("../../utils/logger");
 
 /**
  * Search patients by name or phone.
@@ -19,7 +22,9 @@ async function searchPatients(q) {
 }
 
 function normalizeProfile(row) {
-  if (!row) return null;
+  if (!row) {
+    return null;
+  }
 
   return {
     patientId: row.patient_id,
@@ -27,11 +32,9 @@ function normalizeProfile(row) {
     fullName: row.full_name || "",
     email: row.email || row.account?.email || "",
     phone: row.phone || row.account?.phone || "",
-    birthDate: row.dob || "",
+    birthDate: row.birth_date || "",
     gender: row.gender || "",
     address: row.address || "",
-    medicalHistory: row.medical_history || "",
-    avatar: row.avatar || null,
     noShowCount: row.no_show_count ?? 0,
     account: {
       email: row.account?.email || "",
@@ -93,18 +96,96 @@ async function getMyProfile(patientId) {
   return normalizeProfile(data);
 }
 
-async function updateMyProfile(patientId, payload) {
-  const updateFields = {};
+async function sendPatientPasswordSms({ accountId, phone, password }) {
+  try {
+    await textbeeService.sendSms({
+      recipient: phone,
+      message: textbeeService.patientAccountPassword({ phone, password }),
+    });
+    return "textbee";
+  } catch (smsError) {
+    logger.error("TextBee patient account delivery failed.", {
+      accountId,
+      error: smsError.message,
+      code: smsError.code,
+    });
+    return "textbee_failed";
+  }
+}
 
-  if (payload.fullName !== undefined) updateFields.full_name = payload.fullName;
-  if (payload.email !== undefined) updateFields.email = payload.email;
-  if (payload.phone !== undefined) updateFields.phone = payload.phone;
-  if (payload.birthDate !== undefined)
-    updateFields.dob = payload.birthDate || null;
-  if (payload.gender !== undefined) updateFields.gender = payload.gender;
-  if (payload.address !== undefined) updateFields.address = payload.address;
-  if (payload.medicalHistory !== undefined) {
-    updateFields.medical_history = payload.medicalHistory;
+async function createPatientAccount({
+  fullName,
+  phone,
+  birthDate,
+  gender,
+  address,
+  password,
+}) {
+  const { data: existing, error: existingError } =
+    await patientDao.findProfileByPhone(phone);
+
+  if (existingError) {
+    throw new AppError(existingError.message, 500, "DB_ERROR");
+  }
+
+  if (existing?.account_id) {
+    throw new AppError("Phone number already exists.", 409, "DUPLICATE_PHONE");
+  }
+
+  const account = await accountService.createAccount({
+    username: phone,
+    email: null,
+    phone,
+    password,
+    role_name: "Patient",
+    status: "Active",
+  });
+
+  const patientPayload = {
+    account_id: account.account_id,
+    full_name: fullName,
+    phone,
+    birth_date: birthDate || null,
+    gender: gender || null,
+    address: address || null,
+    no_show_count: 0,
+  };
+  const saveProfile = existing
+    ? patientDao.linkProfileAccount(existing.patient_id, patientPayload)
+    : patientDao.insertProfile(patientPayload);
+  const { data, error } = await saveProfile;
+
+  if (error) {
+    await accountService.deleteAccount(account.account_id).catch(() => {});
+    throw new AppError(error.message, 500, "DB_ERROR");
+  }
+
+  return {
+    ...normalizeProfile(data),
+    passwordSmsDelivery: await sendPatientPasswordSms({
+      accountId: account.account_id,
+      phone,
+      password,
+    }),
+  };
+}
+
+async function updateMyProfile(patientId, payload) {
+  const fields = {
+    fullName: "full_name",
+    email: "email",
+    phone: "phone",
+    gender: "gender",
+    address: "address",
+  };
+  const updateFields = Object.fromEntries(
+    Object.entries(fields)
+      .filter(([key]) => payload[key] !== undefined)
+      .map(([key, column]) => [column, payload[key]]),
+  );
+
+  if (payload.birthDate !== undefined) {
+    updateFields.birth_date = payload.birthDate || null;
   }
 
   if (!Object.keys(updateFields).length) {
@@ -136,6 +217,7 @@ async function getMyTreatmentHistory(patientId) {
 
 module.exports = {
   searchPatients,
+  createPatientAccount,
   getMyProfile,
   getMyTreatmentHistory,
   updateMyProfile,

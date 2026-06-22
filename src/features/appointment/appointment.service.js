@@ -116,26 +116,24 @@ async function bookAppointment({ patientId, newPatient, slotId, serviceId, note,
    Shape normalizer — maps raw Supabase joined row → clean frontend-ready object.
    Field names mirror the mock data shape used in the frontend hook.
 ───────────────────────────────────────────────────────────────────────────── */
+const CANCELLABLE_STATUSES = ["Confirmed", "Waiting"];
+
 function normalize(row) {
   const slotConfig = row.work_slot?.time_slot_config;
   const schedule = row.work_slot?.schedules;
   const dentist = schedule?.dentist;
-
-  // Collect service names for display
-  const services = (row.appointment_service || []).map(
-    (as) => as.dental_service?.service_name,
-  ).filter(Boolean);
+  const services = (row.appointment_service || [])
+    .map((item) => item.dental_service?.service_name)
+    .filter(Boolean);
 
   return {
     id: String(row.appt_id),
     patientName: row.patient?.full_name || null,
     patientPhone: row.patient?.phone || null,
     patientEmail: row.patient?.email || null,
-    patientDob: row.patient?.dob || null,
+    patientDob: row.patient?.birth_date || null,
     patientGender: row.patient?.gender || null,
     patientAddress: row.patient?.address || null,
-    patientMedicalHistory: row.patient?.medical_history || null,
-    patientAvatar: row.patient?.avatar || null,
     patientNoShowCount: row.patient?.no_show_count ?? 0,
     serviceName: services.join(", ") || null,
     services: (row.appointment_service || []).map((as) => ({
@@ -152,7 +150,6 @@ function normalize(row) {
     dentistId: dentist?.dentist_id || null,
     dentistSpeciality: dentist?.speciality || null,
     dentistExperience: dentist?.experience || null,
-    dentistAvatar: dentist?.avatar || null,
     scheduledDate: schedule?.work_date || null,
     scheduledTime: slotConfig?.start_time
       ? slotConfig.start_time.substring(0, 5)
@@ -170,10 +167,6 @@ function normalize(row) {
   };
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Shared filter helpers (applied after fetching — for search/date which need
-   app-level filtering since they span joined columns).
-───────────────────────────────────────────────────────────────────────────── */
 function applyClientFilters(list, filters) {
   let result = list;
 
@@ -202,9 +195,6 @@ function applyClientFilters(list, filters) {
   return result;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   getMyAppointments — Patient: fetch own appointments
-───────────────────────────────────────────────────────────────────────────── */
 async function getMyAppointments(patientId, filters = {}) {
   const { data, error } = await appointmentDao.findByPatientId(
     patientId,
@@ -215,13 +205,9 @@ async function getMyAppointments(patientId, filters = {}) {
     throw new AppError(error.message, 500, "DB_ERROR");
   }
 
-  const normalized = (data || []).map(normalize);
-  return applyClientFilters(normalized, filters);
+  return applyClientFilters((data || []).map(normalize), filters);
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   getAll — Receptionist/Admin/Owner: fetch all clinic appointments
-───────────────────────────────────────────────────────────────────────────── */
 async function getAll(filters = {}) {
   const { data, error } = await appointmentDao.findAll(filters);
 
@@ -229,29 +215,21 @@ async function getAll(filters = {}) {
     throw new AppError(error.message, 500, "DB_ERROR");
   }
 
-  const normalized = (data || []).map(normalize);
-  return applyClientFilters(normalized, filters);
+  return applyClientFilters((data || []).map(normalize), filters);
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   cancelAppointment — Patient or Staff cancels an appointment
-───────────────────────────────────────────────────────────────────────────── */
 async function cancelAppointment(apptId, actorAccountId, reason, role, patientId) {
-  // Verify the appointment exists before cancelling
-  const { data: existing, error: fetchErr } = await appointmentDao.findById(apptId);
+  const { data: existing, error } = await appointmentDao.findById(apptId);
 
-  if (fetchErr || !existing) {
+  if (error || !existing) {
     throw new AppError("Appointment not found.", 404, "NOT_FOUND");
   }
 
-  // Patients may only cancel their own appointments
   if (role === "patient" && existing.patient_id !== patientId) {
     throw new AppError("Access denied.", 403, "FORBIDDEN");
   }
 
-  // Only cancellable statuses
-  const cancellable = ["Confirmed", "Waiting"];
-  if (!cancellable.includes(existing.status)) {
+  if (!CANCELLABLE_STATUSES.includes(existing.status)) {
     throw new AppError(
       `Cannot cancel an appointment with status "${existing.status}".`,
       400,

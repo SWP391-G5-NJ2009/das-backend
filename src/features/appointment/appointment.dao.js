@@ -1,5 +1,6 @@
 const supabase = require("../../config/supabase");
 const AppError = require("../../utils/AppError");
+const logger = require("../../utils/logger");
 
 function ensureSupabase() {
   if (!supabase) {
@@ -11,10 +12,6 @@ function ensureSupabase() {
   }
 }
 
-/**
- * Base select string — joins all related tables needed by the appointment list.
- * Aliased columns keep the shape consistent regardless of caller.
- */
 const APPOINTMENT_SELECT = `
   appt_id,
   status,
@@ -35,7 +32,6 @@ const APPOINTMENT_SELECT = `
         dentist_id,
         speciality,
         experience,
-        avatar,
         account:account_id (
           account_id,
           username,
@@ -49,11 +45,9 @@ const APPOINTMENT_SELECT = `
     full_name,
     phone,
     email,
-    dob,
+    birth_date,
     gender,
     address,
-    medical_history,
-    avatar,
     no_show_count
   ),
   appointment_service (
@@ -82,9 +76,6 @@ const APPOINTMENT_SELECT = `
   )
 `.trim();
 
-/**
- * Fetch all appointments for a specific patient (own appointments).
- */
 async function findByPatientId(patientId, filters = {}) {
   ensureSupabase();
 
@@ -101,9 +92,6 @@ async function findByPatientId(patientId, filters = {}) {
   return query;
 }
 
-/**
- * Fetch all appointments in the clinic (for receptionist / admin / owner).
- */
 async function findAll(filters = {}) {
   ensureSupabase();
 
@@ -119,9 +107,6 @@ async function findAll(filters = {}) {
   return query;
 }
 
-/**
- * Fetch a single appointment by its primary key.
- */
 async function findById(apptId) {
   ensureSupabase();
 
@@ -132,9 +117,6 @@ async function findById(apptId) {
     .single();
 }
 
-/**
- * Cancel an appointment: update status to 'Cancelled' and log to appointment_history.
- */
 async function cancelById(apptId, actorAccountId, reason) {
   ensureSupabase();
 
@@ -146,14 +128,9 @@ async function cancelById(apptId, actorAccountId, reason) {
     .single();
 
   if (error || !data) {
-    throw new AppError(
-      "Failed to cancel appointment.",
-      500,
-      "DB_ERROR",
-    );
+    throw new AppError("Failed to cancel appointment.", 500, "DB_ERROR");
   }
 
-  // Log cancellation to history (non-blocking; best-effort)
   supabase
     .from("appointment_history")
     .insert({
@@ -165,7 +142,7 @@ async function cancelById(apptId, actorAccountId, reason) {
     })
     .then(({ error: histErr }) => {
       if (histErr) {
-        console.error("[appointment.dao] history insert failed:", histErr.message);
+        logger.error("Appointment history insert failed.", histErr);
       }
     });
 

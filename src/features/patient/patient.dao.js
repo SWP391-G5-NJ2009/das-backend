@@ -51,11 +51,9 @@ const PATIENT_PROFILE_SELECT = `
   full_name,
   phone,
   email,
-  dob,
+  birth_date,
   gender,
   address,
-  medical_history,
-  avatar,
   no_show_count,
   account:account_id (
     account_id,
@@ -65,7 +63,7 @@ const PATIENT_PROFILE_SELECT = `
     status,
     role(role_name)
   )
-`.trim();
+`;
 
 const TREATMENT_HISTORY_SELECT = `
   appt_id,
@@ -108,7 +106,7 @@ const TREATMENT_HISTORY_SELECT = `
     payment_status,
     payment_time
   )
-`.trim();
+`;
 
 async function findProfileByPatientId(patientId) {
   ensureSupabase();
@@ -118,6 +116,37 @@ async function findProfileByPatientId(patientId) {
     .select(PATIENT_PROFILE_SELECT)
     .eq("patient_id", patientId)
     .maybeSingle();
+}
+
+async function findProfileByPhone(phone) {
+  ensureSupabase();
+
+  return supabase
+    .from("patient")
+    .select("patient_id, account_id")
+    .eq("phone", phone)
+    .maybeSingle();
+}
+
+async function insertProfile(payload) {
+  ensureSupabase();
+
+  return supabase
+    .from("patient")
+    .insert(payload)
+    .select(PATIENT_PROFILE_SELECT)
+    .single();
+}
+
+async function linkProfileAccount(patientId, payload) {
+  ensureSupabase();
+
+  return supabase
+    .from("patient")
+    .update(payload)
+    .eq("patient_id", patientId)
+    .select(PATIENT_PROFILE_SELECT)
+    .single();
 }
 
 async function updateProfile(patientId, payload) {
@@ -145,6 +174,9 @@ module.exports = {
   createPatient,
   searchPatients,
   findProfileByPatientId,
+  findProfileByPhone,
   findTreatmentHistoryByPatientId,
+  insertProfile,
+  linkProfileAccount,
   updateProfile,
 };
