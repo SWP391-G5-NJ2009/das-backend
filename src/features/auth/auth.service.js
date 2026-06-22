@@ -13,6 +13,7 @@ const {
 const normalizeRole = require("../../utils/normalizeRole");
 
 const ROLE_PROFILE_TABLE = {
+  admin: { table: "admin", idColumn: "admin_id" },
   patient: { table: "patient", idColumn: "patient_id" },
   dentist: { table: "dentist", idColumn: "dentist_id" },
   receptionist: { table: "receptionist", idColumn: "receptionist_id" },

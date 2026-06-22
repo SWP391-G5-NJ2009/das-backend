@@ -8,11 +8,7 @@ const updateMyProfileSchema = Joi.object({
   birthDate: Joi.date().iso().allow("", null),
   gender: Joi.string().trim().max(20).allow("", null),
   address: Joi.string().trim().max(255).allow("", null),
-  medicalHistory: Joi.string().trim().max(1000).allow("", null),
-  citizenId: Joi.string().trim().max(30).allow("", null),
   speciality: Joi.string().trim().max(100).allow("", null),
-  experience: Joi.string().trim().max(1000).allow("", null),
-  avatar: Joi.string().trim().uri().allow("", null),
 }).min(1);
 
 function validateUpdateMyProfile(payload) {

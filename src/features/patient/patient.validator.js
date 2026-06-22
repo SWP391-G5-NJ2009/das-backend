@@ -17,7 +17,6 @@ const updateMyProfileSchema = Joi.object({
   birthDate: Joi.date().iso().allow("", null),
   gender: Joi.string().trim().max(20).allow("", null),
   address: Joi.string().trim().max(255).allow("", null),
-  medicalHistory: Joi.string().trim().max(1000).allow("", null),
 }).min(1);
 
 function validateCreatePatientAccount(payload) {

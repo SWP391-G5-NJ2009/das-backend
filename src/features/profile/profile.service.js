@@ -3,13 +3,29 @@ const AppError = require("../../utils/AppError");
 const normalizeRole = require("../../utils/normalizeRole");
 
 const ROLE_PROFILE = {
+  admin: {
+    table: "admin",
+    id: "admin_id",
+    fields: {
+      fullName: "full_name",
+      email: "email",
+      phone: "phone",
+      birthDate: "birth_date",
+      gender: "gender",
+      address: "address",
+    },
+  },
   dentist: {
     table: "dentist",
     id: "dentist_id",
     fields: {
+      fullName: "full_name",
+      email: "email",
+      phone: "phone",
+      birthDate: "birth_date",
+      gender: "gender",
+      address: "address",
       speciality: "speciality",
-      experience: "experience",
-      avatar: "avatar",
     },
   },
   owner: {
@@ -17,7 +33,11 @@ const ROLE_PROFILE = {
     id: "owner_id",
     fields: {
       fullName: "full_name",
+      email: "email",
       phone: "phone",
+      birthDate: "birth_date",
+      gender: "gender",
+      address: "address",
     },
   },
   patient: {
@@ -27,11 +47,9 @@ const ROLE_PROFILE = {
       fullName: "full_name",
       email: "email",
       phone: "phone",
-      birthDate: "dob",
+      birthDate: "birth_date",
       gender: "gender",
       address: "address",
-      medicalHistory: "medical_history",
-      avatar: "avatar",
     },
   },
   receptionist: {
@@ -39,8 +57,11 @@ const ROLE_PROFILE = {
     id: "receptionist_id",
     fields: {
       fullName: "full_name",
+      email: "email",
       phone: "phone",
-      citizenId: "citizen_id",
+      birthDate: "birth_date",
+      gender: "gender",
+      address: "address",
     },
   },
 };
@@ -70,14 +91,11 @@ function normalizeProfile(role, account, profile) {
     phone: profile?.phone || account.phone || "",
     status: account.status || "",
     fullName: profile?.full_name || account.username || account.email || "",
-    birthDate: profile?.dob || "",
+    birthDate: profile?.birth_date || "",
     gender: profile?.gender || "",
     address: profile?.address || "",
-    medicalHistory: profile?.medical_history || "",
-    citizenId: profile?.citizen_id || "",
+    noShowCount: profile?.no_show_count ?? null,
     speciality: profile?.speciality || "",
-    experience: profile?.experience || "",
-    avatar: profile?.avatar || null,
   };
 }
 

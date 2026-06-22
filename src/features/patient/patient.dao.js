@@ -17,11 +17,9 @@ const PATIENT_PROFILE_SELECT = `
   full_name,
   phone,
   email,
-  dob,
+  birth_date,
   gender,
   address,
-  medical_history,
-  avatar,
   no_show_count,
   account:account_id (
     account_id,

@@ -15,11 +15,9 @@ function normalizeProfile(row) {
     fullName: row.full_name || "",
     email: row.email || row.account?.email || "",
     phone: row.phone || row.account?.phone || "",
-    birthDate: row.dob || "",
+    birthDate: row.birth_date || "",
     gender: row.gender || "",
     address: row.address || "",
-    medicalHistory: row.medical_history || "",
-    avatar: row.avatar || null,
     noShowCount: row.no_show_count ?? 0,
     account: {
       email: row.account?.email || "",
@@ -130,7 +128,7 @@ async function createPatientAccount({
     account_id: account.account_id,
     full_name: fullName,
     phone,
-    dob: birthDate || null,
+    birth_date: birthDate || null,
     gender: gender || null,
     address: address || null,
     no_show_count: 0,
@@ -162,7 +160,6 @@ async function updateMyProfile(patientId, payload) {
     phone: "phone",
     gender: "gender",
     address: "address",
-    medicalHistory: "medical_history",
   };
   const updateFields = Object.fromEntries(
     Object.entries(fields)
@@ -171,7 +168,7 @@ async function updateMyProfile(patientId, payload) {
   );
 
   if (payload.birthDate !== undefined) {
-    updateFields.dob = payload.birthDate || null;
+    updateFields.birth_date = payload.birthDate || null;
   }
 
   if (!Object.keys(updateFields).length) {

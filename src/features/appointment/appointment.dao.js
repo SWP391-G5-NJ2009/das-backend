@@ -32,7 +32,6 @@ const APPOINTMENT_SELECT = `
         dentist_id,
         speciality,
         experience,
-        avatar,
         account:account_id (
           account_id,
           username,
@@ -46,11 +45,9 @@ const APPOINTMENT_SELECT = `
     full_name,
     phone,
     email,
-    dob,
+    birth_date,
     gender,
     address,
-    medical_history,
-    avatar,
     no_show_count
   ),
   appointment_service (

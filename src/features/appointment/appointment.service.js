@@ -16,11 +16,9 @@ function normalize(row) {
     patientName: row.patient?.full_name || null,
     patientPhone: row.patient?.phone || null,
     patientEmail: row.patient?.email || null,
-    patientDob: row.patient?.dob || null,
+    patientDob: row.patient?.birth_date || null,
     patientGender: row.patient?.gender || null,
     patientAddress: row.patient?.address || null,
-    patientMedicalHistory: row.patient?.medical_history || null,
-    patientAvatar: row.patient?.avatar || null,
     patientNoShowCount: row.patient?.no_show_count ?? 0,
     serviceName: services.join(", ") || null,
     services: (row.appointment_service || []).map((item) => ({
@@ -34,7 +32,6 @@ function normalize(row) {
     dentistId: dentist?.dentist_id || null,
     dentistSpeciality: dentist?.speciality || null,
     dentistExperience: dentist?.experience || null,
-    dentistAvatar: dentist?.avatar || null,
     scheduledDate: schedule?.work_date || null,
     scheduledTime: slotConfig?.start_time
       ? slotConfig.start_time.substring(0, 5)
