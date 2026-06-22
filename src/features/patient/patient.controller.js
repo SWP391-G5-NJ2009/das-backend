@@ -1,6 +1,7 @@
 const patientService = require("./patient.service");
 const { sendSuccess } = require("../../utils/response");
 const AppError = require("../../utils/AppError");
+const { validateUpdateMyProfile } = require("./patient.validator");
 
 /**
  * GET /api/patients/search?q=...
@@ -19,4 +20,45 @@ async function searchPatients(req, res, next) {
   }
 }
 
-module.exports = { searchPatients };
+async function getMyProfile(req, res, next) {
+  try {
+    const data = await patientService.getMyProfile(req.user.profileId);
+    return sendSuccess(res, 200, data, "Patient profile fetched successfully.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function updateMyProfile(req, res, next) {
+  try {
+    const payload = validateUpdateMyProfile(req.body);
+    const data = await patientService.updateMyProfile(
+      req.user.profileId,
+      payload,
+    );
+    return sendSuccess(res, 200, data, "Patient profile updated successfully.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function getMyTreatmentHistory(req, res, next) {
+  try {
+    const data = await patientService.getMyTreatmentHistory(req.user.profileId);
+    return sendSuccess(
+      res,
+      200,
+      data,
+      "Treatment history fetched successfully.",
+    );
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = {
+  searchPatients,
+  getMyProfile,
+  getMyTreatmentHistory,
+  updateMyProfile,
+};

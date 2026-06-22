@@ -8,6 +8,15 @@ const router = express.Router();
 router.use(authMiddleware);
 
 // Receptionist: search patients by name/phone
-router.get("/search", requireRole("receptionist"), patientController.searchPatients);
+router.get(
+  "/search",
+  requireRole("receptionist"),
+  patientController.searchPatients,
+);
+router.use(authMiddleware, requireRole("patient"));
+
+router.get("/me", patientController.getMyProfile);
+router.patch("/me", patientController.updateMyProfile);
+router.get("/me/treatments", patientController.getMyTreatmentHistory);
 
 module.exports = router;

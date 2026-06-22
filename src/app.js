@@ -16,7 +16,6 @@ const {
 } = require("./middlewares/error.middleware");
 const { sendSuccess } = require("./utils/response");
 
-
 const app = express();
 
 app.use(
@@ -29,7 +28,6 @@ app.use(
 );
 
 app.use(express.json());
-
 
 app.get("/api/health", (req, res) =>
   sendSuccess(res, 200, { status: "ok" }, "OK"),
