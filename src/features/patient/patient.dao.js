@@ -31,7 +31,7 @@ const PATIENT_PROFILE_SELECT = `
     status,
     role(role_name)
   )
-`.trim();
+`;
 
 const TREATMENT_HISTORY_SELECT = `
   appt_id,
@@ -74,7 +74,7 @@ const TREATMENT_HISTORY_SELECT = `
     payment_status,
     payment_time
   )
-`.trim();
+`;
 
 async function findProfileByPatientId(patientId) {
   ensureSupabase();
