@@ -111,7 +111,8 @@ async function updateService(id, payload) {
 }
 
 async function getDentistsByServiceId(serviceId) {
-  const { data, error } = await dentalServiceDao.findDentistsByServiceId(serviceId);
+  const { data, error } =
+    await dentalServiceDao.findDentistsByServiceId(serviceId);
 
   if (error) {
     throw new AppError(
@@ -121,13 +122,13 @@ async function getDentistsByServiceId(serviceId) {
     );
   }
 
-  // Flatten join: [{ dentist: { dentist_id, speciality, account: { username } } }]
   return (data || [])
     .map((row) => row.dentist)
     .filter(Boolean)
     .map((d) => ({
       dentist_id: d.dentist_id,
-      full_name: d.account?.username || d.account?.email || `Dentist #${d.dentist_id}`,
+      full_name:
+        d.account?.username || d.account?.email || `Dentist #${d.dentist_id}`,
       specialization: d.speciality || "",
       experience: d.experience || "",
     }));

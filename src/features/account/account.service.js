@@ -12,7 +12,14 @@ async function getAllAccounts() {
   return data || [];
 }
 
-async function createAccount({ username, email, phone, password, role_name, status }) {
+async function createAccount({
+  username,
+  email,
+  phone,
+  password,
+  role_name,
+  status,
+}) {
   const { data: existing } = await accountDao.findAccountByUsername(username);
 
   if (existing) {
@@ -44,8 +51,15 @@ async function createAccount({ username, email, phone, password, role_name, stat
   return data;
 }
 
-async function updateAccount(accountId, { username, email, phone, password, role_name, status }) {
-  const updateFields = {};
+async function updateAccount(
+  accountId,
+  { username, email, phone, password, role_name, status },
+) {
+  const updateFields = {
+    ...(email !== undefined ? { email } : {}),
+    ...(phone !== undefined ? { phone } : {}),
+    ...(status !== undefined ? { status } : {}),
+  };
 
   if (username !== undefined) {
     const { data: existing } =
@@ -56,14 +70,6 @@ async function updateAccount(accountId, { username, email, phone, password, role
     }
 
     updateFields.username = username;
-  }
-
-  if (email !== undefined) {
-    updateFields.email = email;
-  }
-
-  if (phone !== undefined) {
-    updateFields.phone = phone;
   }
 
   if (password !== undefined) {
@@ -80,10 +86,6 @@ async function updateAccount(accountId, { username, email, phone, password, role
     }
 
     updateFields.role_id = role.role_id;
-  }
-
-  if (status !== undefined) {
-    updateFields.status = status;
   }
 
   if (Object.keys(updateFields).length === 0) {

@@ -2,7 +2,9 @@ const patientDao = require("./patient.dao");
 const AppError = require("../../utils/AppError");
 
 function normalizeProfile(row) {
-  if (!row) return null;
+  if (!row) {
+    return null;
+  }
 
   return {
     patientId: row.patient_id,
@@ -75,16 +77,22 @@ async function getMyProfile(patientId) {
 }
 
 async function updateMyProfile(patientId, payload) {
-  const updateFields = {};
+  const fields = {
+    fullName: "full_name",
+    email: "email",
+    phone: "phone",
+    gender: "gender",
+    address: "address",
+    medicalHistory: "medical_history",
+  };
+  const updateFields = Object.fromEntries(
+    Object.entries(fields)
+      .filter(([key]) => payload[key] !== undefined)
+      .map(([key, column]) => [column, payload[key]]),
+  );
 
-  if (payload.fullName !== undefined) updateFields.full_name = payload.fullName;
-  if (payload.email !== undefined) updateFields.email = payload.email;
-  if (payload.phone !== undefined) updateFields.phone = payload.phone;
-  if (payload.birthDate !== undefined) updateFields.dob = payload.birthDate || null;
-  if (payload.gender !== undefined) updateFields.gender = payload.gender;
-  if (payload.address !== undefined) updateFields.address = payload.address;
-  if (payload.medicalHistory !== undefined) {
-    updateFields.medical_history = payload.medicalHistory;
+  if (payload.birthDate !== undefined) {
+    updateFields.dob = payload.birthDate || null;
   }
 
   if (!Object.keys(updateFields).length) {

@@ -32,19 +32,12 @@ async function createConsultationRequest({
 }
 
 async function updateConsultationRequest(id, { status, note }) {
-  const updateFields = {};
-
-  if (status !== undefined) {
-    updateFields.status = status;
-  }
-
-  if (note !== undefined) {
-    updateFields.note = note;
-  }
-
   const { data, error } = await consultationDao.updateConsultationRequest(
     id,
-    updateFields,
+    {
+      ...(status !== undefined ? { status } : {}),
+      ...(note !== undefined ? { note } : {}),
+    },
   );
 
   if (error) {

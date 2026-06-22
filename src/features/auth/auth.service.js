@@ -23,12 +23,7 @@ const STAFF_ROLES = ["receptionist", "dentist", "owner", "admin"];
 
 async function verifyPassword(account, password) {
   const storedPassword = account.password_hash || account.password;
-
-  if (!storedPassword) {
-    return false;
-  }
-
-  return bcrypt.compare(password, storedPassword);
+  return storedPassword ? bcrypt.compare(password, storedPassword) : false;
 }
 
 async function getAccountById(accountId) {
@@ -70,8 +65,6 @@ function createAuthPayload(account, profile) {
   const profileConfig = ROLE_PROFILE_TABLE[role];
   const profileId =
     profileConfig && profile ? profile[profileConfig.idColumn] : null;
-  const fullName = profile?.full_name || account.email;
-  const phone = profile?.phone || null;
 
   return {
     accountId: account.account_id,
@@ -79,8 +72,8 @@ function createAuthPayload(account, profile) {
     username: account.username,
     role,
     profileId,
-    fullName,
-    phone,
+    fullName: profile?.full_name || account.email,
+    phone: profile?.phone || null,
   };
 }
 
@@ -149,12 +142,7 @@ async function staffLogin({ username, password }) {
     );
   }
 
-  return loginWithAccount(account, password, [
-    "receptionist",
-    "dentist",
-    "owner",
-    "admin",
-  ]);
+  return loginWithAccount(account, password, STAFF_ROLES);
 }
 
 async function findAccountForIdentifier(identifier) {
