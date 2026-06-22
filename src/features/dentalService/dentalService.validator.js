@@ -7,7 +7,7 @@ const servicePayloadSchema = Joi.object({
   description: Joi.string().trim().max(2000).allow("", null),
   unit_price: Joi.number().min(0).required(),
   slot_occupied: Joi.number().integer().min(1).default(1),
-  status: Joi.string().valid("Active", "Inactive").default("Active"),
+  status: Joi.string().valid("Active", "Inactive").default("Inactive"),
 });
 
 function validateServicePayload(payload) {

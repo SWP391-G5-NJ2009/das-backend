@@ -1,10 +1,125 @@
 const appointmentDao = require("./appointment.dao");
+const patientDao = require("../patient/patient.dao");
 const AppError = require("../../utils/AppError");
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   bookAppointment — Patient or Receptionist creates a new appointment
+───────────────────────────────────────────────────────────────────────────── */
+async function bookAppointment({ patientId, newPatient, slotId, serviceId, note, actorAccountId, actorRole }) {
+  // ── Walk-in patient: create patient record on the fly ────────────────────
+  let resolvedPatientId = patientId;
+  if (!resolvedPatientId && newPatient) {
+    const created = await patientDao.createPatient(newPatient);
+    resolvedPatientId = created.patient_id;
+  }
+  if (!resolvedPatientId) {
+    throw new AppError("Patient ID could not be resolved.", 400, "VALIDATION_ERROR");
+  }
+
+  // ── BR-14: Validate slot timing before attempting to claim it ────────────
+  const slotInfo = await appointmentDao.findSlotInfo(slotId);
+  if (!slotInfo) {
+    throw new AppError("Slot not found.", 404, "NOT_FOUND");
+  }
+
+  const workDate = slotInfo.schedules?.work_date;         // "YYYY-MM-DD"
+  const startTime = slotInfo.time_slot_config?.start_time; // "HH:MM:SS"
+
+  if (workDate && startTime) {
+    // Build the exact start datetime of the slot in server local time
+    const slotDateTime = new Date(`${workDate}T${startTime}`);
+    const now = new Date();
+    const diffMs = slotDateTime.getTime() - now.getTime();
+
+    // Block everyone: slot start time has already passed
+    if (diffMs <= 0) {
+      throw new AppError(
+        "This time slot has already passed and can no longer be booked.",
+        400,
+        "SLOT_PAST",
+      );
+    }
+
+    // Block patients only: slot starts within 30 minutes
+    if (actorRole === "patient" && diffMs < 30 * 60 * 1000) {
+      throw new AppError(
+        "Appointments must be booked at least 30 minutes in advance.",
+        400,
+        "SLOT_TOO_SOON",
+      );
+    }
+  }
+  // ── End BR-14 ────────────────────────────────────────────────────────────
+
+  // ── BR-15: One active appointment per service per patient (patient only) ──
+  if (actorRole === "patient") {
+    const conflict = await appointmentDao.findConfirmedAppointmentByService(
+      resolvedPatientId,
+      serviceId,
+    );
+    if (conflict) {
+      throw new AppError(
+        "You already have an active appointment for this service. " +
+          "Please wait until your current appointment is checked in, cancelled, or resolved before booking again.",
+        409,
+        "DUPLICATE_SERVICE_BOOKING",
+      );
+    }
+  }
+  // ── End BR-15 ────────────────────────────────────────────────────────────
+
+  // Step 1: Atomic slot claim — guards against concurrent bookings
+  const claimedSlot = await appointmentDao.markSlotBooked(slotId);
+  if (!claimedSlot) {
+    throw new AppError(
+      "This time slot has just been booked by another user. Please select a different slot.",
+      409,
+      "SLOT_TAKEN",
+    );
+  }
+
+  // Step 2: Create appointment record
+  const appointment = await appointmentDao.createAppointment({
+    patient_id: resolvedPatientId,
+    slot_id: slotId,
+    status: "Confirmed",
+    note: note || null,
+    book_time: new Date().toISOString(),
+  });
+
+  // Step 3: Look up service price then link service to the appointment
+  const actualPrice = await appointmentDao.getServicePrice(serviceId);
+  await appointmentDao.insertAppointmentServices([
+    { appt_id: appointment.appt_id, service_id: serviceId, actual_price: actualPrice },
+  ]);
+
+  // Step 4: Log to history (non-blocking — failure never rejects the booking)
+  // TODO: trigger SMS/Email notification here (to be implemented by another dev)
+  Promise.allSettled([
+    appointmentDao.insertHistory({
+      appt_id: appointment.appt_id,
+      action_type: "Booked",
+      actor_account_id: actorAccountId,
+      reason: null,
+      created_at: new Date().toISOString(),
+    }),
+  ]).then((results) => {
+    results.forEach(
+      (r) => r.status === "rejected" && console.error("[booking]", r.reason),
+    );
+  });
+
+  return appointment;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Shape normalizer — maps raw Supabase joined row → clean frontend-ready object.
+   Field names mirror the mock data shape used in the frontend hook.
+───────────────────────────────────────────────────────────────────────────── */
 const CANCELLABLE_STATUSES = ["Confirmed", "Waiting"];
 
 function normalize(row) {
-  const slotConfig = row.work_slot?.slot_config;
+  const slotConfig = row.work_slot?.time_slot_config;
   const schedule = row.work_slot?.schedules;
   const dentist = schedule?.dentist;
   const services = (row.appointment_service || [])
@@ -21,14 +136,17 @@ function normalize(row) {
     patientAddress: row.patient?.address || null,
     patientNoShowCount: row.patient?.no_show_count ?? 0,
     serviceName: services.join(", ") || null,
-    services: (row.appointment_service || []).map((item) => ({
-      serviceId: item.dental_service?.service_id,
-      serviceName: item.dental_service?.service_name,
-      actualPrice: item.actual_price,
+    services: (row.appointment_service || []).map((as) => ({
+      serviceId: as.dental_service?.service_id,
+      serviceName: as.dental_service?.service_name,
+      actualPrice: as.actual_price,
+      slotOccupied: as.dental_service?.slot_occupied ?? 1,
     })),
-    dentistName: dentist
-      ? `BS. ${dentist.account?.username || dentist.account?.email || "?"}`
-      : null,
+    slotOccupied: (row.appointment_service || []).reduce(
+      (sum, as) => sum + (as.dental_service?.slot_occupied ?? 1),
+      0,
+    ),
+    dentistName: dentist ? `BS. ${dentist.account?.username || dentist.account?.email || "?"}` : null,
     dentistId: dentist?.dentist_id || null,
     dentistSpeciality: dentist?.speciality || null,
     dentistExperience: dentist?.experience || null,
@@ -52,8 +170,15 @@ function normalize(row) {
 function applyClientFilters(list, filters) {
   let result = list;
 
+  // Exact day takes priority; otherwise fall through to month, then year
   if (filters.date) {
     result = result.filter((a) => a.scheduledDate === filters.date);
+  } else if (filters.month) {
+    // filters.month is "YYYY-MM"
+    result = result.filter((a) => a.scheduledDate?.startsWith(filters.month));
+  } else if (filters.year) {
+    // filters.year is "YYYY"
+    result = result.filter((a) => a.scheduledDate?.startsWith(filters.year));
   }
 
   if (filters.search) {
@@ -112,10 +237,21 @@ async function cancelAppointment(apptId, actorAccountId, reason, role, patientId
     );
   }
 
-  return appointmentDao.cancelById(apptId, actorAccountId, reason);
+  const cancelled = await appointmentDao.cancelById(apptId, actorAccountId, reason);
+
+  // Release the slot back to Available (non-blocking — failure is logged, not thrown)
+  const slotId = existing.work_slot?.slot_id;
+  if (slotId) {
+    appointmentDao.releaseSlot(slotId).catch((err) =>
+      console.error("[appointment.service] releaseSlot failed:", err.message),
+    );
+  }
+
+  return cancelled;
 }
 
 module.exports = {
+  bookAppointment,
   cancelAppointment,
   getAll,
   getMyAppointments,

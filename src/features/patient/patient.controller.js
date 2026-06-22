@@ -4,6 +4,25 @@ const {
   validateUpdateMyProfile,
 } = require("./patient.validator");
 const { sendSuccess } = require("../../utils/response");
+const AppError = require("../../utils/AppError");
+const { validateUpdateMyProfile } = require("./patient.validator");
+
+/**
+ * GET /api/patients/search?q=...
+ * Receptionist: search patients by name or phone.
+ */
+async function searchPatients(req, res, next) {
+  try {
+    const q = (req.query.q || "").trim();
+    if (q.length < 2) {
+      return sendSuccess(res, 200, [], "Query too short.");
+    }
+    const data = await patientService.searchPatients(q);
+    return sendSuccess(res, 200, data, "Patients fetched successfully.");
+  } catch (err) {
+    return next(err);
+  }
+}
 
 async function createPatientAccount(req, res, next) {
   try {
@@ -52,6 +71,7 @@ async function getMyTreatmentHistory(req, res, next) {
 }
 
 module.exports = {
+  searchPatients,
   createPatientAccount,
   getMyProfile,
   getMyTreatmentHistory,

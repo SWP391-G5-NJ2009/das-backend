@@ -15,7 +15,7 @@ function mapServicePayload({
     description: description || null,
     unit_price: Number(unit_price),
     slot_occupied: Number(slot_occupied) || 1,
-    status: status || "Active",
+    status: status || "Inactive",
   };
 }
 

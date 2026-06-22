@@ -5,14 +5,22 @@ const requireRole = require("../../middlewares/role.middleware");
 
 const router = express.Router();
 
+router.use(authMiddleware);
+
+// Receptionist: search patients by name/phone
+router.get(
+  "/search",
+  requireRole("receptionist"),
+  patientController.searchPatients,
+);
+
 router.post(
   "/",
-  authMiddleware,
   requireRole("receptionist"),
   patientController.createPatientAccount,
 );
 
-router.use(authMiddleware, requireRole("patient"));
+router.use(requireRole("patient"));
 
 router.get("/me", patientController.getMyProfile);
 router.patch("/me", patientController.updateMyProfile);

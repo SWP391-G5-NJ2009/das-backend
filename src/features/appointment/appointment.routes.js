@@ -22,6 +22,13 @@ router.get(
   appointmentController.getAllAppointments,
 );
 
+// Book: patient (for themselves) or receptionist (supplies patientId)
+router.post(
+  "/",
+  requireRole("patient", "receptionist"),
+  appointmentController.bookAppointment,
+);
+
 // Cancel: patient (own) or receptionist
 router.patch(
   "/:id/cancel",
