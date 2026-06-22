@@ -5,8 +5,6 @@ const {
 } = require("./patient.validator");
 const { sendSuccess } = require("../../utils/response");
 const AppError = require("../../utils/AppError");
-const { validateUpdateMyProfile } = require("./patient.validator");
-
 /**
  * GET /api/patients/search?q=...
  * Receptionist: search patients by name or phone.
