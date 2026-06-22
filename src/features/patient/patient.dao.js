@@ -86,6 +86,37 @@ async function findProfileByPatientId(patientId) {
     .maybeSingle();
 }
 
+async function findProfileByPhone(phone) {
+  ensureSupabase();
+
+  return supabase
+    .from("patient")
+    .select("patient_id, account_id")
+    .eq("phone", phone)
+    .maybeSingle();
+}
+
+async function insertProfile(payload) {
+  ensureSupabase();
+
+  return supabase
+    .from("patient")
+    .insert(payload)
+    .select(PATIENT_PROFILE_SELECT)
+    .single();
+}
+
+async function linkProfileAccount(patientId, payload) {
+  ensureSupabase();
+
+  return supabase
+    .from("patient")
+    .update(payload)
+    .eq("patient_id", patientId)
+    .select(PATIENT_PROFILE_SELECT)
+    .single();
+}
+
 async function updateProfile(patientId, payload) {
   ensureSupabase();
 
@@ -109,6 +140,9 @@ async function findTreatmentHistoryByPatientId(patientId) {
 
 module.exports = {
   findProfileByPatientId,
+  findProfileByPhone,
   findTreatmentHistoryByPatientId,
+  insertProfile,
+  linkProfileAccount,
   updateProfile,
 };

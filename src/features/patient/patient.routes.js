@@ -5,6 +5,13 @@ const requireRole = require("../../middlewares/role.middleware");
 
 const router = express.Router();
 
+router.post(
+  "/",
+  authMiddleware,
+  requireRole("receptionist"),
+  patientController.createPatientAccount,
+);
+
 router.use(authMiddleware, requireRole("patient"));
 
 router.get("/me", patientController.getMyProfile);

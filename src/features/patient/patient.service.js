@@ -1,5 +1,8 @@
 const patientDao = require("./patient.dao");
+const accountService = require("../account/account.service");
+const textbeeService = require("../../integrations/textbee/textbee.service");
 const AppError = require("../../utils/AppError");
+const logger = require("../../utils/logger");
 
 function normalizeProfile(row) {
   if (!row) {
@@ -40,7 +43,9 @@ function normalizeTreatment(row) {
     0,
   );
   const totalAmount =
-    (invoice?.total_amount ?? servicesTotal) || row.total_estimated_amount || null;
+    (invoice?.total_amount ?? servicesTotal) ||
+    row.total_estimated_amount ||
+    null;
 
   return {
     id: String(treatment?.record_id || row.appt_id),
@@ -74,6 +79,84 @@ async function getMyProfile(patientId) {
   }
 
   return normalizeProfile(data);
+}
+
+function buildPatientAccountEmail(phone) {
+  return `patient.${phone.replace(/\D/g, "")}@dentalcare.local`;
+}
+
+async function sendPatientPasswordSms({ accountId, phone, password }) {
+  try {
+    await textbeeService.sendSms({
+      recipient: phone,
+      message: textbeeService.patientAccountPassword({ phone, password }),
+    });
+    return "textbee";
+  } catch (smsError) {
+    logger.error("TextBee patient account delivery failed.", {
+      accountId,
+      error: smsError.message,
+      code: smsError.code,
+    });
+    return "textbee_failed";
+  }
+}
+
+async function createPatientAccount({
+  fullName,
+  phone,
+  birthDate,
+  gender,
+  address,
+  password,
+}) {
+  const { data: existing, error: existingError } =
+    await patientDao.findProfileByPhone(phone);
+
+  if (existingError) {
+    throw new AppError(existingError.message, 500, "DB_ERROR");
+  }
+
+  if (existing?.account_id) {
+    throw new AppError("Phone number already exists.", 409, "DUPLICATE_PHONE");
+  }
+
+  const account = await accountService.createAccount({
+    username: phone,
+    email: buildPatientAccountEmail(phone),
+    phone,
+    password,
+    role_name: "Patient",
+    status: "Active",
+  });
+
+  const patientPayload = {
+    account_id: account.account_id,
+    full_name: fullName,
+    phone,
+    dob: birthDate || null,
+    gender: gender || null,
+    address: address || null,
+    no_show_count: 0,
+  };
+  const saveProfile = existing
+    ? patientDao.linkProfileAccount(existing.patient_id, patientPayload)
+    : patientDao.insertProfile(patientPayload);
+  const { data, error } = await saveProfile;
+
+  if (error) {
+    await accountService.deleteAccount(account.account_id).catch(() => {});
+    throw new AppError(error.message, 500, "DB_ERROR");
+  }
+
+  return {
+    ...normalizeProfile(data),
+    passwordSmsDelivery: await sendPatientPasswordSms({
+      accountId: account.account_id,
+      phone,
+      password,
+    }),
+  };
 }
 
 async function updateMyProfile(patientId, payload) {
@@ -123,6 +206,7 @@ async function getMyTreatmentHistory(patientId) {
 }
 
 module.exports = {
+  createPatientAccount,
   getMyProfile,
   getMyTreatmentHistory,
   updateMyProfile,
