@@ -100,9 +100,9 @@ async function findById(apptId) {
 async function cancelById(apptId, actorAccountId, reason) {
   const { data, error } = await supabase
     .from("appointment")
-    .update({ status: "Cancelled" })
+    .update({ status: "Cancelled", note: reason || null })
     .eq("appt_id", apptId)
-    .select("appt_id, status")
+    .select("appt_id, status, note")
     .single();
 
   if (error || !data) {
@@ -126,6 +126,7 @@ async function cancelById(apptId, actorAccountId, reason) {
 
   return data;
 }
+
 
 /**
  * Atomically claim a work_slot: set status = 'Booked' only if currently 'Available'.
