@@ -1,12 +1,6 @@
 const supabase = require("../../config/supabase");
 const AppError = require("../../utils/AppError");
 
-function ensureSupabase() {
-  if (!supabase) {
-    throw new AppError("Supabase is not configured.", 500, "SUPABASE_NOT_CONFIGURED");
-  }
-}
-
 /**
  * Fetch work_slots for a specific dentist on a given date.
  * Returns ALL slots (Available, Booked, Unavailable) so the UI can
@@ -18,8 +12,6 @@ function ensureSupabase() {
  * @param {string} date - ISO date string "YYYY-MM-DD"
  */
 async function findSlotsByDentistAndDate(dentistId, date) {
-  ensureSupabase();
-
   // Use `!inner` on both joined tables so PostgREST performs an INNER JOIN
   // and correctly applies the embedded filters (work_date, dentist_id).
   const { data, error } = await supabase

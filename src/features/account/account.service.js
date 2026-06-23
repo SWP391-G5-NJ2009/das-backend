@@ -1,6 +1,6 @@
-const bcrypt = require("bcryptjs");
 const accountDao = require("./account.dao");
 const AppError = require("../../utils/AppError");
+const { hashPassword } = require("../../utils/password");
 
 async function getAllAccounts() {
   const { data, error } = await accountDao.findAllAccounts();
@@ -12,6 +12,27 @@ async function getAllAccounts() {
   return data || [];
 }
 
+async function ensureUsernameAvailable(username, accountId = null) {
+  const lookup = accountId
+    ? accountDao.findAccountByUsernameExcept(username, accountId)
+    : accountDao.findAccountByUsername(username);
+  const { data: existing } = await lookup;
+
+  if (existing) {
+    throw new AppError("Username already exists.", 409, "DUPLICATE_USERNAME");
+  }
+}
+
+async function getRoleId(roleName) {
+  const { data: role, error } = await accountDao.findRoleByName(roleName);
+
+  if (error || !role) {
+    throw new AppError(`Role '${roleName}' not found.`, 400, "INVALID_ROLE");
+  }
+
+  return role.role_id;
+}
+
 async function createAccount({
   username,
   email,
@@ -20,26 +41,16 @@ async function createAccount({
   role_name,
   status,
 }) {
-  const { data: existing } = await accountDao.findAccountByUsername(username);
+  await ensureUsernameAvailable(username);
 
-  if (existing) {
-    throw new AppError("Username already exists.", 409, "DUPLICATE_USERNAME");
-  }
-
-  const { data: role, error: roleError } =
-    await accountDao.findRoleByName(role_name);
-
-  if (roleError || !role) {
-    throw new AppError(`Role '${role_name}' not found.`, 400, "INVALID_ROLE");
-  }
-
-  const password_hash = await bcrypt.hash(password, 10);
+  const role_id = await getRoleId(role_name);
+  const password_hash = await hashPassword(password);
   const { data, error } = await accountDao.insertAccount({
     username,
     email,
     phone,
     password_hash,
-    role_id: role.role_id,
+    role_id,
     status: status || "Active",
   });
 
@@ -61,29 +72,16 @@ async function updateAccount(
   };
 
   if (username !== undefined) {
-    const { data: existing } =
-      await accountDao.findAccountByUsernameExcept(username, accountId);
-
-    if (existing) {
-      throw new AppError("Username already exists.", 409, "DUPLICATE_USERNAME");
-    }
-
+    await ensureUsernameAvailable(username, accountId);
     updateFields.username = username;
   }
 
   if (password !== undefined) {
-    updateFields.password_hash = await bcrypt.hash(password, 10);
+    updateFields.password_hash = await hashPassword(password);
   }
 
   if (role_name !== undefined) {
-    const { data: role, error: roleError } =
-      await accountDao.findRoleByName(role_name);
-
-    if (roleError || !role) {
-      throw new AppError(`Role '${role_name}' not found.`, 400, "INVALID_ROLE");
-    }
-
-    updateFields.role_id = role.role_id;
+    updateFields.role_id = await getRoleId(role_name);
   }
 
   if (Object.keys(updateFields).length === 0) {

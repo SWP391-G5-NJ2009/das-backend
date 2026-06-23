@@ -1,23 +1,10 @@
 const supabase = require("../../config/supabase");
-const AppError = require("../../utils/AppError");
-
-function ensureSupabase() {
-  if (!supabase) {
-    throw new AppError(
-      "Supabase is not configured.",
-      500,
-      "SUPABASE_NOT_CONFIGURED",
-    );
-  }
-}
 
 function accountSelect() {
   return "account_id, email, username, phone, status, role(role_name)";
 }
 
 async function findAccountById(accountId) {
-  ensureSupabase();
-
   return supabase
     .from("account")
     .select(accountSelect())
@@ -26,8 +13,6 @@ async function findAccountById(accountId) {
 }
 
 async function findProfileByAccountId(table, accountId) {
-  ensureSupabase();
-
   return supabase
     .from(table)
     .select("*")
@@ -36,8 +21,6 @@ async function findProfileByAccountId(table, accountId) {
 }
 
 async function updateAccount(accountId, payload) {
-  ensureSupabase();
-
   return supabase
     .from("account")
     .update(payload)
@@ -47,8 +30,6 @@ async function updateAccount(accountId, payload) {
 }
 
 async function updateProfile(table, accountId, payload) {
-  ensureSupabase();
-
   return supabase
     .from(table)
     .update(payload)

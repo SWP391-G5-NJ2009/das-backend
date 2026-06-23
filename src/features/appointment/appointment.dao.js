@@ -2,16 +2,6 @@ const supabase = require("../../config/supabase");
 const AppError = require("../../utils/AppError");
 const logger = require("../../utils/logger");
 
-function ensureSupabase() {
-  if (!supabase) {
-    throw new AppError(
-      "Supabase is not configured.",
-      500,
-      "SUPABASE_NOT_CONFIGURED",
-    );
-  }
-}
-
 const APPOINTMENT_SELECT = `
   appt_id,
   status,
@@ -77,8 +67,6 @@ const APPOINTMENT_SELECT = `
 `.trim();
 
 async function findByPatientId(patientId, filters = {}) {
-  ensureSupabase();
-
   let query = supabase
     .from("appointment")
     .select(APPOINTMENT_SELECT)
@@ -93,8 +81,6 @@ async function findByPatientId(patientId, filters = {}) {
 }
 
 async function findAll(filters = {}) {
-  ensureSupabase();
-
   let query = supabase
     .from("appointment")
     .select(APPOINTMENT_SELECT)
@@ -108,8 +94,6 @@ async function findAll(filters = {}) {
 }
 
 async function findById(apptId) {
-  ensureSupabase();
-
   return supabase
     .from("appointment")
     .select(APPOINTMENT_SELECT)
@@ -118,8 +102,6 @@ async function findById(apptId) {
 }
 
 async function cancelById(apptId, actorAccountId, reason) {
-  ensureSupabase();
-
   const { data, error } = await supabase
     .from("appointment")
     .update({ status: "Cancelled" })
@@ -154,8 +136,6 @@ async function cancelById(apptId, actorAccountId, reason) {
  * Returns the updated slot row, or null if the slot was already taken/unavailable.
  */
 async function markSlotBooked(slotId) {
-  ensureSupabase();
-
   const { data, error } = await supabase
     .from("work_slot")
     .update({ status: "Booked" })
@@ -173,8 +153,6 @@ async function markSlotBooked(slotId) {
  * Only transitions from 'Booked' → 'Available' (leaves 'Unavailable' slots untouched).
  */
 async function releaseSlot(slotId) {
-  ensureSupabase();
-
   const { error } = await supabase
     .from("work_slot")
     .update({ status: "Available" })
@@ -191,8 +169,6 @@ async function releaseSlot(slotId) {
  * Returns { work_date: "YYYY-MM-DD", start_time: "HH:MM:SS" } or null.
  */
 async function findSlotInfo(slotId) {
-  ensureSupabase();
-
   const { data, error } = await supabase
     .from("work_slot")
     .select(`
@@ -211,8 +187,6 @@ async function findSlotInfo(slotId) {
  * Insert a new appointment row.
  */
 async function createAppointment(payload) {
-  ensureSupabase();
-
   const { data, error } = await supabase
     .from("appointment")
     .insert(payload)
@@ -227,8 +201,6 @@ async function createAppointment(payload) {
  * Insert rows into appointment_service (one per service selected).
  */
 async function insertAppointmentServices(rows) {
-  ensureSupabase();
-
   const { error } = await supabase.from("appointment_service").insert(rows);
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
 }
@@ -237,8 +209,6 @@ async function insertAppointmentServices(rows) {
  * Insert a row into appointment_history (best-effort, non-blocking).
  */
 async function insertHistory(row) {
-  ensureSupabase();
-
   const { error } = await supabase.from("appointment_history").insert(row);
   if (error) {
     console.error("[appointment.dao] history insert failed:", error.message);
@@ -250,8 +220,6 @@ async function insertHistory(row) {
  * Used to populate actual_price in appointment_service.
  */
 async function getServicePrice(serviceId) {
-  ensureSupabase();
-
   const { data, error } = await supabase
     .from("dental_services")
     .select("unit_price")
@@ -268,8 +236,6 @@ async function getServicePrice(serviceId) {
  * Returns the existing appointment row if found, null otherwise.
  */
 async function findConfirmedAppointmentByService(patientId, serviceId) {
-  ensureSupabase();
-
   const { data, error } = await supabase
     .from("appointment")
     .select(`

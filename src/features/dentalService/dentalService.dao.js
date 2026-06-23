@@ -1,19 +1,6 @@
 const supabase = require("../../config/supabase");
-const AppError = require("../../utils/AppError");
-
-function ensureSupabase() {
-  if (!supabase) {
-    throw new AppError(
-      "Supabase is not configured.",
-      500,
-      "SUPABASE_NOT_CONFIGURED",
-    );
-  }
-}
 
 async function findAllServices() {
-  ensureSupabase();
-
   return supabase
     .from("dental_services")
     .select(
@@ -32,8 +19,6 @@ async function findAllServices() {
 }
 
 async function deleteService(id) {
-  ensureSupabase();
-
   return supabase
     .from("dental_services")
     .delete()
@@ -42,14 +27,10 @@ async function deleteService(id) {
 }
 
 async function insertService(payload) {
-  ensureSupabase();
-
   return supabase.from("dental_services").insert([payload]).select();
 }
 
 async function findAllCategories() {
-  ensureSupabase();
-
   return supabase
     .from("service_categories")
     .select("category_id, category_name, description")
@@ -57,8 +38,6 @@ async function findAllCategories() {
 }
 
 async function updateService(id, payload) {
-  ensureSupabase();
-
   return supabase
     .from("dental_services")
     .update(payload)
@@ -67,8 +46,6 @@ async function updateService(id, payload) {
 }
 
 async function findDentistsByServiceId(serviceId) {
-  ensureSupabase();
-
   return supabase
     .from("dentist_services")
     .select(
