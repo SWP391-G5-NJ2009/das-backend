@@ -20,13 +20,9 @@ const APPOINTMENT_SELECT = `
       status,
       dentist:dentist_id (
         dentist_id,
+        full_name,
         speciality,
-        experience,
-        account:account_id (
-          account_id,
-          username,
-          email
-        )
+        experience
       )
     )
   ),

@@ -146,7 +146,7 @@ function normalize(row) {
       (sum, as) => sum + (as.dental_service?.slot_occupied ?? 1),
       0,
     ),
-    dentistName: dentist ? `BS. ${dentist.account?.username || dentist.account?.email || "?"}` : null,
+    dentistName: dentist?.full_name || null,
     dentistId: dentist?.dentist_id || null,
     dentistSpeciality: dentist?.speciality || null,
     dentistExperience: dentist?.experience || null,
