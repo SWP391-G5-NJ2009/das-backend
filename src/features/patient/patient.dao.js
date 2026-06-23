@@ -20,7 +20,7 @@ async function searchPatients(q) {
 
   const { data, error } = await supabase
     .from("patient")
-    .select("patient_id, full_name, phone, email, dob, gender")
+    .select("patient_id, full_name, phone, email, birth_date, gender")
     .or(`full_name.ilike.%${q}%,phone.ilike.%${q}%`)
     .limit(20);
 
@@ -108,16 +108,6 @@ const TREATMENT_HISTORY_SELECT = `
   )
 `;
 
-async function findProfileByPatientId(patientId) {
-  ensureSupabase();
-
-  return supabase
-    .from("patient")
-    .select(PATIENT_PROFILE_SELECT)
-    .eq("patient_id", patientId)
-    .maybeSingle();
-}
-
 async function findProfileByPhone(phone) {
   ensureSupabase();
 
@@ -149,17 +139,6 @@ async function linkProfileAccount(patientId, payload) {
     .single();
 }
 
-async function updateProfile(patientId, payload) {
-  ensureSupabase();
-
-  return supabase
-    .from("patient")
-    .update(payload)
-    .eq("patient_id", patientId)
-    .select(PATIENT_PROFILE_SELECT)
-    .single();
-}
-
 async function findTreatmentHistoryByPatientId(patientId) {
   ensureSupabase();
 
@@ -173,10 +152,8 @@ async function findTreatmentHistoryByPatientId(patientId) {
 module.exports = {
   createPatient,
   searchPatients,
-  findProfileByPatientId,
   findProfileByPhone,
   findTreatmentHistoryByPatientId,
   insertProfile,
   linkProfileAccount,
-  updateProfile,
 };

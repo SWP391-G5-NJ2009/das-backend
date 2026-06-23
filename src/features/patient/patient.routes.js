@@ -22,8 +22,6 @@ router.post(
 
 router.use(requireRole("patient"));
 
-router.get("/me", patientController.getMyProfile);
-router.patch("/me", patientController.updateMyProfile);
 router.get("/me/treatments", patientController.getMyTreatmentHistory);
 
 module.exports = router;

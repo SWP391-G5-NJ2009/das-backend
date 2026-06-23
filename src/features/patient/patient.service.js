@@ -16,7 +16,7 @@ async function searchPatients(q) {
     fullName: p.full_name,
     phone: p.phone || "",
     email: p.email || "",
-    dob: p.dob || null,
+    birthDate: p.birth_date || null,
     gender: p.gender || null,
   }));
 }
@@ -80,20 +80,6 @@ function normalizeTreatment(row) {
     status: row.status,
     paymentStatus: invoice?.payment_status || "",
   };
-}
-
-async function getMyProfile(patientId) {
-  const { data, error } = await patientDao.findProfileByPatientId(patientId);
-
-  if (error) {
-    throw new AppError(error.message, 500, "DB_ERROR");
-  }
-
-  if (!data) {
-    throw new AppError("Patient profile not found.", 404, "PATIENT_NOT_FOUND");
-  }
-
-  return normalizeProfile(data);
 }
 
 async function sendPatientPasswordSms({ accountId, phone, password }) {
@@ -170,40 +156,6 @@ async function createPatientAccount({
   };
 }
 
-async function updateMyProfile(patientId, payload) {
-  const fields = {
-    fullName: "full_name",
-    email: "email",
-    phone: "phone",
-    gender: "gender",
-    address: "address",
-  };
-  const updateFields = Object.fromEntries(
-    Object.entries(fields)
-      .filter(([key]) => payload[key] !== undefined)
-      .map(([key, column]) => [column, payload[key]]),
-  );
-
-  if (payload.birthDate !== undefined) {
-    updateFields.birth_date = payload.birthDate || null;
-  }
-
-  if (!Object.keys(updateFields).length) {
-    throw new AppError("No fields to update.", 400, "NO_UPDATES");
-  }
-
-  const { data, error } = await patientDao.updateProfile(
-    patientId,
-    updateFields,
-  );
-
-  if (error) {
-    throw new AppError(error.message, 500, "DB_ERROR");
-  }
-
-  return normalizeProfile(data);
-}
-
 async function getMyTreatmentHistory(patientId) {
   const { data, error } =
     await patientDao.findTreatmentHistoryByPatientId(patientId);
@@ -218,7 +170,5 @@ async function getMyTreatmentHistory(patientId) {
 module.exports = {
   searchPatients,
   createPatientAccount,
-  getMyProfile,
   getMyTreatmentHistory,
-  updateMyProfile,
 };
