@@ -75,6 +75,7 @@ async function findDentistsByServiceId(serviceId) {
       `
       dentist:dentist_id (
         dentist_id,
+        full_name,
         speciality,
         experience,
         account:account_id (

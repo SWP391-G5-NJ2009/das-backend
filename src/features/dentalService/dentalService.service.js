@@ -127,8 +127,7 @@ async function getDentistsByServiceId(serviceId) {
     .filter(Boolean)
     .map((d) => ({
       dentist_id: d.dentist_id,
-      full_name:
-        d.account?.username || d.account?.email || `Dentist #${d.dentist_id}`,
+      full_name: d.full_name || d.account?.email || `Dentist #${d.dentist_id}`,
       specialization: d.speciality || "",
       experience: d.experience || "",
     }));
