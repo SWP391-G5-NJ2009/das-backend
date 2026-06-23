@@ -30,55 +30,32 @@ function normalizeProfile(row) {
     patientId: row.patient_id,
     accountId: row.account_id,
     fullName: row.full_name || "",
-    email: row.email || row.account?.email || "",
     phone: row.phone || row.account?.phone || "",
     birthDate: row.birth_date || "",
     gender: row.gender || "",
     address: row.address || "",
-    noShowCount: row.no_show_count ?? 0,
-    account: {
-      email: row.account?.email || "",
-      username: row.account?.username || "",
-      status: row.account?.status || "",
-      role: row.account?.role?.role_name || "",
-    },
   };
 }
 
 function normalizeTreatment(row) {
   const schedule = row.work_slot?.schedules;
-  const dentist = schedule?.dentist;
   const services = row.appointment_service || [];
   const invoice = Array.isArray(row.invoice) ? row.invoice[0] : row.invoice;
   const treatment = Array.isArray(row.treatment_record)
     ? row.treatment_record[0]
     : row.treatment_record;
-  const servicesTotal = services.reduce(
-    (sum, service) => sum + Number(service.actual_price || 0),
-    0,
-  );
-  const totalAmount =
-    (invoice?.total_amount ?? servicesTotal) ||
-    row.total_estimated_amount ||
-    null;
 
   return {
-    id: String(treatment?.record_id || row.appt_id),
-    appointmentId: row.appt_id,
-    date: schedule?.work_date || row.book_time?.slice(0, 10) || "",
+    id: String(row.appt_id),
+    date: schedule?.work_date || "",
     treatment:
       services
         .map((service) => service.dental_service?.service_name)
         .filter(Boolean)
         .join(", ") || "Điều trị nha khoa",
     diagnosis: treatment?.diagnosis || "",
-    notes: treatment?.treatment_note || "",
-    dentist: dentist
-      ? `BS. ${dentist.account?.username || dentist.account?.email || "Nha sĩ"}`
-      : "",
-    cost: totalAmount,
-    status: row.status,
-    paymentStatus: invoice?.payment_status || "",
+    dentist: schedule?.dentist?.full_name || "",
+    cost: invoice?.total_amount ?? null,
   };
 }
 

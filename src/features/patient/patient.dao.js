@@ -53,44 +53,24 @@ const PATIENT_PROFILE_SELECT = `
 
 const TREATMENT_HISTORY_SELECT = `
   appt_id,
-  patient_id,
-  status,
-  book_time,
-  total_estimated_amount,
-  note,
   work_slot:slot_id (
-    slot_config:slot_config_id (
-      start_time,
-      end_time
-    ),
     schedules:schedule_id (
       work_date,
       dentist:dentist_id (
-        dentist_id,
-        account:account_id (
-          username,
-          email
-        )
+        full_name
       )
     )
   ),
   appointment_service (
-    actual_price,
     dental_service:service_id (
-      service_id,
       service_name
     )
   ),
   treatment_record!inner (
-    record_id,
-    diagnosis,
-    treatment_note
+    diagnosis
   ),
   invoice (
-    invoice_id,
-    total_amount,
-    payment_status,
-    payment_time
+    total_amount
   )
 `;
 
