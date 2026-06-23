@@ -237,6 +237,30 @@ async function cancelAppointment(apptId, actorAccountId, reason, role, patientId
     );
   }
 
+  // ── BR-13: Patients can only cancel at least 24 hours before scheduled time ──
+  if (role === "patient") {
+    const slotId = existing.work_slot?.slot_id;
+    if (slotId) {
+      const slotInfo = await appointmentDao.findSlotInfo(slotId);
+      if (slotInfo) {
+        const workDate = slotInfo.schedules?.work_date;
+        const startTime = slotInfo.time_slot_config?.start_time;
+        if (workDate && startTime) {
+          const slotDateTime = new Date(`${workDate}T${startTime}`);
+          const diffMs = slotDateTime.getTime() - Date.now();
+          if (diffMs < 24 * 60 * 60 * 1000) {
+            throw new AppError(
+              "Appointments can only be cancelled at least 24 hours before the scheduled time. Please contact the receptionist directly for assistance.",
+              400,
+              "CANCEL_TOO_LATE",
+            );
+          }
+        }
+      }
+    }
+  }
+  // ── End BR-13 ────────────────────────────────────────────────────────────────
+
   const cancelled = await appointmentDao.cancelById(apptId, actorAccountId, reason);
 
   // Release the slot back to Available (non-blocking — failure is logged, not thrown)
