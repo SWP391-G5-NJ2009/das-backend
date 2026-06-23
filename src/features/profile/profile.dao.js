@@ -1,7 +1,11 @@
 const supabase = require("../../config/supabase");
 
 function accountSelect() {
-  return "account_id, email, username, phone, status, role(role_name)";
+  return "account_id, email, role(role_name)";
+}
+
+function profileSelect() {
+  return "full_name, email, birth_date, gender, address";
 }
 
 async function findAccountById(accountId) {
@@ -15,7 +19,7 @@ async function findAccountById(accountId) {
 async function findProfileByAccountId(table, accountId) {
   return supabase
     .from(table)
-    .select("*")
+    .select(profileSelect())
     .eq("account_id", accountId)
     .maybeSingle();
 }
@@ -34,7 +38,7 @@ async function updateProfile(table, accountId, payload) {
     .from(table)
     .update(payload)
     .eq("account_id", accountId)
-    .select("*")
+    .select(profileSelect())
     .single();
 }
 
