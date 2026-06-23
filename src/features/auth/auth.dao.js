@@ -12,7 +12,7 @@ function ensureSupabase() {
 }
 
 function accountSelect() {
-  return "account_id, email, username, phone, password, password_hash, role_id, status, role(role_name)";
+  return "account_id, email, username, phone, password_hash, role_id, status, role(role_name)";
 }
 
 async function findAccountById(accountId) {
@@ -111,7 +111,7 @@ async function updateAccountPassword(accountId, passwordHash) {
 
   return supabase
     .from("account")
-    .update({ password_hash: passwordHash, password: passwordHash })
+    .update({ password_hash: passwordHash })
     .eq("account_id", accountId);
 }
 

@@ -38,7 +38,6 @@ async function createAccount({
     username,
     email,
     phone,
-    password: password_hash,
     password_hash,
     role_id: role.role_id,
     status: status || "Active",
@@ -73,8 +72,7 @@ async function updateAccount(
   }
 
   if (password !== undefined) {
-    updateFields.password = await bcrypt.hash(password, 10);
-    updateFields.password_hash = updateFields.password;
+    updateFields.password_hash = await bcrypt.hash(password, 10);
   }
 
   if (role_name !== undefined) {

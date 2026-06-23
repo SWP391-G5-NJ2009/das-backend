@@ -23,8 +23,9 @@ const ROLE_PROFILE_TABLE = {
 const STAFF_ROLES = ["receptionist", "dentist", "owner", "admin"];
 
 async function verifyPassword(account, password) {
-  const storedPassword = account.password_hash || account.password;
-  return storedPassword ? bcrypt.compare(password, storedPassword) : false;
+  return account.password_hash
+    ? bcrypt.compare(password, account.password_hash)
+    : false;
 }
 
 async function getAccountById(accountId) {
