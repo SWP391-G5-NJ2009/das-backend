@@ -53,12 +53,6 @@ const APPOINTMENT_SELECT = `
     total_amount,
     payment_status,
     payment_time
-  ),
-  appointment_history (
-    history_id,
-    action_type,
-    reason,
-    created_at
   )
 `.trim();
 
@@ -109,20 +103,7 @@ async function cancelById(apptId, actorAccountId, reason) {
     throw new AppError("Failed to cancel appointment.", 500, "DB_ERROR");
   }
 
-  supabase
-    .from("appointment_history")
-    .insert({
-      appt_id: apptId,
-      action_type: "Cancelled",
-      actor_account_id: actorAccountId,
-      reason: reason || null,
-      created_at: new Date().toISOString(),
-    })
-    .then(({ error: histErr }) => {
-      if (histErr) {
-        logger.error("Appointment history insert failed.", histErr);
-      }
-    });
+
 
   return data;
 }
@@ -202,15 +183,7 @@ async function insertAppointmentServices(rows) {
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
 }
 
-/**
- * Insert a row into appointment_history (best-effort, non-blocking).
- */
-async function insertHistory(row) {
-  const { error } = await supabase.from("appointment_history").insert(row);
-  if (error) {
-    console.error("[appointment.dao] history insert failed:", error.message);
-  }
-}
+
 
 /**
  * Fetch the price of a dental service by its ID.
@@ -259,7 +232,6 @@ module.exports = {
   findSlotInfo,
   getServicePrice,
   insertAppointmentServices,
-  insertHistory,
   markSlotBooked,
   releaseSlot,
 };
