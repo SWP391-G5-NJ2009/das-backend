@@ -28,7 +28,8 @@ async function getMyAppointments(req, res, next) {
 
 /**
  * GET /api/appointments
- * Receptionist / Admin / Owner: fetch all clinic appointments.
+ * Receptionist: fetch all clinic appointments.
+ * Dentist: fetch own assigned appointments.
  */
 async function getAllAppointments(req, res, next) {
   try {
@@ -38,6 +39,7 @@ async function getAllAppointments(req, res, next) {
       month: req.query.month || null,
       year: req.query.year || null,
       search: req.query.search || null,
+      dentistId: req.user.role === "dentist" ? req.user.profileId : null,
     };
     const data = await appointmentService.getAll(filters);
     return sendSuccess(res, 200, data, "Appointments fetched successfully.");

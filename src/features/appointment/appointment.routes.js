@@ -15,10 +15,10 @@ router.get(
   appointmentController.getMyAppointments,
 );
 
-// Receptionist: view all clinic appointments
+// Receptionist / Dentist: view clinic appointments
 router.get(
   "/",
-  requireRole("receptionist"),
+  requireRole("receptionist", "dentist"),
   appointmentController.getAllAppointments,
 );
 
