@@ -6,11 +6,13 @@ const createConsultationSchema = Joi.object({
   phone: Joi.string().trim().min(8).max(20).required(),
   email: Joi.string().trim().email().allow("", null),
   description: Joi.string().trim().min(1).max(2000).required(),
+  website: Joi.string().allow("").valid(""),
+  loadedAt: Joi.number().optional(),
 });
 
 const updateConsultationSchema = Joi.object({
   status: Joi.string()
-    .valid("Pending", "Solved", "Spam", "Fail-to-contact", "Other")
+    .valid("Pending", "Resolved", "Spam", "Fail-to-contact", "Other")
     .required(),
   note: Joi.string().trim().max(2000).allow("", null),
 });

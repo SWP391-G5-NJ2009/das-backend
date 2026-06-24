@@ -11,13 +11,19 @@ function ensureSupabase() {
   }
 }
 
-async function findAllConsultationRequests() {
+async function findAllConsultationRequests(filters = {}) {
   ensureSupabase();
 
-  return supabase
+  let query = supabase
     .from("consultation_request")
     .select("*")
     .order("created_at", { ascending: false });
+
+  if (filters.status && filters.status !== "All") {
+    query = query.eq("status", filters.status)
+  }
+
+  return query;
 }
 
 async function insertConsultationRequest(payload) {

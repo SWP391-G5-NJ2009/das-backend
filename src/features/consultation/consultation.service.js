@@ -1,8 +1,8 @@
 const consultationDao = require("./consultation.dao");
 const AppError = require("../../utils/AppError");
 
-async function getAllConsultationRequests() {
-  const { data, error } = await consultationDao.findAllConsultationRequests();
+async function getAllConsultationRequests(filters = {}) {
+  const { data, error } = await consultationDao.findAllConsultationRequests(filters);
 
   if (error) {
     throw new AppError(error.message, 500, "DB_ERROR");
