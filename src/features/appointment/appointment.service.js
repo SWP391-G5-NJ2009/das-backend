@@ -93,23 +93,9 @@ async function bookAppointment({ patientId, newPatient, slotId, serviceId, note,
     { appt_id: appointment.appt_id, service_id: serviceId, actual_price: actualPrice },
   ]);
 
-  // Step 4: Log to history (non-blocking — failure never rejects the booking)
-  // TODO: trigger SMS/Email notification here (to be implemented by another dev)
-  Promise.allSettled([
-    appointmentDao.insertHistory({
-      appt_id: appointment.appt_id,
-      action_type: "Booked",
-      actor_account_id: actorAccountId,
-      reason: null,
-      created_at: new Date().toISOString(),
-    }),
-  ]).then((results) => {
-    results.forEach(
-      (r) => r.status === "rejected" && console.error("[booking]", r.reason),
-    );
-  });
 
   return appointment;
+
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -163,7 +149,6 @@ function normalize(row) {
     totalEstimatedAmount: row.total_estimated_amount || null,
     treatmentRecord: row.treatment_record?.[0] || null,
     invoice: row.invoice?.[0] || null,
-    history: row.appointment_history || [],
   };
 }
 
