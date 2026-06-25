@@ -11,6 +11,7 @@ async function getAllConsultationRequests(req, res, next) {
       status: req.query.status || null,
       date: req.query.date || null,
       search: req.query.search || null,
+      pagination: req.query.pagination || null,
     };
     const data = await consultationService.getAllConsultationRequests(filters);
     return sendSuccess(res, 200, data, "Requests retrieved successfully.");

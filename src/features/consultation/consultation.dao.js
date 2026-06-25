@@ -1,10 +1,14 @@
 const supabase = require("../../config/supabase");
 
-async function findAllConsultationRequests() {
-  return supabase
+async function findAllConsultationRequests(filters = {}) {
+  const PAGE_SIZE = 20;
+  const page = parseInt(filters.pagination) || 1;
+
+  let query = supabase
     .from("consultation_request")
-    .select("*")
-    .order("created_at", { ascending: false });
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range((page-1)*PAGE_SIZE, page*PAGE_SIZE-1);
 
   if (filters.status && filters.status !== "All") {
     query = query.eq("status", filters.status)
