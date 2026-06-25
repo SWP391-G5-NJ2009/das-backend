@@ -103,11 +103,8 @@ async function cancelById(apptId, actorAccountId, reason) {
     throw new AppError("Failed to cancel appointment.", 500, "DB_ERROR");
   }
 
-
-
   return data;
 }
-
 
 /**
  * Atomically claim a work_slot: set status = 'Booked' only if currently 'Available'.
@@ -149,11 +146,13 @@ async function releaseSlot(slotId) {
 async function findSlotInfo(slotId) {
   const { data, error } = await supabase
     .from("work_slot")
-    .select(`
+    .select(
+      `
       slot_id,
       time_slot_config:slot_config_id (start_time),
       schedules:schedule_id (work_date)
-    `)
+    `,
+    )
     .eq("slot_id", slotId)
     .maybeSingle();
 
@@ -183,8 +182,6 @@ async function insertAppointmentServices(rows) {
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
 }
 
-
-
 /**
  * Fetch the price of a dental service by its ID.
  * Used to populate actual_price in appointment_service.
@@ -208,11 +205,13 @@ async function getServicePrice(serviceId) {
 async function findConfirmedAppointmentByService(patientId, serviceId) {
   const { data, error } = await supabase
     .from("appointment")
-    .select(`
+    .select(
+      `
       appt_id,
       status,
       appointment_service!inner (service_id)
-    `)
+    `,
+    )
     .eq("patient_id", patientId)
     .eq("status", "Confirmed")
     .eq("appointment_service.service_id", serviceId)
@@ -220,6 +219,115 @@ async function findConfirmedAppointmentByService(patientId, serviceId) {
 
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
   return data; // null if no conflict
+}
+
+/**
+ * No-Show sweep: fetch all Confirmed appointments whose slot start
+ * time + 15 min has already passed, mark them No-Show, and return the
+ * updated rows so the caller can increment no_show_count.
+ *
+ * Returns an array of { appt_id, patient_id } objects.
+ */
+async function markOverdueAsNoShow() {
+  const now = new Date();
+
+  // Fetch Confirmed appointments with their slot datetime info
+  const { data: candidates, error: fetchError } = await supabase
+    .from("appointment")
+    .select(
+      `
+      appt_id,
+      patient_id,
+      work_slot:slot_id (
+        time_slot_config:slot_config_id (start_time),
+        schedules:schedule_id (work_date)
+      )
+    `,
+    )
+    .in("status", ["Confirmed"]);
+
+  if (fetchError) {
+    logger.error("[noShow] Failed to fetch candidates:", fetchError.message);
+    return [];
+  }
+
+  if (!candidates || candidates.length === 0) return [];
+
+  // Filter those whose slot start + 15 min < now
+  const NO_SHOW_GRACE_MS = 15 * 60 * 1000; // 15 minutes
+  const overdueIds = [];
+  const overduePatientIds = {}; // appt_id → patient_id
+
+  for (const appt of candidates) {
+    const workDate = appt.work_slot?.schedules?.work_date; // "YYYY-MM-DD"
+    const startTime = appt.work_slot?.time_slot_config?.start_time; // "HH:MM:SS"
+    if (!workDate || !startTime) continue;
+
+    const slotStart = new Date(`${workDate}T${startTime}`);
+    const deadline = new Date(slotStart.getTime() + NO_SHOW_GRACE_MS);
+
+    if (now >= deadline) {
+      overdueIds.push(appt.appt_id);
+      overduePatientIds[appt.appt_id] = appt.patient_id;
+    }
+  }
+
+  if (overdueIds.length === 0) return [];
+
+  // Bulk update to No-Show
+  const { data: updated, error: updateError } = await supabase
+    .from("appointment")
+    .update({ status: "No-Show" })
+    .in("appt_id", overdueIds)
+    .in("status", ["Confirmed"]) // double-check: guard against race
+    .select("appt_id, patient_id");
+
+  if (updateError) {
+    logger.error(
+      "[noShow] Failed to update appointments:",
+      updateError.message,
+    );
+    return [];
+  }
+
+  return updated || [];
+}
+
+/**
+ * Increment no_show_count for a list of patient IDs.
+ * Uses a direct atomic UPDATE (no_show_count = no_show_count + 1).
+ */
+async function incrementNoShowCount(patientIds) {
+  if (!patientIds || patientIds.length === 0) return;
+
+  for (const patientId of patientIds) {
+    // Read current count, then write back incremented value
+    const { data: patient, error: readError } = await supabase
+      .from("patient")
+      .select("no_show_count")
+      .eq("patient_id", patientId)
+      .single();
+
+    if (readError || !patient) {
+      logger.error(
+        `[noShow] Could not read no_show_count for patient ${patientId}:`,
+        readError?.message,
+      );
+      continue;
+    }
+
+    const { error: writeError } = await supabase
+      .from("patient")
+      .update({ no_show_count: (patient.no_show_count ?? 0) + 1 })
+      .eq("patient_id", patientId);
+
+    if (writeError) {
+      logger.error(
+        `[noShow] Failed to increment no_show_count for patient ${patientId}:`,
+        writeError.message,
+      );
+    }
+  }
 }
 
 module.exports = {
@@ -231,7 +339,10 @@ module.exports = {
   findConfirmedAppointmentByService,
   findSlotInfo,
   getServicePrice,
+  incrementNoShowCount,
   insertAppointmentServices,
+  markNoShowSlotAvailable: releaseSlot,
+  markOverdueAsNoShow,
   markSlotBooked,
   releaseSlot,
 };
