@@ -177,6 +177,12 @@ function applyClientFilters(list, filters) {
     );
   }
 
+  if (filters.dentistId) {
+    result = result.filter(
+      (a) => String(a.dentistId) === String(filters.dentistId),
+    );
+  }
+
   return result;
 }
 
