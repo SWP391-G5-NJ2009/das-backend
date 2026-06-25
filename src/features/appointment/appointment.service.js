@@ -1,42 +1,141 @@
 const appointmentDao = require("./appointment.dao");
+const patientDao = require("../patient/patient.dao");
 const AppError = require("../../utils/AppError");
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   bookAppointment — Patient or Receptionist creates a new appointment
+───────────────────────────────────────────────────────────────────────────── */
+async function bookAppointment({ patientId, newPatient, slotId, serviceId, note, actorAccountId, actorRole }) {
+  // ── Walk-in patient: create patient record on the fly ────────────────────
+  let resolvedPatientId = patientId;
+  if (!resolvedPatientId && newPatient) {
+    const created = await patientDao.createPatient(newPatient);
+    resolvedPatientId = created.patient_id;
+  }
+  if (!resolvedPatientId) {
+    throw new AppError("Patient ID could not be resolved.", 400, "VALIDATION_ERROR");
+  }
+
+  // ── BR-14: Validate slot timing before attempting to claim it ────────────
+  const slotInfo = await appointmentDao.findSlotInfo(slotId);
+  if (!slotInfo) {
+    throw new AppError("Slot not found.", 404, "NOT_FOUND");
+  }
+
+  const workDate = slotInfo.schedules?.work_date;         // "YYYY-MM-DD"
+  const startTime = slotInfo.time_slot_config?.start_time; // "HH:MM:SS"
+
+  if (workDate && startTime) {
+    // Build the exact start datetime of the slot in server local time
+    const slotDateTime = new Date(`${workDate}T${startTime}`);
+    const now = new Date();
+    const diffMs = slotDateTime.getTime() - now.getTime();
+
+    // Block everyone: slot start time has already passed
+    if (diffMs <= 0) {
+      throw new AppError(
+        "This time slot has already passed and can no longer be booked.",
+        400,
+        "SLOT_PAST",
+      );
+    }
+
+    // Block patients only: slot starts within 30 minutes
+    if (actorRole === "patient" && diffMs < 30 * 60 * 1000) {
+      throw new AppError(
+        "Appointments must be booked at least 30 minutes in advance.",
+        400,
+        "SLOT_TOO_SOON",
+      );
+    }
+  }
+  // ── End BR-14 ────────────────────────────────────────────────────────────
+
+  // ── BR-15: One active appointment per service per patient (patient only) ──
+  if (actorRole === "patient") {
+    const conflict = await appointmentDao.findConfirmedAppointmentByService(
+      resolvedPatientId,
+      serviceId,
+    );
+    if (conflict) {
+      throw new AppError(
+        "You already have an active appointment for this service. " +
+          "Please wait until your current appointment is checked in, cancelled, or resolved before booking again.",
+        409,
+        "DUPLICATE_SERVICE_BOOKING",
+      );
+    }
+  }
+  // ── End BR-15 ────────────────────────────────────────────────────────────
+
+  // Step 1: Atomic slot claim — guards against concurrent bookings
+  const claimedSlot = await appointmentDao.markSlotBooked(slotId);
+  if (!claimedSlot) {
+    throw new AppError(
+      "This time slot has just been booked by another user. Please select a different slot.",
+      409,
+      "SLOT_TAKEN",
+    );
+  }
+
+  // Step 2: Create appointment record
+  const appointment = await appointmentDao.createAppointment({
+    patient_id: resolvedPatientId,
+    slot_id: slotId,
+    status: "Confirmed",
+    note: note || null,
+    book_time: new Date().toISOString(),
+  });
+
+  // Step 3: Look up service price then link service to the appointment
+  const actualPrice = await appointmentDao.getServicePrice(serviceId);
+  await appointmentDao.insertAppointmentServices([
+    { appt_id: appointment.appt_id, service_id: serviceId, actual_price: actualPrice },
+  ]);
+
+
+  return appointment;
+
+}
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Shape normalizer — maps raw Supabase joined row → clean frontend-ready object.
    Field names mirror the mock data shape used in the frontend hook.
 ───────────────────────────────────────────────────────────────────────────── */
+const CANCELLABLE_STATUSES = ["Confirmed", "Waiting"];
+
 function normalize(row) {
-  const slotConfig = row.work_slot?.slot_config;
+  const slotConfig = row.work_slot?.time_slot_config;
   const schedule = row.work_slot?.schedules;
   const dentist = schedule?.dentist;
-
-  // Collect service names for display
-  const services = (row.appointment_service || []).map(
-    (as) => as.dental_service?.service_name,
-  ).filter(Boolean);
+  const services = (row.appointment_service || [])
+    .map((item) => item.dental_service?.service_name)
+    .filter(Boolean);
 
   return {
     id: String(row.appt_id),
     patientName: row.patient?.full_name || null,
     patientPhone: row.patient?.phone || null,
     patientEmail: row.patient?.email || null,
-    patientDob: row.patient?.dob || null,
+    patientDob: row.patient?.birth_date || null,
     patientGender: row.patient?.gender || null,
     patientAddress: row.patient?.address || null,
-    patientMedicalHistory: row.patient?.medical_history || null,
-    patientAvatar: row.patient?.avatar || null,
     patientNoShowCount: row.patient?.no_show_count ?? 0,
     serviceName: services.join(", ") || null,
     services: (row.appointment_service || []).map((as) => ({
       serviceId: as.dental_service?.service_id,
       serviceName: as.dental_service?.service_name,
       actualPrice: as.actual_price,
+      slotOccupied: as.dental_service?.slot_occupied ?? 1,
     })),
-    dentistName: dentist ? `BS. ${dentist.account?.username || dentist.account?.email || "?"}` : null,
+    slotOccupied: (row.appointment_service || []).reduce(
+      (sum, as) => sum + (as.dental_service?.slot_occupied ?? 1),
+      0,
+    ),
+    dentistName: dentist?.full_name || null,
     dentistId: dentist?.dentist_id || null,
     dentistSpeciality: dentist?.speciality || null,
     dentistExperience: dentist?.experience || null,
-    dentistAvatar: dentist?.avatar || null,
     scheduledDate: schedule?.work_date || null,
     scheduledTime: slotConfig?.start_time
       ? slotConfig.start_time.substring(0, 5)
@@ -50,19 +149,21 @@ function normalize(row) {
     totalEstimatedAmount: row.total_estimated_amount || null,
     treatmentRecord: row.treatment_record?.[0] || null,
     invoice: row.invoice?.[0] || null,
-    history: row.appointment_history || [],
   };
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Shared filter helpers (applied after fetching — for search/date which need
-   app-level filtering since they span joined columns).
-───────────────────────────────────────────────────────────────────────────── */
 function applyClientFilters(list, filters) {
   let result = list;
 
+  // Exact day takes priority; otherwise fall through to month, then year
   if (filters.date) {
     result = result.filter((a) => a.scheduledDate === filters.date);
+  } else if (filters.month) {
+    // filters.month is "YYYY-MM"
+    result = result.filter((a) => a.scheduledDate?.startsWith(filters.month));
+  } else if (filters.year) {
+    // filters.year is "YYYY"
+    result = result.filter((a) => a.scheduledDate?.startsWith(filters.year));
   }
 
   if (filters.search) {
@@ -76,12 +177,15 @@ function applyClientFilters(list, filters) {
     );
   }
 
+  if (filters.dentistId) {
+    result = result.filter(
+      (a) => String(a.dentistId) === String(filters.dentistId),
+    );
+  }
+
   return result;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   getMyAppointments — Patient: fetch own appointments
-───────────────────────────────────────────────────────────────────────────── */
 async function getMyAppointments(patientId, filters = {}) {
   const { data, error } = await appointmentDao.findByPatientId(
     patientId,
@@ -92,13 +196,9 @@ async function getMyAppointments(patientId, filters = {}) {
     throw new AppError(error.message, 500, "DB_ERROR");
   }
 
-  const normalized = (data || []).map(normalize);
-  return applyClientFilters(normalized, filters);
+  return applyClientFilters((data || []).map(normalize), filters);
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   getAll — Receptionist/Admin/Owner: fetch all clinic appointments
-───────────────────────────────────────────────────────────────────────────── */
 async function getAll(filters = {}) {
   const { data, error } = await appointmentDao.findAll(filters);
 
@@ -106,29 +206,21 @@ async function getAll(filters = {}) {
     throw new AppError(error.message, 500, "DB_ERROR");
   }
 
-  const normalized = (data || []).map(normalize);
-  return applyClientFilters(normalized, filters);
+  return applyClientFilters((data || []).map(normalize), filters);
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   cancelAppointment — Patient or Staff cancels an appointment
-───────────────────────────────────────────────────────────────────────────── */
 async function cancelAppointment(apptId, actorAccountId, reason, role, patientId) {
-  // Verify the appointment exists before cancelling
-  const { data: existing, error: fetchErr } = await appointmentDao.findById(apptId);
+  const { data: existing, error } = await appointmentDao.findById(apptId);
 
-  if (fetchErr || !existing) {
+  if (error || !existing) {
     throw new AppError("Appointment not found.", 404, "NOT_FOUND");
   }
 
-  // Patients may only cancel their own appointments
   if (role === "patient" && existing.patient_id !== patientId) {
     throw new AppError("Access denied.", 403, "FORBIDDEN");
   }
 
-  // Only cancellable statuses
-  const cancellable = ["Confirmed", "Waiting"];
-  if (!cancellable.includes(existing.status)) {
+  if (!CANCELLABLE_STATUSES.includes(existing.status)) {
     throw new AppError(
       `Cannot cancel an appointment with status "${existing.status}".`,
       400,
@@ -136,10 +228,45 @@ async function cancelAppointment(apptId, actorAccountId, reason, role, patientId
     );
   }
 
-  return appointmentDao.cancelById(apptId, actorAccountId, reason);
+  // ── BR-13: Patients can only cancel at least 24 hours before scheduled time ──
+  if (role === "patient") {
+    const slotId = existing.work_slot?.slot_id;
+    if (slotId) {
+      const slotInfo = await appointmentDao.findSlotInfo(slotId);
+      if (slotInfo) {
+        const workDate = slotInfo.schedules?.work_date;
+        const startTime = slotInfo.time_slot_config?.start_time;
+        if (workDate && startTime) {
+          const slotDateTime = new Date(`${workDate}T${startTime}`);
+          const diffMs = slotDateTime.getTime() - Date.now();
+          if (diffMs < 24 * 60 * 60 * 1000) {
+            throw new AppError(
+              "Appointments can only be cancelled at least 24 hours before the scheduled time. Please contact the receptionist directly for assistance.",
+              400,
+              "CANCEL_TOO_LATE",
+            );
+          }
+        }
+      }
+    }
+  }
+  // ── End BR-13 ────────────────────────────────────────────────────────────────
+
+  const cancelled = await appointmentDao.cancelById(apptId, actorAccountId, reason);
+
+  // Release the slot back to Available (non-blocking — failure is logged, not thrown)
+  const slotId = existing.work_slot?.slot_id;
+  if (slotId) {
+    appointmentDao.releaseSlot(slotId).catch((err) =>
+      console.error("[appointment.service] releaseSlot failed:", err.message),
+    );
+  }
+
+  return cancelled;
 }
 
 module.exports = {
+  bookAppointment,
   cancelAppointment,
   getAll,
   getMyAppointments,

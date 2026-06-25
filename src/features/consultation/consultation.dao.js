@@ -1,20 +1,7 @@
 const supabase = require("../../config/supabase");
-const AppError = require("../../utils/AppError");
 
-function ensureSupabase() {
-  if (!supabase) {
-    throw new AppError(
-      "Supabase is not configured.",
-      500,
-      "SUPABASE_NOT_CONFIGURED",
-    );
-  }
-}
-
-async function findAllConsultationRequests(filters = {}) {
-  ensureSupabase();
-
-  let query = supabase
+async function findAllConsultationRequests() {
+  return supabase
     .from("consultation_request")
     .select("*")
     .order("created_at", { ascending: false });
@@ -27,8 +14,6 @@ async function findAllConsultationRequests(filters = {}) {
 }
 
 async function insertConsultationRequest(payload) {
-  ensureSupabase();
-
   return supabase
     .from("consultation_request")
     .insert(payload)
@@ -37,8 +22,6 @@ async function insertConsultationRequest(payload) {
 }
 
 async function updateConsultationRequest(id, updateFields) {
-  ensureSupabase();
-
   return supabase
     .from("consultation_request")
     .update(updateFields)

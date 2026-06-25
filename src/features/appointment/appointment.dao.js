@@ -1,20 +1,7 @@
 const supabase = require("../../config/supabase");
 const AppError = require("../../utils/AppError");
+const logger = require("../../utils/logger");
 
-function ensureSupabase() {
-  if (!supabase) {
-    throw new AppError(
-      "Supabase is not configured.",
-      500,
-      "SUPABASE_NOT_CONFIGURED",
-    );
-  }
-}
-
-/**
- * Base select string — joins all related tables needed by the appointment list.
- * Aliased columns keep the shape consistent regardless of caller.
- */
 const APPOINTMENT_SELECT = `
   appt_id,
   status,
@@ -23,7 +10,7 @@ const APPOINTMENT_SELECT = `
   book_time,
   work_slot:slot_id (
     slot_id,
-    slot_config:slot_config_id (
+    time_slot_config:slot_config_id (
       start_time,
       end_time
     ),
@@ -33,14 +20,9 @@ const APPOINTMENT_SELECT = `
       status,
       dentist:dentist_id (
         dentist_id,
+        full_name,
         speciality,
-        experience,
-        avatar,
-        account:account_id (
-          account_id,
-          username,
-          email
-        )
+        experience
       )
     )
   ),
@@ -49,11 +31,9 @@ const APPOINTMENT_SELECT = `
     full_name,
     phone,
     email,
-    dob,
+    birth_date,
     gender,
     address,
-    medical_history,
-    avatar,
     no_show_count
   ),
   appointment_service (
@@ -73,21 +53,10 @@ const APPOINTMENT_SELECT = `
     total_amount,
     payment_status,
     payment_time
-  ),
-  appointment_history (
-    history_id,
-    action_type,
-    reason,
-    created_at
   )
 `.trim();
 
-/**
- * Fetch all appointments for a specific patient (own appointments).
- */
 async function findByPatientId(patientId, filters = {}) {
-  ensureSupabase();
-
   let query = supabase
     .from("appointment")
     .select(APPOINTMENT_SELECT)
@@ -101,12 +70,7 @@ async function findByPatientId(patientId, filters = {}) {
   return query;
 }
 
-/**
- * Fetch all appointments in the clinic (for receptionist / admin / owner).
- */
 async function findAll(filters = {}) {
-  ensureSupabase();
-
   let query = supabase
     .from("appointment")
     .select(APPOINTMENT_SELECT)
@@ -119,12 +83,7 @@ async function findAll(filters = {}) {
   return query;
 }
 
-/**
- * Fetch a single appointment by its primary key.
- */
 async function findById(apptId) {
-  ensureSupabase();
-
   return supabase
     .from("appointment")
     .select(APPOINTMENT_SELECT)
@@ -132,49 +91,147 @@ async function findById(apptId) {
     .single();
 }
 
-/**
- * Cancel an appointment: update status to 'Cancelled' and log to appointment_history.
- */
 async function cancelById(apptId, actorAccountId, reason) {
-  ensureSupabase();
-
   const { data, error } = await supabase
     .from("appointment")
-    .update({ status: "Cancelled" })
+    .update({ status: "Cancelled", note: reason || null })
     .eq("appt_id", apptId)
-    .select("appt_id, status")
+    .select("appt_id, status, note")
     .single();
 
   if (error || !data) {
-    throw new AppError(
-      "Failed to cancel appointment.",
-      500,
-      "DB_ERROR",
-    );
+    throw new AppError("Failed to cancel appointment.", 500, "DB_ERROR");
   }
 
-  // Log cancellation to history (non-blocking; best-effort)
-  supabase
-    .from("appointment_history")
-    .insert({
-      appt_id: apptId,
-      action_type: "Cancelled",
-      actor_account_id: actorAccountId,
-      reason: reason || null,
-      created_at: new Date().toISOString(),
-    })
-    .then(({ error: histErr }) => {
-      if (histErr) {
-        console.error("[appointment.dao] history insert failed:", histErr.message);
-      }
-    });
+
 
   return data;
 }
 
+
+/**
+ * Atomically claim a work_slot: set status = 'Booked' only if currently 'Available'.
+ * Returns the updated slot row, or null if the slot was already taken/unavailable.
+ */
+async function markSlotBooked(slotId) {
+  const { data, error } = await supabase
+    .from("work_slot")
+    .update({ status: "Booked" })
+    .eq("slot_id", slotId)
+    .eq("status", "Available") // atomic guard — only succeeds if still Available
+    .select("slot_id")
+    .maybeSingle();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return data; // null means slot was already taken or unavailable
+}
+
+/**
+ * Release a work_slot back to 'Available' when an appointment is cancelled.
+ * Only transitions from 'Booked' → 'Available' (leaves 'Unavailable' slots untouched).
+ */
+async function releaseSlot(slotId) {
+  const { error } = await supabase
+    .from("work_slot")
+    .update({ status: "Available" })
+    .eq("slot_id", slotId)
+    .eq("status", "Booked"); // only release if currently Booked
+
+  if (error) {
+    console.error("[appointment.dao] releaseSlot failed:", error.message);
+  }
+}
+
+/**
+ * Fetch the date and start time of a slot — used for BR-14 timing validation.
+ * Returns { work_date: "YYYY-MM-DD", start_time: "HH:MM:SS" } or null.
+ */
+async function findSlotInfo(slotId) {
+  const { data, error } = await supabase
+    .from("work_slot")
+    .select(`
+      slot_id,
+      time_slot_config:slot_config_id (start_time),
+      schedules:schedule_id (work_date)
+    `)
+    .eq("slot_id", slotId)
+    .maybeSingle();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return data;
+}
+
+/**
+ * Insert a new appointment row.
+ */
+async function createAppointment(payload) {
+  const { data, error } = await supabase
+    .from("appointment")
+    .insert(payload)
+    .select("appt_id, status, book_time, note, total_estimated_amount")
+    .single();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return data;
+}
+
+/**
+ * Insert rows into appointment_service (one per service selected).
+ */
+async function insertAppointmentServices(rows) {
+  const { error } = await supabase.from("appointment_service").insert(rows);
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+}
+
+
+
+/**
+ * Fetch the price of a dental service by its ID.
+ * Used to populate actual_price in appointment_service.
+ */
+async function getServicePrice(serviceId) {
+  const { data, error } = await supabase
+    .from("dental_services")
+    .select("unit_price")
+    .eq("service_id", serviceId)
+    .single();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  if (!data) throw new AppError("Service not found.", 404, "NOT_FOUND");
+  return data.unit_price;
+}
+
+/**
+ * BR-15: Check if patient already has a 'Confirmed' appointment for a given service.
+ * Returns the existing appointment row if found, null otherwise.
+ */
+async function findConfirmedAppointmentByService(patientId, serviceId) {
+  const { data, error } = await supabase
+    .from("appointment")
+    .select(`
+      appt_id,
+      status,
+      appointment_service!inner (service_id)
+    `)
+    .eq("patient_id", patientId)
+    .eq("status", "Confirmed")
+    .eq("appointment_service.service_id", serviceId)
+    .maybeSingle();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return data; // null if no conflict
+}
+
 module.exports = {
   cancelById,
+  createAppointment,
   findAll,
   findById,
   findByPatientId,
+  findConfirmedAppointmentByService,
+  findSlotInfo,
+  getServicePrice,
+  insertAppointmentServices,
+  markSlotBooked,
+  releaseSlot,
 };

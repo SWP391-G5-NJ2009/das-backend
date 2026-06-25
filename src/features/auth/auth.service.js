@@ -1,4 +1,3 @@
-const bcrypt = require("bcryptjs");
 const authDao = require("./auth.dao");
 const textbeeService = require("../../integrations/textbee/textbee.service");
 const AppError = require("../../utils/AppError");
@@ -10,23 +9,47 @@ const {
   getOtpExpiry,
   hashOtp,
 } = require("../../utils/otp");
+const { comparePassword, hashPassword } = require("../../utils/password");
 const normalizeRole = require("../../utils/normalizeRole");
 
 const ROLE_PROFILE_TABLE = {
+  admin: { table: "admin", idColumn: "admin_id" },
   patient: { table: "patient", idColumn: "patient_id" },
   dentist: { table: "dentist", idColumn: "dentist_id" },
   receptionist: { table: "receptionist", idColumn: "receptionist_id" },
   owner: { table: "owner", idColumn: "owner_id" },
 };
 
+const STAFF_ROLES = ["receptionist", "dentist", "owner", "admin"];
+const INVALID_CREDENTIALS_MESSAGE = "Invalid credentials. Please try again.";
+const PROCESSING_ERROR_MESSAGE =
+  "Unable to process data. Please try again later.";
+const PASSWORD_UPDATE_ERROR_MESSAGE =
+  "Unable to update password. Please try again later.";
+
+function invalidCredentialsError() {
+  return new AppError(INVALID_CREDENTIALS_MESSAGE, 401, "INVALID_CREDENTIALS");
+}
+
+function processingError() {
+  return new AppError(PROCESSING_ERROR_MESSAGE, 500, "DB_ERROR");
+}
+
+function passwordUpdateError() {
+  return new AppError(PASSWORD_UPDATE_ERROR_MESSAGE, 500, "DB_ERROR");
+}
+
+function isActiveStatus(status) {
+  return String(status || "").toLowerCase() === "active";
+}
+
+function isDuplicateLookupError(error) {
+  const errorMessage = `${error.message || ""} ${error.details || ""}`;
+  return errorMessage.toLowerCase().includes("multiple");
+}
+
 async function verifyPassword(account, password) {
-  const storedPassword = account.password_hash || account.password;
-
-  if (!storedPassword) {
-    return false;
-  }
-
-  return bcrypt.compare(password, storedPassword);
+  return comparePassword(password, account.password_hash);
 }
 
 async function getAccountById(accountId) {
@@ -53,11 +76,7 @@ async function getProfile(role, accountId) {
   );
 
   if (error) {
-    throw new AppError(
-      "Unable to process data. Please try again later.",
-      500,
-      "DB_ERROR",
-    );
+    throw processingError();
   }
 
   return data;
@@ -68,8 +87,6 @@ function createAuthPayload(account, profile) {
   const profileConfig = ROLE_PROFILE_TABLE[role];
   const profileId =
     profileConfig && profile ? profile[profileConfig.idColumn] : null;
-  const fullName = profile?.full_name || account.email;
-  const phone = profile?.phone || null;
 
   return {
     accountId: account.account_id,
@@ -77,8 +94,8 @@ function createAuthPayload(account, profile) {
     username: account.username,
     role,
     profileId,
-    fullName,
-    phone,
+    fullName: profile?.full_name || account.email,
+    phone: profile?.phone || null,
   };
 }
 
@@ -98,24 +115,16 @@ async function loginWithAccount(account, password, allowedRoles) {
   const role = normalizeRole(account?.role?.role_name);
 
   if (!account || !allowedRoles.includes(role)) {
-    throw new AppError(
-      "Invalid credentials. Please try again.",
-      401,
-      "INVALID_CREDENTIALS",
-    );
+    throw invalidCredentialsError();
   }
 
-  if (String(account.status || "").toLowerCase() !== "active") {
+  if (!isActiveStatus(account.status)) {
     throw new AppError("Account is not active.", 403, "ACCOUNT_INACTIVE");
   }
 
   const passwordMatches = await verifyPassword(account, password);
   if (!passwordMatches) {
-    throw new AppError(
-      "Invalid credentials. Please try again.",
-      401,
-      "INVALID_CREDENTIALS",
-    );
+    throw invalidCredentialsError();
   }
 
   return issueAuth(account);
@@ -140,19 +149,10 @@ async function staffLogin({ username, password }) {
     await authDao.findStaffAccountByIdentifier(username);
 
   if (error || !account) {
-    throw new AppError(
-      "Invalid credentials. Please try again.",
-      401,
-      "INVALID_CREDENTIALS",
-    );
+    throw invalidCredentialsError();
   }
 
-  return loginWithAccount(account, password, [
-    "receptionist",
-    "dentist",
-    "owner",
-    "admin",
-  ]);
+  return loginWithAccount(account, password, STAFF_ROLES);
 }
 
 async function findAccountForIdentifier(identifier) {
@@ -160,11 +160,7 @@ async function findAccountForIdentifier(identifier) {
     await authDao.findPatientAccountByPhone(identifier);
 
   if (patientError) {
-    throw new AppError(
-      "Unable to process data. Please try again later.",
-      500,
-      "DB_ERROR",
-    );
+    throw processingError();
   }
 
   if (patient?.account) {
@@ -175,11 +171,7 @@ async function findAccountForIdentifier(identifier) {
     await authDao.findAccountByIdentifier(identifier);
 
   if (accountError) {
-    throw new AppError(
-      "Unable to process data. Please try again later.",
-      500,
-      "DB_ERROR",
-    );
+    throw processingError();
   }
 
   if (!account) {
@@ -193,11 +185,7 @@ async function findAccountForIdentifier(identifier) {
   return { account, phone: null };
 }
 
-async function forgotPassword({ identifier }) {
-  const { account, phone } = await findAccountForIdentifier(identifier);
-  const profile = await getProfile(account.role?.role_name, account.account_id);
-  const recipient = phone || profile?.phone;
-
+async function createPasswordResetOtp({ account, recipient }) {
   if (!recipient) {
     throw new AppError(
       "This account does not have a phone number for OTP delivery.",
@@ -211,18 +199,14 @@ async function forgotPassword({ identifier }) {
 
   const { error } = await authDao.insertOtpToken({
     account_id: account.account_id,
-    phone,
+    phone: recipient,
     purpose: "reset_password",
     otp_hash: otpHash,
     expires_at: getOtpExpiry(),
   });
 
   if (error) {
-    throw new AppError(
-      "Unable to process data. Please try again later.",
-      500,
-      "DB_ERROR",
-    );
+    throw processingError();
   }
 
   let otpDelivery = "textbee";
@@ -251,14 +235,61 @@ async function forgotPassword({ identifier }) {
   }
 
   return {
+    accountId: account.account_id,
     otpDelivery,
     smsMessageId: smsResult?.messageId || smsResult?.id || null,
     devOtp: process.env.NODE_ENV === "production" ? undefined : otp,
   };
 }
 
-async function getLatestValidOtp(identifier, otp) {
-  const { account } = await findAccountForIdentifier(identifier);
+async function forgotPassword({ identifier }) {
+  const { account, phone } = await findAccountForIdentifier(identifier);
+  const profile = await getProfile(account.role?.role_name, account.account_id);
+  const recipient = phone || account.phone || profile?.phone;
+
+  return createPasswordResetOtp({ account, recipient });
+}
+
+async function staffForgotPassword({ username }) {
+  const normalizedUsername = username.trim().toLowerCase();
+  const { data: account, error } =
+    await authDao.findStaffAccountByUsername(normalizedUsername);
+
+  if (error) {
+    const isDuplicateLookup = isDuplicateLookupError(error);
+
+    throw new AppError(
+      isDuplicateLookup
+        ? "Staff username lookup is not unique. Please contact an administrator."
+        : PROCESSING_ERROR_MESSAGE,
+      500,
+      isDuplicateLookup ? "USERNAME_NOT_UNIQUE" : "DB_ERROR",
+    );
+  }
+
+  const role = normalizeRole(account?.role?.role_name);
+  if (
+    !account ||
+    !STAFF_ROLES.includes(role) ||
+    String(account.username || "").toLowerCase() !== normalizedUsername
+  ) {
+    throw new AppError(
+      "Account not found. Please check and try again.",
+      404,
+      "ACCOUNT_NOT_FOUND",
+    );
+  }
+
+  return createPasswordResetOtp({
+    account,
+    recipient: account.phone,
+  });
+}
+
+async function getLatestValidOtp({ accountId, identifier, otp }) {
+  const account = accountId
+    ? await getAccountById(accountId)
+    : (await findAccountForIdentifier(identifier)).account;
   const { data, error } = await authDao.findLatestResetPasswordOtp(
     account.account_id,
   );
@@ -274,14 +305,18 @@ async function getLatestValidOtp(identifier, otp) {
   return { account, otpToken: data };
 }
 
-async function verifyOtp({ identifier, otp }) {
-  await getLatestValidOtp(identifier, otp);
+async function verifyOtp({ accountId, identifier, otp }) {
+  await getLatestValidOtp({ accountId, identifier, otp });
   return { verified: true };
 }
 
-async function resetPassword({ identifier, otp, newPassword }) {
-  const { account, otpToken } = await getLatestValidOtp(identifier, otp);
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+async function resetPassword({ accountId, identifier, otp, newPassword }) {
+  const { account, otpToken } = await getLatestValidOtp({
+    accountId,
+    identifier,
+    otp,
+  });
+  const passwordHash = await hashPassword(newPassword);
 
   const { error: updateError } = await authDao.updateAccountPassword(
     account.account_id,
@@ -289,11 +324,7 @@ async function resetPassword({ identifier, otp, newPassword }) {
   );
 
   if (updateError) {
-    throw new AppError(
-      "Unable to update password. Please try again later.",
-      500,
-      "DB_ERROR",
-    );
+    throw passwordUpdateError();
   }
 
   const { error: consumeError } = await authDao.consumeOtpToken(
@@ -323,15 +354,11 @@ async function changePassword({ accountId, oldPassword, newPassword }) {
     );
   }
 
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+  const passwordHash = await hashPassword(newPassword);
   const { error } = await authDao.updateAccountPassword(accountId, passwordHash);
 
   if (error) {
-    throw new AppError(
-      "Unable to update password. Please try again later.",
-      500,
-      "DB_ERROR",
-    );
+    throw passwordUpdateError();
   }
 
   return { changed: true };
@@ -343,5 +370,6 @@ module.exports = {
   patientLogin,
   resetPassword,
   staffLogin,
+  staffForgotPassword,
   verifyOtp,
 };

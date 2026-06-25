@@ -73,6 +73,8 @@ Current role names supported by the API:
 
 Forgot password OTP is stored in `otp_tokens` and sent by TextBee SMS. SpeedSMS is intentionally not integrated yet. In development, the forgot-password endpoint also returns `devOtp` for testing.
 
+Staff forgot password looks up accounts by `account.username` case-insensitively, then sends the OTP to that specific row's `account.phone`. Supabase enforces case-insensitive username uniqueness with `account_username_ci_unique` on `lower(username)`.
+
 ## Run
 
 Development mode:
@@ -150,6 +152,19 @@ Content-Type: application/json
 
 In development, this request sends the OTP through TextBee and also returns the OTP in `data.devOtp`. In production, `devOtp` is omitted.
 
+Staff forgot password:
+
+```http
+POST /api/auth/forgot-password/staff
+Content-Type: application/json
+
+{
+  "username": "admin"
+}
+```
+
+Both forgot-password endpoints return `data.accountId`; send that value to OTP verification and password reset.
+
 Reset password:
 
 ```http
@@ -157,7 +172,7 @@ POST /api/auth/reset-password
 Content-Type: application/json
 
 {
-  "identifier": "0901000001",
+  "accountId": "account-id-from-forgot-password",
   "otp": "123456",
   "newPassword": "NewPassword123"
 }

@@ -15,19 +15,30 @@ const forgotPasswordSchema = Joi.object({
   identifier: Joi.string().trim().min(2).max(100).required(),
 });
 
-const verifyOtpSchema = Joi.object({
-  identifier: Joi.string().trim().min(2).max(100).required(),
-  otp: Joi.string().trim().length(6).pattern(/^\d+$/).required(),
+const staffForgotPasswordSchema = Joi.object({
+  username: Joi.string().trim().min(2).max(100).required(),
 });
 
+const accountIdSchema = Joi.alternatives().try(
+  Joi.string().trim().min(1).max(100),
+  Joi.number().integer().positive(),
+);
+
+const verifyOtpSchema = Joi.object({
+  accountId: accountIdSchema,
+  identifier: Joi.string().trim().min(2).max(100),
+  otp: Joi.string().trim().length(6).pattern(/^\d+$/).required(),
+}).or("accountId", "identifier");
+
 const resetPasswordSchema = Joi.object({
-  identifier: Joi.string().trim().min(2).max(100).required(),
+  accountId: accountIdSchema,
+  identifier: Joi.string().trim().min(2).max(100),
   otp: Joi.string().trim().length(6).pattern(/^\d+$/).required(),
   newPassword: Joi.string()
     .min(8)
     .pattern(/^(?=.*[A-Za-z])(?=.*\d).+$/)
     .required(),
-});
+}).or("accountId", "identifier");
 
 const changePasswordSchema = Joi.object({
   oldPassword: Joi.string().required(),
@@ -42,6 +53,7 @@ module.exports = {
   forgotPasswordSchema,
   patientLoginSchema,
   resetPasswordSchema,
+  staffForgotPasswordSchema,
   staffLoginSchema,
   validate,
   verifyOtpSchema,

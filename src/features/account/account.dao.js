@@ -1,19 +1,6 @@
 const supabase = require("../../config/supabase");
-const AppError = require("../../utils/AppError");
-
-function ensureSupabase() {
-  if (!supabase) {
-    throw new AppError(
-      "Supabase is not configured.",
-      500,
-      "SUPABASE_NOT_CONFIGURED",
-    );
-  }
-}
 
 async function findAllAccounts() {
-  ensureSupabase();
-
   return supabase
     .from("account")
     .select("account_id, username, email, phone, status, created_date, role(role_name)")
@@ -21,8 +8,6 @@ async function findAllAccounts() {
 }
 
 async function findAccountByUsername(username) {
-  ensureSupabase();
-
   return supabase
     .from("account")
     .select("account_id")
@@ -31,8 +16,6 @@ async function findAccountByUsername(username) {
 }
 
 async function findAccountByUsernameExcept(username, accountId) {
-  ensureSupabase();
-
   return supabase
     .from("account")
     .select("account_id")
@@ -42,8 +25,6 @@ async function findAccountByUsernameExcept(username, accountId) {
 }
 
 async function findAccountById(accountId) {
-  ensureSupabase();
-
   return supabase
     .from("account")
     .select("account_id")
@@ -52,8 +33,6 @@ async function findAccountById(accountId) {
 }
 
 async function findRoleByName(roleName) {
-  ensureSupabase();
-
   return supabase
     .from("role")
     .select("role_id")
@@ -62,8 +41,6 @@ async function findRoleByName(roleName) {
 }
 
 async function insertAccount(account) {
-  ensureSupabase();
-
   return supabase
     .from("account")
     .insert(account)
@@ -72,8 +49,6 @@ async function insertAccount(account) {
 }
 
 async function updateAccount(accountId, updateFields) {
-  ensureSupabase();
-
   return supabase
     .from("account")
     .update(updateFields)
@@ -83,8 +58,6 @@ async function updateAccount(accountId, updateFields) {
 }
 
 async function deleteAccount(accountId) {
-  ensureSupabase();
-
   return supabase.from("account").delete().eq("account_id", accountId);
 }
 

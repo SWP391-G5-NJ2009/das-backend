@@ -1,5 +1,9 @@
 const appointmentService = require("./appointment.service");
 const { sendSuccess } = require("../../utils/response");
+const {
+  validateBookAppointment,
+  validateCancelAppointment,
+} = require("./appointment.validator");
 
 /**
  * GET /api/appointments/my
@@ -11,6 +15,8 @@ async function getMyAppointments(req, res, next) {
     const filters = {
       status: req.query.status || null,
       date: req.query.date || null,
+      month: req.query.month || null,
+      year: req.query.year || null,
       search: req.query.search || null,
     };
     const data = await appointmentService.getMyAppointments(patientId, filters);
@@ -22,14 +28,18 @@ async function getMyAppointments(req, res, next) {
 
 /**
  * GET /api/appointments
- * Receptionist / Admin / Owner: fetch all clinic appointments.
+ * Receptionist: fetch all clinic appointments.
+ * Dentist: fetch own assigned appointments.
  */
 async function getAllAppointments(req, res, next) {
   try {
     const filters = {
       status: req.query.status || null,
       date: req.query.date || null,
+      month: req.query.month || null,
+      year: req.query.year || null,
       search: req.query.search || null,
+      dentistId: req.user.role === "dentist" ? req.user.profileId : null,
     };
     const data = await appointmentService.getAll(filters);
     return sendSuccess(res, 200, data, "Appointments fetched successfully.");
@@ -45,7 +55,7 @@ async function getAllAppointments(req, res, next) {
 async function cancelAppointment(req, res, next) {
   try {
     const apptId = parseInt(req.params.id, 10);
-    const { reason } = req.body;
+    const { reason } = validateCancelAppointment(req.body);
     const { id: actorAccountId, role, profileId } = req.user;
 
     const data = await appointmentService.cancelAppointment(
@@ -61,7 +71,44 @@ async function cancelAppointment(req, res, next) {
   }
 }
 
+/**
+ * POST /api/appointments
+ * Patient or Receptionist: create a new appointment.
+ */
+async function bookAppointment(req, res, next) {
+  try {
+    const { slotId, serviceId, note, patientId: bodyPatientId, newPatient } =
+      validateBookAppointment(req.body);
+    const { role, profileId, id: actorAccountId } = req.user;
+
+    if (role === "receptionist" && !bodyPatientId && !newPatient) {
+      return next(
+        new (require("../../utils/AppError"))(
+          "Either patientId or newPatient (fullName + phone) is required for receptionist bookings.",
+          400,
+          "VALIDATION_ERROR",
+        ),
+      );
+    }
+
+    const data = await appointmentService.bookAppointment({
+      // Patient books for themselves; receptionist supplies patientId or newPatient
+      patientId: role === "patient" ? Number(profileId) : bodyPatientId ? Number(bodyPatientId) : null,
+      newPatient: role === "receptionist" ? (newPatient || null) : null,
+      slotId: Number(slotId),
+      serviceId: Number(serviceId),
+      note,
+      actorAccountId,
+      actorRole: role,
+    });
+    return sendSuccess(res, 201, data, "Appointment booked successfully.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
+  bookAppointment,
   cancelAppointment,
   getAllAppointments,
   getMyAppointments,

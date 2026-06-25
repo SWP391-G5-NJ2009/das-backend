@@ -1,19 +1,6 @@
 const supabase = require("../../config/supabase");
-const AppError = require("../../utils/AppError");
-
-function ensureSupabase() {
-  if (!supabase) {
-    throw new AppError(
-      "Supabase is not configured.",
-      500,
-      "SUPABASE_NOT_CONFIGURED",
-    );
-  }
-}
 
 async function findAllPayments() {
-  ensureSupabase();
-
   return supabase
     .from("payment")
     .select(

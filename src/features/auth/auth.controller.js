@@ -5,6 +5,7 @@ const {
   forgotPasswordSchema,
   patientLoginSchema,
   resetPasswordSchema,
+  staffForgotPasswordSchema,
   staffLoginSchema,
   validate,
   verifyOtpSchema,
@@ -38,6 +39,16 @@ async function forgotPassword(req, res, next) {
   try {
     const payload = validate(forgotPasswordSchema, req.body);
     const data = await authService.forgotPassword(payload);
+    return sendSuccess(res, 200, data, "OTP has been generated.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function staffForgotPassword(req, res, next) {
+  try {
+    const payload = validate(staffForgotPasswordSchema, req.body);
+    const data = await authService.staffForgotPassword(payload);
     return sendSuccess(res, 200, data, "OTP has been generated.");
   } catch (err) {
     return next(err);
@@ -93,6 +104,7 @@ module.exports = {
   logout,
   patientLogin,
   resetPassword,
+  staffForgotPassword,
   staffLogin,
   verifyOtp,
 };

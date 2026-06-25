@@ -19,7 +19,6 @@ router.post(
   requireRole("owner"),
   dentalServiceController.createService,
 );
-router.get("/categories", dentalServiceController.getAllCategories);
 router.put(
   "/:id",
   authMiddleware,

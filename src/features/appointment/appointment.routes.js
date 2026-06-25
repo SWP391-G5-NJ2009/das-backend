@@ -15,11 +15,18 @@ router.get(
   appointmentController.getMyAppointments,
 );
 
-// Receptionist: view all clinic appointments
+// Receptionist / Dentist: view clinic appointments
 router.get(
   "/",
-  requireRole("receptionist"),
+  requireRole("receptionist", "dentist"),
   appointmentController.getAllAppointments,
+);
+
+// Book: patient (for themselves) or receptionist (supplies patientId)
+router.post(
+  "/",
+  requireRole("patient", "receptionist"),
+  appointmentController.bookAppointment,
 );
 
 // Cancel: patient (own) or receptionist
