@@ -222,6 +222,27 @@ async function findConfirmedAppointmentByService(patientId, serviceId) {
 }
 
 /**
+ * Guard check: returns true if any active appointment
+ * (Confirmed, Conflict, Checked-in)
+ * is currently linked to the given service. Used to block delete/deactivate operations.
+ */
+async function hasActiveAppointmentsByServiceId(serviceId) {
+  const { data, error } = await supabase
+    .from("appointment")
+    .select(
+      `
+      appt_id,
+            appointment_service!inner (service_id)
+    `,
+    )
+    .in("status", ["Confirmed", "Conflict", "Checked-in"])
+    .eq("appointment_service.service_id", serviceId)
+    .limit(1);
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return Array.isArray(data) && data.length > 0;
+}
+/**
  * No-Show sweep: fetch all Confirmed appointments whose slot start
  * time + 15 min has already passed, mark them No-Show, and return the
  * updated rows so the caller can increment no_show_count.
@@ -237,6 +258,8 @@ async function markOverdueAsNoShow() {
     .select(
       `
       appt_id,
+
+
       patient_id,
       work_slot:slot_id (
         time_slot_config:slot_config_id (start_time),
@@ -339,6 +362,7 @@ module.exports = {
   findConfirmedAppointmentByService,
   findSlotInfo,
   getServicePrice,
+  hasActiveAppointmentsByServiceId,
   incrementNoShowCount,
   insertAppointmentServices,
   markNoShowSlotAvailable: releaseSlot,
