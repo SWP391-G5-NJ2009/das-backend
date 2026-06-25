@@ -103,11 +103,8 @@ async function cancelById(apptId, actorAccountId, reason) {
     throw new AppError("Failed to cancel appointment.", 500, "DB_ERROR");
   }
 
-
-
   return data;
 }
-
 
 /**
  * Atomically claim a work_slot: set status = 'Booked' only if currently 'Available'.
@@ -149,11 +146,13 @@ async function releaseSlot(slotId) {
 async function findSlotInfo(slotId) {
   const { data, error } = await supabase
     .from("work_slot")
-    .select(`
+    .select(
+      `
       slot_id,
       time_slot_config:slot_config_id (start_time),
       schedules:schedule_id (work_date)
-    `)
+    `,
+    )
     .eq("slot_id", slotId)
     .maybeSingle();
 
@@ -183,8 +182,6 @@ async function insertAppointmentServices(rows) {
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
 }
 
-
-
 /**
  * Fetch the price of a dental service by its ID.
  * Used to populate actual_price in appointment_service.
@@ -208,11 +205,13 @@ async function getServicePrice(serviceId) {
 async function findConfirmedAppointmentByService(patientId, serviceId) {
   const { data, error } = await supabase
     .from("appointment")
-    .select(`
+    .select(
+      `
       appt_id,
       status,
       appointment_service!inner (service_id)
-    `)
+    `,
+    )
     .eq("patient_id", patientId)
     .eq("status", "Confirmed")
     .eq("appointment_service.service_id", serviceId)
@@ -220,6 +219,28 @@ async function findConfirmedAppointmentByService(patientId, serviceId) {
 
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
   return data; // null if no conflict
+}
+
+/**
+ * Guard check: returns true if any active appointment
+ * (Confirmed, Conflict, Checked-in)
+ * is currently linked to the given service. Used to block delete/deactivate operations.
+ */
+async function hasActiveAppointmentsByServiceId(serviceId) {
+  const { data, error } = await supabase
+    .from("appointment")
+    .select(
+      `
+      appt_id,
+      appointment_service!inner (service_id)
+    `,
+    )
+    .in("status", ["Confirmed", "Conflict", "Checked-in"])
+    .eq("appointment_service.service_id", serviceId)
+    .limit(1);
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return Array.isArray(data) && data.length > 0;
 }
 
 module.exports = {
@@ -231,6 +252,7 @@ module.exports = {
   findConfirmedAppointmentByService,
   findSlotInfo,
   getServicePrice,
+  hasActiveAppointmentsByServiceId,
   insertAppointmentServices,
   markSlotBooked,
   releaseSlot,
