@@ -48,11 +48,10 @@ function normalizeTreatment(row) {
   return {
     id: String(row.appt_id),
     date: schedule?.work_date || "",
-    treatment:
-      services
-        .map((service) => service.dental_service?.service_name)
-        .filter(Boolean)
-        .join(", ") || "Điều trị nha khoa",
+    treatment: services
+      .map((service) => service.dental_service?.service_name)
+      .filter(Boolean)
+      .join(", "),
     diagnosis: treatment?.diagnosis || "",
     dentist: schedule?.dentist?.full_name || "",
     cost: invoice?.total_amount ?? null,
@@ -96,7 +95,7 @@ async function createPatientAccount({
   }
 
   const account = await accountService.createAccount({
-    username: phone,
+    username: null,
     email: null,
     phone,
     password,
