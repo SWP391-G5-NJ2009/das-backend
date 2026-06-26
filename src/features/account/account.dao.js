@@ -1,10 +1,33 @@
 const supabase = require("../../config/supabase");
 
-async function findAllAccounts() {
-  return supabase
+async function findAllAccounts(filters = {}) {
+  const PAGE_SIZE = 20;
+  const page = parseInt(filters.pagination) || 1;
+
+  let query = supabase
     .from("account")
-    .select("account_id, username, email, phone, status, created_date, role(role_name)")
-    .order("created_date", { ascending: false });
+    .select("*, role(role_name)", { count: "exact" })
+    .order("created_date", { ascending: false })
+    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+
+  if (filters.roleId) {
+    query = query.eq("role_id", filters.roleId);
+  }
+
+  if (filters.search) {
+    const s = `%${filters.search}%`;
+    query = query.or(`username.ilike.${s},phone.ilike.${s},email.ilike.${s}`);
+  }
+
+  if (filters.date) {
+    const start = new Date(filters.date);
+    //const end = new Date(start);
+    query = query.gte("created_date", start.toISOString());
+    // .lt("created_at", end.toISOString());
+
+  }
+
+  return query;
 }
 
 async function findAccountByUsername(username) {
