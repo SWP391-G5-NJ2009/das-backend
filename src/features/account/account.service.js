@@ -2,14 +2,21 @@ const accountDao = require("./account.dao");
 const AppError = require("../../utils/AppError");
 const { hashPassword } = require("../../utils/password");
 
-async function getAllAccounts() {
-  const { data, error } = await accountDao.findAllAccounts();
+async function getAllAccounts(filters = {}) {
+  let queryFilters = { ...filters };
+
+  if (queryFilters.status && queryFilters.status !== "All") {
+    const roleId = await getRoleId(queryFilters.status);
+    queryFilters.roleId = roleId;
+  }
+
+  const { data, error, count } = await accountDao.findAllAccounts(queryFilters);
 
   if (error) {
     throw new AppError(error.message, 500, "DB_ERROR");
   }
 
-  return data || [];
+  return { items: data || [], total: count || 0 };
 }
 
 async function ensureUsernameAvailable(username, accountId = null) {
