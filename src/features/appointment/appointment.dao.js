@@ -397,7 +397,7 @@ async function findConfirmedAppointmentByService(patientId, serviceId) {
 /**
  * Guard check: returns true if any active appointment
  * (Confirmed, Conflict, Checked-in)
- * is currently linked to the given service. Used to block delete/deactivate operations.
+ * is currently linked to the given service. Used to block deactivate operations.
  */
 async function hasActiveAppointmentsByServiceId(serviceId) {
   const { data, error } = await supabase
@@ -410,6 +410,23 @@ async function hasActiveAppointmentsByServiceId(serviceId) {
     )
     .in("status", ["Confirmed", "Conflict", "Checked-in"])
     .eq("appointment_service.service_id", serviceId)
+    .limit(1);
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return Array.isArray(data) && data.length > 0;
+}
+
+/**
+ * BR-25 hard-deletion guard: returns true if the service has EVER been linked
+ * to any appointment record, regardless of status (Confirmed, Cancelled,
+ * Completed, No-Show, etc.).
+ * If this returns true the service MUST NOT be hard-deleted.
+ */
+async function hasAnyAppointmentByServiceId(serviceId) {
+  const { data, error } = await supabase
+    .from("appointment_service")
+    .select("appt_id")
+    .eq("service_id", serviceId)
     .limit(1);
 
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
@@ -538,6 +555,7 @@ module.exports = {
   findSlotsByApptId,
   getServicePrice,
   hasActiveAppointmentsByServiceId,
+  hasAnyAppointmentByServiceId,
   incrementNoShowCount,
   insertAppointmentServices,
   insertAppointmentSlots,
