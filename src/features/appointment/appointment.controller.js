@@ -77,7 +77,7 @@ async function cancelAppointment(req, res, next) {
  */
 async function bookAppointment(req, res, next) {
   try {
-    const { slotId, serviceId, note, patientId: bodyPatientId, newPatient } =
+    const { slotId, serviceId, note, patientId: bodyPatientId, newPatient, slotOccupied } =
       validateBookAppointment(req.body);
     const { role, profileId, id: actorAccountId } = req.user;
 
@@ -100,6 +100,7 @@ async function bookAppointment(req, res, next) {
       note,
       actorAccountId,
       actorRole: role,
+      slotOccupied: slotOccupied ?? 1,
     });
     return sendSuccess(res, 201, data, "Appointment booked successfully.");
   } catch (err) {
