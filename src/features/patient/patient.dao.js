@@ -82,6 +82,21 @@ async function findProfileByPhone(phone) {
     .maybeSingle();
 }
 
+/**
+ * BR-11: Fetch patient's no_show_count to decide if they are banned from booking.
+ */
+async function findPatientById(patientId) {
+  const { data, error } = await supabase
+    .from("patient")
+    .select("patient_id, full_name, no_show_count")
+    .eq("patient_id", patientId)
+    .single();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  if (!data) throw new AppError("Patient not found.", 404, "NOT_FOUND");
+  return data;
+}
+
 async function insertProfile(payload) {
   return supabase
     .from("patient")
@@ -111,6 +126,7 @@ module.exports = {
   createPatient,
   searchPatients,
   findProfileByPhone,
+  findPatientById,
   findTreatmentHistoryByPatientId,
   insertProfile,
   linkProfileAccount,
