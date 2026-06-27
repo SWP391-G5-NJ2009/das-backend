@@ -35,13 +35,14 @@ async function getAllServices() {
 }
 
 async function deleteService(id) {
-  // Guard: block delete if service has any active appointments
-  const hasActive = await appointmentDao.hasActiveAppointmentsByServiceId(id);
-  if (hasActive) {
+  // BR-25: Hard-deletion is blocked if the service has EVER been linked to
+  // any appointment record, regardless of status (past, cancelled, completed…).
+  const everBooked = await appointmentDao.hasAnyAppointmentByServiceId(id);
+  if (everBooked) {
     throw new AppError(
-      "Cannot delete this service because it is currently booked in active appointments (Confirmed, Checked-in, Conflict). Please cancel or complete them first.",
+      "Deletion Denied. This service cannot be deleted because it contains linked appointment record. Please use the Inactivate status instead to hide it.",
       409,
-      "SERVICE_IN_USE",
+      "SERVICE_HAS_HISTORY",
     );
   }
 
@@ -97,18 +98,6 @@ async function getAllCategories() {
 }
 
 async function updateService(id, payload) {
-  // Guard: block deactivation if service has any active appointments
-  if (payload.status === "Inactive") {
-    const hasActive = await appointmentDao.hasActiveAppointmentsByServiceId(id);
-    if (hasActive) {
-      throw new AppError(
-        "Cannot deactivate this service because it is currently booked in active appointments (Confirmed, Checked-in, Conflict). Please cancel or complete them first.",
-        409,
-        "SERVICE_IN_USE",
-      );
-    }
-  }
-
   const { data, error } = await dentalServiceDao.updateService(
     id,
     mapServicePayload(payload),
