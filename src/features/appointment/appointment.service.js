@@ -183,6 +183,7 @@ function normalize(row) {
 
   return {
     id: String(row.appt_id),
+    patientId: row.patient?.patient_id ?? null,
     patientName: row.patient?.full_name || null,
     patientPhone: row.patient?.phone || null,
     patientEmail: row.patient?.email || null,
@@ -190,6 +191,7 @@ function normalize(row) {
     patientGender: row.patient?.gender || null,
     patientAddress: row.patient?.address || null,
     patientNoShowCount: row.patient?.no_show_count ?? 0,
+
     serviceName: services.join(", ") || null,
     services: (row.appointment_service || []).map((as) => ({
       serviceId: as.dental_service?.service_id,

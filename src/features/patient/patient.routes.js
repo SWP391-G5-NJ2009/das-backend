@@ -20,6 +20,13 @@ router.post(
   patientController.createPatientAccount,
 );
 
+// Receptionist: lift booking ban for a patient
+router.patch(
+  "/:patientId/lift-ban",
+  requireRole("receptionist"),
+  patientController.liftBookingBan,
+);
+
 router.use(requireRole("patient"));
 
 router.get("/me/treatments", patientController.getMyTreatmentHistory);
