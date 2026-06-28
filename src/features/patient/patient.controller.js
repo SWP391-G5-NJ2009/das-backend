@@ -30,7 +30,24 @@ async function createPatientAccount(req, res, next) {
 
 async function getMyTreatmentHistory(req, res, next) {
   try {
-    const data = await patientService.getMyTreatmentHistory(req.user.profileId);
+    const data = await patientService.getTreatmentHistory(req.user.profileId);
+    return sendSuccess(
+      res,
+      200,
+      data,
+      "Treatment history fetched successfully.",
+    );
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function getTreatmentHistoryByPatient(req, res, next) {
+  try {
+    const data = await patientService.getTreatmentHistory(req.params.patientId, {
+      actorProfileId: req.user.profileId,
+      actorRole: req.user.role,
+    });
     return sendSuccess(
       res,
       200,
@@ -46,4 +63,5 @@ module.exports = {
   searchPatients,
   createPatientAccount,
   getMyTreatmentHistory,
+  getTreatmentHistoryByPatient,
 };

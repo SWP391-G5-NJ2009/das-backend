@@ -128,6 +128,7 @@ function normalize(row) {
 
   return {
     id: String(row.appt_id),
+    patientId: row.patient?.patient_id || row.patient_id || null,
     patientName: row.patient?.full_name || null,
     patientPhone: row.patient?.phone || null,
     patientEmail: row.patient?.email || null,
