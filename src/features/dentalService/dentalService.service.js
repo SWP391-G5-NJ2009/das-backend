@@ -1,4 +1,5 @@
 const dentalServiceDao = require("./dentalService.dao");
+const appointmentDao = require("../appointment/appointment.dao");
 const AppError = require("../../utils/AppError");
 
 function mapServicePayload({
@@ -34,6 +35,16 @@ async function getAllServices() {
 }
 
 async function deleteService(id) {
+  // Guard: block delete if service has any active appointments
+  const hasActive = await appointmentDao.hasActiveAppointmentsByServiceId(id);
+  if (hasActive) {
+    throw new AppError(
+      "Cannot delete this service because it is currently booked in active appointments (Confirmed, Checked-in, Conflict). Please cancel or complete them first.",
+      409,
+      "SERVICE_IN_USE",
+    );
+  }
+
   const { data, error } = await dentalServiceDao.deleteService(id);
 
   if (error) {
@@ -86,6 +97,18 @@ async function getAllCategories() {
 }
 
 async function updateService(id, payload) {
+  // Guard: block deactivation if service has any active appointments
+  if (payload.status === "Inactive") {
+    const hasActive = await appointmentDao.hasActiveAppointmentsByServiceId(id);
+    if (hasActive) {
+      throw new AppError(
+        "Cannot deactivate this service because it is currently booked in active appointments (Confirmed, Checked-in, Conflict). Please cancel or complete them first.",
+        409,
+        "SERVICE_IN_USE",
+      );
+    }
+  }
+
   const { data, error } = await dentalServiceDao.updateService(
     id,
     mapServicePayload(payload),

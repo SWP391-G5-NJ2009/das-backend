@@ -7,7 +7,13 @@ const {
 
 async function getAllConsultationRequests(req, res, next) {
   try {
-    const data = await consultationService.getAllConsultationRequests();
+    const filters = {
+      status: req.query.status || null,
+      date: req.query.date || null,
+      search: req.query.search || null,
+      pagination: req.query.pagination || null,
+    };
+    const data = await consultationService.getAllConsultationRequests(filters);
     return sendSuccess(res, 200, data, "Requests retrieved successfully.");
   } catch (err) {
     return next(err);
@@ -17,6 +23,11 @@ async function getAllConsultationRequests(req, res, next) {
 async function createConsultationRequest(req, res, next) {
   try {
     const payload = validateCreateConsultation(req.body);
+
+    if (Date.now() - payload.loadedAt < 3000) {
+      throw new AppError("Form submitted too quickly.", 400, "SPAM_DETECTED");
+    }
+
     const data = await consultationService.createConsultationRequest(payload);
     return sendSuccess(res, 201, data, "Consultation created successfully.");
   } catch (err) {

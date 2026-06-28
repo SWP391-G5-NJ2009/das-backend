@@ -1,4 +1,3 @@
-const bcrypt = require("bcryptjs");
 const authDao = require("./auth.dao");
 const textbeeService = require("../../integrations/textbee/textbee.service");
 const AppError = require("../../utils/AppError");
@@ -10,6 +9,7 @@ const {
   getOtpExpiry,
   hashOtp,
 } = require("../../utils/otp");
+const { comparePassword, hashPassword } = require("../../utils/password");
 const normalizeRole = require("../../utils/normalizeRole");
 
 const ROLE_PROFILE_TABLE = {
@@ -21,11 +21,35 @@ const ROLE_PROFILE_TABLE = {
 };
 
 const STAFF_ROLES = ["receptionist", "dentist", "owner", "admin"];
+const INVALID_CREDENTIALS_MESSAGE = "Invalid credentials. Please try again.";
+const PROCESSING_ERROR_MESSAGE =
+  "Unable to process data. Please try again later.";
+const PASSWORD_UPDATE_ERROR_MESSAGE =
+  "Unable to update password. Please try again later.";
+
+function invalidCredentialsError() {
+  return new AppError(INVALID_CREDENTIALS_MESSAGE, 401, "INVALID_CREDENTIALS");
+}
+
+function processingError() {
+  return new AppError(PROCESSING_ERROR_MESSAGE, 500, "DB_ERROR");
+}
+
+function passwordUpdateError() {
+  return new AppError(PASSWORD_UPDATE_ERROR_MESSAGE, 500, "DB_ERROR");
+}
+
+function isActiveStatus(status) {
+  return String(status || "").toLowerCase() === "active";
+}
+
+function isDuplicateLookupError(error) {
+  const errorMessage = `${error.message || ""} ${error.details || ""}`;
+  return errorMessage.toLowerCase().includes("multiple");
+}
 
 async function verifyPassword(account, password) {
-  return account.password_hash
-    ? bcrypt.compare(password, account.password_hash)
-    : false;
+  return comparePassword(password, account.password_hash);
 }
 
 async function getAccountById(accountId) {
@@ -52,11 +76,7 @@ async function getProfile(role, accountId) {
   );
 
   if (error) {
-    throw new AppError(
-      "Unable to process data. Please try again later.",
-      500,
-      "DB_ERROR",
-    );
+    throw processingError();
   }
 
   return data;
@@ -95,24 +115,16 @@ async function loginWithAccount(account, password, allowedRoles) {
   const role = normalizeRole(account?.role?.role_name);
 
   if (!account || !allowedRoles.includes(role)) {
-    throw new AppError(
-      "Invalid credentials. Please try again.",
-      401,
-      "INVALID_CREDENTIALS",
-    );
+    throw invalidCredentialsError();
   }
 
-  if (String(account.status || "").toLowerCase() !== "active") {
+  if (!isActiveStatus(account.status)) {
     throw new AppError("Account is not active.", 403, "ACCOUNT_INACTIVE");
   }
 
   const passwordMatches = await verifyPassword(account, password);
   if (!passwordMatches) {
-    throw new AppError(
-      "Invalid credentials. Please try again.",
-      401,
-      "INVALID_CREDENTIALS",
-    );
+    throw invalidCredentialsError();
   }
 
   return issueAuth(account);
@@ -137,11 +149,7 @@ async function staffLogin({ username, password }) {
     await authDao.findStaffAccountByIdentifier(username);
 
   if (error || !account) {
-    throw new AppError(
-      "Invalid credentials. Please try again.",
-      401,
-      "INVALID_CREDENTIALS",
-    );
+    throw invalidCredentialsError();
   }
 
   return loginWithAccount(account, password, STAFF_ROLES);
@@ -152,11 +160,7 @@ async function findAccountForIdentifier(identifier) {
     await authDao.findPatientAccountByPhone(identifier);
 
   if (patientError) {
-    throw new AppError(
-      "Unable to process data. Please try again later.",
-      500,
-      "DB_ERROR",
-    );
+    throw processingError();
   }
 
   if (patient?.account) {
@@ -167,11 +171,7 @@ async function findAccountForIdentifier(identifier) {
     await authDao.findAccountByIdentifier(identifier);
 
   if (accountError) {
-    throw new AppError(
-      "Unable to process data. Please try again later.",
-      500,
-      "DB_ERROR",
-    );
+    throw processingError();
   }
 
   if (!account) {
@@ -206,11 +206,7 @@ async function createPasswordResetOtp({ account, recipient }) {
   });
 
   if (error) {
-    throw new AppError(
-      "Unable to process data. Please try again later.",
-      500,
-      "DB_ERROR",
-    );
+    throw processingError();
   }
 
   let otpDelivery = "textbee";
@@ -260,13 +256,12 @@ async function staffForgotPassword({ username }) {
     await authDao.findStaffAccountByUsername(normalizedUsername);
 
   if (error) {
-    const errorMessage = `${error.message || ""} ${error.details || ""}`;
-    const isDuplicateLookup = errorMessage.toLowerCase().includes("multiple");
+    const isDuplicateLookup = isDuplicateLookupError(error);
 
     throw new AppError(
       isDuplicateLookup
         ? "Staff username lookup is not unique. Please contact an administrator."
-        : "Unable to process data. Please try again later.",
+        : PROCESSING_ERROR_MESSAGE,
       500,
       isDuplicateLookup ? "USERNAME_NOT_UNIQUE" : "DB_ERROR",
     );
@@ -321,7 +316,7 @@ async function resetPassword({ accountId, identifier, otp, newPassword }) {
     identifier,
     otp,
   });
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+  const passwordHash = await hashPassword(newPassword);
 
   const { error: updateError } = await authDao.updateAccountPassword(
     account.account_id,
@@ -329,11 +324,7 @@ async function resetPassword({ accountId, identifier, otp, newPassword }) {
   );
 
   if (updateError) {
-    throw new AppError(
-      "Unable to update password. Please try again later.",
-      500,
-      "DB_ERROR",
-    );
+    throw passwordUpdateError();
   }
 
   const { error: consumeError } = await authDao.consumeOtpToken(
@@ -363,15 +354,11 @@ async function changePassword({ accountId, oldPassword, newPassword }) {
     );
   }
 
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+  const passwordHash = await hashPassword(newPassword);
   const { error } = await authDao.updateAccountPassword(accountId, passwordHash);
 
   if (error) {
-    throw new AppError(
-      "Unable to update password. Please try again later.",
-      500,
-      "DB_ERROR",
-    );
+    throw passwordUpdateError();
   }
 
   return { changed: true };

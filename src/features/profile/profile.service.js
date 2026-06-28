@@ -3,72 +3,19 @@ const AppError = require("../../utils/AppError");
 const normalizeRole = require("../../utils/normalizeRole");
 
 const ROLE_PROFILE = {
-  admin: {
-    table: "admin",
-    id: "admin_id",
-    fields: {
-      fullName: "full_name",
-      email: "email",
-      phone: "phone",
-      birthDate: "birth_date",
-      gender: "gender",
-      address: "address",
-    },
-  },
-  dentist: {
-    table: "dentist",
-    id: "dentist_id",
-    fields: {
-      fullName: "full_name",
-      email: "email",
-      phone: "phone",
-      birthDate: "birth_date",
-      gender: "gender",
-      address: "address",
-      speciality: "speciality",
-    },
-  },
-  owner: {
-    table: "owner",
-    id: "owner_id",
-    fields: {
-      fullName: "full_name",
-      email: "email",
-      phone: "phone",
-      birthDate: "birth_date",
-      gender: "gender",
-      address: "address",
-    },
-  },
-  patient: {
-    table: "patient",
-    id: "patient_id",
-    fields: {
-      fullName: "full_name",
-      email: "email",
-      phone: "phone",
-      birthDate: "birth_date",
-      gender: "gender",
-      address: "address",
-    },
-  },
-  receptionist: {
-    table: "receptionist",
-    id: "receptionist_id",
-    fields: {
-      fullName: "full_name",
-      email: "email",
-      phone: "phone",
-      birthDate: "birth_date",
-      gender: "gender",
-      address: "address",
-    },
-  },
+  admin: { table: "admin", id: "admin_id" },
+  dentist: { table: "dentist", id: "dentist_id" },
+  owner: { table: "owner", id: "owner_id" },
+  patient: { table: "patient", id: "patient_id" },
+  receptionist: { table: "receptionist", id: "receptionist_id" },
 };
 
-const ACCOUNT_FIELDS = {
+const PROFILE_FIELDS = {
+  fullName: "full_name",
   email: "email",
-  phone: "phone",
+  birthDate: "birth_date",
+  gender: "gender",
+  address: "address",
 };
 
 function pickColumns(payload, fields) {
@@ -80,22 +27,13 @@ function pickColumns(payload, fields) {
 }
 
 function normalizeProfile(role, account, profile) {
-  const config = ROLE_PROFILE[role];
-
   return {
-    accountId: account.account_id,
-    profileId: config && profile ? profile[config.id] : null,
     role,
-    username: account.username || "",
+    fullName: profile?.full_name || account.email || "",
     email: profile?.email || account.email || "",
-    phone: profile?.phone || account.phone || "",
-    status: account.status || "",
-    fullName: profile?.full_name || account.username || account.email || "",
     birthDate: profile?.birth_date || "",
     gender: profile?.gender || "",
     address: profile?.address || "",
-    noShowCount: profile?.no_show_count ?? null,
-    speciality: profile?.speciality || "",
   };
 }
 
@@ -140,7 +78,12 @@ async function updateMyProfile(accountId, payload) {
   let account = await getAccount(accountId);
   const role = normalizeRole(account.role?.role_name);
   const config = ROLE_PROFILE[role];
-  const accountFields = pickColumns(payload, ACCOUNT_FIELDS);
+  const accountFields = pickColumns(payload, { email: "email" });
+  const profileFields = pickColumns(payload, PROFILE_FIELDS);
+
+  if (!Object.keys(accountFields).length && !Object.keys(profileFields).length) {
+    throw new AppError("No fields to update.", 400, "NO_UPDATES");
+  }
 
   if (Object.keys(accountFields).length) {
     const { data, error } = await profileDao.updateAccount(
@@ -155,30 +98,18 @@ async function updateMyProfile(accountId, payload) {
     account = data;
   }
 
-  let profile = null;
-
-  if (config) {
-    const profileFields = pickColumns(payload, config.fields);
-
-    if (Object.keys(profileFields).length) {
-      const { data, error } = await profileDao.updateProfile(
-        config.table,
-        accountId,
-        profileFields,
-      );
-
-      if (error) {
-        throw new AppError(error.message, 500, "DB_ERROR");
-      }
-
-      profile = data;
-    } else {
-      profile = (await getProfileForAccount(account)).profile;
-    }
+  if (!config) {
+    return normalizeProfile(role, account, null);
   }
 
-  if (!Object.keys(accountFields).length && !profile) {
-    throw new AppError("No fields to update.", 400, "NO_UPDATES");
+  const { data: profile, error } = await profileDao.updateProfile(
+    config.table,
+    accountId,
+    profileFields,
+  );
+
+  if (error) {
+    throw new AppError(error.message, 500, "DB_ERROR");
   }
 
   return normalizeProfile(role, account, profile);

@@ -2,16 +2,6 @@ const supabase = require("../../config/supabase");
 const AppError = require("../../utils/AppError");
 const logger = require("../../utils/logger");
 
-function ensureSupabase() {
-  if (!supabase) {
-    throw new AppError(
-      "Supabase is not configured.",
-      500,
-      "SUPABASE_NOT_CONFIGURED",
-    );
-  }
-}
-
 const APPOINTMENT_SELECT = `
   appt_id,
   status,
@@ -30,13 +20,9 @@ const APPOINTMENT_SELECT = `
       status,
       dentist:dentist_id (
         dentist_id,
+        full_name,
         speciality,
-        experience,
-        account:account_id (
-          account_id,
-          username,
-          email
-        )
+        experience
       )
     )
   ),
@@ -67,18 +53,10 @@ const APPOINTMENT_SELECT = `
     total_amount,
     payment_status,
     payment_time
-  ),
-  appointment_history (
-    history_id,
-    action_type,
-    reason,
-    created_at
   )
 `.trim();
 
 async function findByPatientId(patientId, filters = {}) {
-  ensureSupabase();
-
   let query = supabase
     .from("appointment")
     .select(APPOINTMENT_SELECT)
@@ -93,8 +71,6 @@ async function findByPatientId(patientId, filters = {}) {
 }
 
 async function findAll(filters = {}) {
-  ensureSupabase();
-
   let query = supabase
     .from("appointment")
     .select(APPOINTMENT_SELECT)
@@ -108,8 +84,6 @@ async function findAll(filters = {}) {
 }
 
 async function findById(apptId) {
-  ensureSupabase();
-
   return supabase
     .from("appointment")
     .select(APPOINTMENT_SELECT)
@@ -118,33 +92,16 @@ async function findById(apptId) {
 }
 
 async function cancelById(apptId, actorAccountId, reason) {
-  ensureSupabase();
-
   const { data, error } = await supabase
     .from("appointment")
-    .update({ status: "Cancelled" })
+    .update({ status: "Cancelled", note: reason || null })
     .eq("appt_id", apptId)
-    .select("appt_id, status")
+    .select("appt_id, status, note")
     .single();
 
   if (error || !data) {
     throw new AppError("Failed to cancel appointment.", 500, "DB_ERROR");
   }
-
-  supabase
-    .from("appointment_history")
-    .insert({
-      appt_id: apptId,
-      action_type: "Cancelled",
-      actor_account_id: actorAccountId,
-      reason: reason || null,
-      created_at: new Date().toISOString(),
-    })
-    .then(({ error: histErr }) => {
-      if (histErr) {
-        logger.error("Appointment history insert failed.", histErr);
-      }
-    });
 
   return data;
 }
@@ -154,8 +111,6 @@ async function cancelById(apptId, actorAccountId, reason) {
  * Returns the updated slot row, or null if the slot was already taken/unavailable.
  */
 async function markSlotBooked(slotId) {
-  ensureSupabase();
-
   const { data, error } = await supabase
     .from("work_slot")
     .update({ status: "Booked" })
@@ -173,8 +128,6 @@ async function markSlotBooked(slotId) {
  * Only transitions from 'Booked' → 'Available' (leaves 'Unavailable' slots untouched).
  */
 async function releaseSlot(slotId) {
-  ensureSupabase();
-
   const { error } = await supabase
     .from("work_slot")
     .update({ status: "Available" })
@@ -191,15 +144,15 @@ async function releaseSlot(slotId) {
  * Returns { work_date: "YYYY-MM-DD", start_time: "HH:MM:SS" } or null.
  */
 async function findSlotInfo(slotId) {
-  ensureSupabase();
-
   const { data, error } = await supabase
     .from("work_slot")
-    .select(`
+    .select(
+      `
       slot_id,
       time_slot_config:slot_config_id (start_time),
       schedules:schedule_id (work_date)
-    `)
+    `,
+    )
     .eq("slot_id", slotId)
     .maybeSingle();
 
@@ -211,8 +164,6 @@ async function findSlotInfo(slotId) {
  * Insert a new appointment row.
  */
 async function createAppointment(payload) {
-  ensureSupabase();
-
   const { data, error } = await supabase
     .from("appointment")
     .insert(payload)
@@ -227,22 +178,8 @@ async function createAppointment(payload) {
  * Insert rows into appointment_service (one per service selected).
  */
 async function insertAppointmentServices(rows) {
-  ensureSupabase();
-
   const { error } = await supabase.from("appointment_service").insert(rows);
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
-}
-
-/**
- * Insert a row into appointment_history (best-effort, non-blocking).
- */
-async function insertHistory(row) {
-  ensureSupabase();
-
-  const { error } = await supabase.from("appointment_history").insert(row);
-  if (error) {
-    console.error("[appointment.dao] history insert failed:", error.message);
-  }
 }
 
 /**
@@ -250,8 +187,6 @@ async function insertHistory(row) {
  * Used to populate actual_price in appointment_service.
  */
 async function getServicePrice(serviceId) {
-  ensureSupabase();
-
   const { data, error } = await supabase
     .from("dental_services")
     .select("unit_price")
@@ -268,15 +203,15 @@ async function getServicePrice(serviceId) {
  * Returns the existing appointment row if found, null otherwise.
  */
 async function findConfirmedAppointmentByService(patientId, serviceId) {
-  ensureSupabase();
-
   const { data, error } = await supabase
     .from("appointment")
-    .select(`
+    .select(
+      `
       appt_id,
       status,
       appointment_service!inner (service_id)
-    `)
+    `,
+    )
     .eq("patient_id", patientId)
     .eq("status", "Confirmed")
     .eq("appointment_service.service_id", serviceId)
@@ -284,6 +219,138 @@ async function findConfirmedAppointmentByService(patientId, serviceId) {
 
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
   return data; // null if no conflict
+}
+
+/**
+ * Guard check: returns true if any active appointment
+ * (Confirmed, Conflict, Checked-in)
+ * is currently linked to the given service. Used to block delete/deactivate operations.
+ */
+async function hasActiveAppointmentsByServiceId(serviceId) {
+  const { data, error } = await supabase
+    .from("appointment")
+    .select(
+      `
+      appt_id,
+            appointment_service!inner (service_id)
+    `,
+    )
+    .in("status", ["Confirmed", "Conflict", "Checked-in"])
+    .eq("appointment_service.service_id", serviceId)
+    .limit(1);
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return Array.isArray(data) && data.length > 0;
+}
+/**
+ * No-Show sweep: fetch all Confirmed appointments whose slot start
+ * time + 15 min has already passed, mark them No-Show, and return the
+ * updated rows so the caller can increment no_show_count.
+ *
+ * Returns an array of { appt_id, patient_id } objects.
+ */
+async function markOverdueAsNoShow() {
+  const now = new Date();
+
+  // Fetch Confirmed appointments with their slot datetime info
+  const { data: candidates, error: fetchError } = await supabase
+    .from("appointment")
+    .select(
+      `
+      appt_id,
+
+
+      patient_id,
+      work_slot:slot_id (
+        time_slot_config:slot_config_id (start_time),
+        schedules:schedule_id (work_date)
+      )
+    `,
+    )
+    .in("status", ["Confirmed"]);
+
+  if (fetchError) {
+    logger.error("[noShow] Failed to fetch candidates:", fetchError.message);
+    return [];
+  }
+
+  if (!candidates || candidates.length === 0) return [];
+
+  // Filter those whose slot start + 15 min < now
+  const NO_SHOW_GRACE_MS = 15 * 60 * 1000; // 15 minutes
+  const overdueIds = [];
+  const overduePatientIds = {}; // appt_id → patient_id
+
+  for (const appt of candidates) {
+    const workDate = appt.work_slot?.schedules?.work_date; // "YYYY-MM-DD"
+    const startTime = appt.work_slot?.time_slot_config?.start_time; // "HH:MM:SS"
+    if (!workDate || !startTime) continue;
+
+    const slotStart = new Date(`${workDate}T${startTime}`);
+    const deadline = new Date(slotStart.getTime() + NO_SHOW_GRACE_MS);
+
+    if (now >= deadline) {
+      overdueIds.push(appt.appt_id);
+      overduePatientIds[appt.appt_id] = appt.patient_id;
+    }
+  }
+
+  if (overdueIds.length === 0) return [];
+
+  // Bulk update to No-Show
+  const { data: updated, error: updateError } = await supabase
+    .from("appointment")
+    .update({ status: "No-Show" })
+    .in("appt_id", overdueIds)
+    .in("status", ["Confirmed"]) // double-check: guard against race
+    .select("appt_id, patient_id");
+
+  if (updateError) {
+    logger.error(
+      "[noShow] Failed to update appointments:",
+      updateError.message,
+    );
+    return [];
+  }
+
+  return updated || [];
+}
+
+/**
+ * Increment no_show_count for a list of patient IDs.
+ * Uses a direct atomic UPDATE (no_show_count = no_show_count + 1).
+ */
+async function incrementNoShowCount(patientIds) {
+  if (!patientIds || patientIds.length === 0) return;
+
+  for (const patientId of patientIds) {
+    // Read current count, then write back incremented value
+    const { data: patient, error: readError } = await supabase
+      .from("patient")
+      .select("no_show_count")
+      .eq("patient_id", patientId)
+      .single();
+
+    if (readError || !patient) {
+      logger.error(
+        `[noShow] Could not read no_show_count for patient ${patientId}:`,
+        readError?.message,
+      );
+      continue;
+    }
+
+    const { error: writeError } = await supabase
+      .from("patient")
+      .update({ no_show_count: (patient.no_show_count ?? 0) + 1 })
+      .eq("patient_id", patientId);
+
+    if (writeError) {
+      logger.error(
+        `[noShow] Failed to increment no_show_count for patient ${patientId}:`,
+        writeError.message,
+      );
+    }
+  }
 }
 
 module.exports = {
@@ -295,8 +362,11 @@ module.exports = {
   findConfirmedAppointmentByService,
   findSlotInfo,
   getServicePrice,
+  hasActiveAppointmentsByServiceId,
+  incrementNoShowCount,
   insertAppointmentServices,
-  insertHistory,
+  markNoShowSlotAvailable: releaseSlot,
+  markOverdueAsNoShow,
   markSlotBooked,
   releaseSlot,
 };

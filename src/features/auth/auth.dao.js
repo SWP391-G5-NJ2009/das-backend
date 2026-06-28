@@ -1,23 +1,10 @@
 const supabase = require("../../config/supabase");
-const AppError = require("../../utils/AppError");
-
-function ensureSupabase() {
-  if (!supabase) {
-    throw new AppError(
-      "Supabase is not configured.",
-      500,
-      "SUPABASE_NOT_CONFIGURED",
-    );
-  }
-}
 
 function accountSelect() {
   return "account_id, email, username, phone, password_hash, role_id, status, role(role_name)";
 }
 
 async function findAccountById(accountId) {
-  ensureSupabase();
-
   return supabase
     .from("account")
     .select(accountSelect())
@@ -26,8 +13,6 @@ async function findAccountById(accountId) {
 }
 
 async function findProfile(table, accountId) {
-  ensureSupabase();
-
   return supabase
     .from(table)
     .select("*")
@@ -36,8 +21,6 @@ async function findProfile(table, accountId) {
 }
 
 async function findPatientByPhone(phone) {
-  ensureSupabase();
-
   return supabase
     .from("patient")
     .select(`patient_id, account_id, account(${accountSelect()})`)
@@ -46,8 +29,6 @@ async function findPatientByPhone(phone) {
 }
 
 async function findPatientAccountByPhone(phone) {
-  ensureSupabase();
-
   return supabase
     .from("patient")
     .select(`phone, account(${accountSelect()})`)
@@ -56,8 +37,6 @@ async function findPatientAccountByPhone(phone) {
 }
 
 async function findStaffAccountByIdentifier(identifier) {
-  ensureSupabase();
-
   return supabase
     .from("account")
     .select(accountSelect())
@@ -66,8 +45,6 @@ async function findStaffAccountByIdentifier(identifier) {
 }
 
 async function findStaffAccountByUsername(username) {
-  ensureSupabase();
-
   return supabase
     .from("account")
     .select(accountSelect())
@@ -76,8 +53,6 @@ async function findStaffAccountByUsername(username) {
 }
 
 async function findAccountByIdentifier(identifier) {
-  ensureSupabase();
-
   return supabase
     .from("account")
     .select(accountSelect())
@@ -86,14 +61,10 @@ async function findAccountByIdentifier(identifier) {
 }
 
 async function insertOtpToken(payload) {
-  ensureSupabase();
-
   return supabase.from("otp_tokens").insert(payload);
 }
 
 async function findLatestResetPasswordOtp(accountId) {
-  ensureSupabase();
-
   return supabase
     .from("otp_tokens")
     .select("*")
@@ -107,8 +78,6 @@ async function findLatestResetPasswordOtp(accountId) {
 }
 
 async function updateAccountPassword(accountId, passwordHash) {
-  ensureSupabase();
-
   return supabase
     .from("account")
     .update({ password_hash: passwordHash })
@@ -116,8 +85,6 @@ async function updateAccountPassword(accountId, passwordHash) {
 }
 
 async function consumeOtpToken(otpId) {
-  ensureSupabase();
-
   return supabase
     .from("otp_tokens")
     .update({ consumed_at: new Date().toISOString() })

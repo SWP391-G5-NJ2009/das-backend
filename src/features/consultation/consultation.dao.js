@@ -1,28 +1,23 @@
 const supabase = require("../../config/supabase");
-const AppError = require("../../utils/AppError");
 
-function ensureSupabase() {
-  if (!supabase) {
-    throw new AppError(
-      "Supabase is not configured.",
-      500,
-      "SUPABASE_NOT_CONFIGURED",
-    );
-  }
-}
+async function findAllConsultationRequests(filters = {}) {
+  const PAGE_SIZE = 20;
+  const page = parseInt(filters.pagination) || 1;
 
-async function findAllConsultationRequests() {
-  ensureSupabase();
-
-  return supabase
+  let query = supabase
     .from("consultation_request")
-    .select("*")
-    .order("created_at", { ascending: false });
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range((page-1)*PAGE_SIZE, page*PAGE_SIZE-1);
+
+  if (filters.status && filters.status !== "All") {
+    query = query.eq("status", filters.status)
+  }
+
+  return query;
 }
 
 async function insertConsultationRequest(payload) {
-  ensureSupabase();
-
   return supabase
     .from("consultation_request")
     .insert(payload)
@@ -31,8 +26,6 @@ async function insertConsultationRequest(payload) {
 }
 
 async function updateConsultationRequest(id, updateFields) {
-  ensureSupabase();
-
   return supabase
     .from("consultation_request")
     .update(updateFields)

@@ -1,23 +1,11 @@
 const supabase = require("../../config/supabase");
 const AppError = require("../../utils/AppError");
 
-function ensureSupabase() {
-  if (!supabase) {
-    throw new AppError(
-      "Supabase is not configured.",
-      500,
-      "SUPABASE_NOT_CONFIGURED",
-    );
-  }
-}
-
 /**
  * Search patients by full_name or phone (case-insensitive partial match).
  * Returns up to 20 results.
  */
 async function searchPatients(q) {
-  ensureSupabase();
-
   const { data, error } = await supabase
     .from("patient")
     .select("patient_id, full_name, phone, email, birth_date, gender")
@@ -33,8 +21,6 @@ async function searchPatients(q) {
  * Only full_name and phone are required.
  */
 async function createPatient({ fullName, phone }) {
-  ensureSupabase();
-
   const { data, error } = await supabase
     .from("patient")
     .insert({ full_name: fullName, phone })
@@ -67,50 +53,28 @@ const PATIENT_PROFILE_SELECT = `
 
 const TREATMENT_HISTORY_SELECT = `
   appt_id,
-  patient_id,
-  status,
-  book_time,
-  total_estimated_amount,
-  note,
   work_slot:slot_id (
-    slot_config:slot_config_id (
-      start_time,
-      end_time
-    ),
     schedules:schedule_id (
       work_date,
       dentist:dentist_id (
-        dentist_id,
-        account:account_id (
-          username,
-          email
-        )
+        full_name
       )
     )
   ),
   appointment_service (
-    actual_price,
     dental_service:service_id (
-      service_id,
       service_name
     )
   ),
   treatment_record!inner (
-    record_id,
-    diagnosis,
-    treatment_note
+    diagnosis
   ),
   invoice (
-    invoice_id,
-    total_amount,
-    payment_status,
-    payment_time
+    total_amount
   )
 `;
 
 async function findProfileByPhone(phone) {
-  ensureSupabase();
-
   return supabase
     .from("patient")
     .select("patient_id, account_id")
@@ -119,8 +83,6 @@ async function findProfileByPhone(phone) {
 }
 
 async function insertProfile(payload) {
-  ensureSupabase();
-
   return supabase
     .from("patient")
     .insert(payload)
@@ -129,8 +91,6 @@ async function insertProfile(payload) {
 }
 
 async function linkProfileAccount(patientId, payload) {
-  ensureSupabase();
-
   return supabase
     .from("patient")
     .update(payload)
@@ -140,8 +100,6 @@ async function linkProfileAccount(patientId, payload) {
 }
 
 async function findTreatmentHistoryByPatientId(patientId) {
-  ensureSupabase();
-
   return supabase
     .from("appointment")
     .select(TREATMENT_HISTORY_SELECT)

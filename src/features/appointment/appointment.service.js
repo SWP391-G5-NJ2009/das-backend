@@ -93,23 +93,9 @@ async function bookAppointment({ patientId, newPatient, slotId, serviceId, note,
     { appt_id: appointment.appt_id, service_id: serviceId, actual_price: actualPrice },
   ]);
 
-  // Step 4: Log to history (non-blocking — failure never rejects the booking)
-  // TODO: trigger SMS/Email notification here (to be implemented by another dev)
-  Promise.allSettled([
-    appointmentDao.insertHistory({
-      appt_id: appointment.appt_id,
-      action_type: "Booked",
-      actor_account_id: actorAccountId,
-      reason: null,
-      created_at: new Date().toISOString(),
-    }),
-  ]).then((results) => {
-    results.forEach(
-      (r) => r.status === "rejected" && console.error("[booking]", r.reason),
-    );
-  });
 
   return appointment;
+
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -147,7 +133,7 @@ function normalize(row) {
       (sum, as) => sum + (as.dental_service?.slot_occupied ?? 1),
       0,
     ),
-    dentistName: dentist ? `BS. ${dentist.account?.username || dentist.account?.email || "?"}` : null,
+    dentistName: dentist?.full_name || null,
     dentistId: dentist?.dentist_id || null,
     dentistSpeciality: dentist?.speciality || null,
     dentistExperience: dentist?.experience || null,
@@ -164,7 +150,6 @@ function normalize(row) {
     totalEstimatedAmount: row.total_estimated_amount || null,
     treatmentRecord: row.treatment_record?.[0] || null,
     invoice: row.invoice?.[0] || null,
-    history: row.appointment_history || [],
   };
 }
 
@@ -243,6 +228,30 @@ async function cancelAppointment(apptId, actorAccountId, reason, role, patientId
       "INVALID_STATUS_TRANSITION",
     );
   }
+
+  // ── BR-13: Patients can only cancel at least 24 hours before scheduled time ──
+  if (role === "patient") {
+    const slotId = existing.work_slot?.slot_id;
+    if (slotId) {
+      const slotInfo = await appointmentDao.findSlotInfo(slotId);
+      if (slotInfo) {
+        const workDate = slotInfo.schedules?.work_date;
+        const startTime = slotInfo.time_slot_config?.start_time;
+        if (workDate && startTime) {
+          const slotDateTime = new Date(`${workDate}T${startTime}`);
+          const diffMs = slotDateTime.getTime() - Date.now();
+          if (diffMs < 24 * 60 * 60 * 1000) {
+            throw new AppError(
+              "Appointments can only be cancelled at least 24 hours before the scheduled time. Please contact the receptionist directly for assistance.",
+              400,
+              "CANCEL_TOO_LATE",
+            );
+          }
+        }
+      }
+    }
+  }
+  // ── End BR-13 ────────────────────────────────────────────────────────────────
 
   const cancelled = await appointmentDao.cancelById(apptId, actorAccountId, reason);
 
