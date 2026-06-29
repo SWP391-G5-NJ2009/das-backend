@@ -3,6 +3,7 @@ const accountService = require("../account/account.service");
 const textbeeService = require("../../integrations/textbee/textbee.service");
 const AppError = require("../../utils/AppError");
 const logger = require("../../utils/logger");
+const normalizeRole = require("../../utils/normalizeRole");
 
 /**
  * Search patients by name or phone.
@@ -30,32 +31,77 @@ function normalizeProfile(row) {
     patientId: row.patient_id,
     accountId: row.account_id,
     fullName: row.full_name || "",
+    email: row.email || row.account?.email || "",
     phone: row.phone || row.account?.phone || "",
     birthDate: row.birth_date || "",
     gender: row.gender || "",
     address: row.address || "",
+    noShowCount: row.no_show_count ?? 0,
+    account: {
+      email: row.account?.email || "",
+      username: row.account?.username || "",
+      status: row.account?.status || "",
+      role: row.account?.role?.role_name || "",
+    },
   };
 }
 
 function normalizeTreatment(row) {
   const schedule = row.work_slot?.schedules;
+  const dentist = schedule?.dentist;
   const services = row.appointment_service || [];
   const invoice = Array.isArray(row.invoice) ? row.invoice[0] : row.invoice;
   const treatment = Array.isArray(row.treatment_record)
     ? row.treatment_record[0]
     : row.treatment_record;
+  const servicesTotal = services.reduce(
+    (sum, service) => sum + Number(service.actual_price || 0),
+    0,
+  );
+  const totalAmount =
+    (invoice?.total_amount ?? servicesTotal) ||
+    row.total_estimated_amount ||
+    null;
 
   return {
-    id: String(row.appt_id),
-    date: schedule?.work_date || "",
-    treatment: services
-      .map((service) => service.dental_service?.service_name)
-      .filter(Boolean)
-      .join(", "),
+    recordId: treatment?.record_id || null,
+    id: String(treatment?.record_id || row.appt_id),
+    appointmentId: row.appt_id,
+    date: schedule?.work_date || row.book_time?.slice(0, 10) || "",
+    startTime:
+      row.work_slot?.slot_config?.start_time?.substring(0, 5) || "",
+    endTime: row.work_slot?.slot_config?.end_time?.substring(0, 5) || "",
+    treatment:
+      services
+        .map((service) => service.dental_service?.service_name)
+        .filter(Boolean)
+        .join(", ") || "Điều trị nha khoa",
     diagnosis: treatment?.diagnosis || "",
-    dentist: schedule?.dentist?.full_name || "",
-    cost: invoice?.total_amount ?? null,
+    treatmentNote: treatment?.treatment_note || "",
+    notes: treatment?.treatment_note || "",
+    appointmentNote: row.note || "",
+    dentist: dentist
+      ? `BS. ${dentist.account?.username || dentist.account?.email || "Nha sĩ"}`
+      : "",
+    cost: totalAmount,
+    status: row.status,
+    paymentStatus: invoice?.payment_status || "",
+    paymentTime: invoice?.payment_time || "",
   };
+}
+
+function getTreatmentDentistId(row) {
+  return row.work_slot?.schedules?.dentist?.dentist_id || null;
+}
+
+function filterTreatmentHistoryByActor(rows, { actorProfileId, actorRole } = {}) {
+  if (normalizeRole(actorRole) !== "dentist") {
+    return rows;
+  }
+
+  return rows.filter(
+    (row) => String(getTreatmentDentistId(row)) === String(actorProfileId),
+  );
 }
 
 async function sendPatientPasswordSms({ accountId, phone, password }) {
@@ -95,7 +141,7 @@ async function createPatientAccount({
   }
 
   const account = await accountService.createAccount({
-    username: null,
+    username: phone,
     email: null,
     phone,
     password,
@@ -132,7 +178,7 @@ async function createPatientAccount({
   };
 }
 
-async function getMyTreatmentHistory(patientId) {
+async function getTreatmentHistory(patientId, actor = {}) {
   const { data, error } =
     await patientDao.findTreatmentHistoryByPatientId(patientId);
 
@@ -140,7 +186,7 @@ async function getMyTreatmentHistory(patientId) {
     throw new AppError(error.message, 500, "DB_ERROR");
   }
 
-  return (data || []).map(normalizeTreatment);
+  return filterTreatmentHistoryByActor(data || [], actor).map(normalizeTreatment);
 }
 
 /**
@@ -170,6 +216,6 @@ async function liftBookingBan(patientId) {
 module.exports = {
   searchPatients,
   createPatientAccount,
-  getMyTreatmentHistory,
+  getTreatmentHistory,
   liftBookingBan,
 };

@@ -20,6 +20,12 @@ router.post(
   patientController.createPatientAccount,
 );
 
+router.get(
+  "/me/treatments",
+  requireRole("patient"),
+  patientController.getMyTreatmentHistory,
+);
+
 // Receptionist: lift booking ban for a patient
 router.patch(
   "/:patientId/lift-ban",
@@ -27,8 +33,10 @@ router.patch(
   patientController.liftBookingBan,
 );
 
-router.use(requireRole("patient"));
-
-router.get("/me/treatments", patientController.getMyTreatmentHistory);
+router.get(
+  "/:patientId/treatments",
+  requireRole("dentist", "receptionist"),
+  patientController.getTreatmentHistoryByPatient,
+);
 
 module.exports = router;
