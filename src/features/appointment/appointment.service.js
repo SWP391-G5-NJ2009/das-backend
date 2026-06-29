@@ -16,7 +16,22 @@ async function bookAppointment({ patientId, newPatient, slotId, serviceId, note,
     throw new AppError("Patient ID could not be resolved.", 400, "VALIDATION_ERROR");
   }
 
+  // ── BR-11: Block patient with ≥ 3 No-Shows from booking online ──────────
+  if (actorRole === "patient") {
+    const patientInfo = await patientDao.findPatientById(resolvedPatientId);
+    if (patientInfo.no_show_count >= 3) {
+      throw new AppError(
+        "Your account has been restricted from booking appointments online due to 3 or more no-shows. " +
+          "Please contact the clinic directly for assistance.",
+        403,
+        "BOOKING_BANNED_NO_SHOW",
+      );
+    }
+  }
+  // ── End BR-11 ────────────────────────────────────────────────────────────
+
   // ── BR-14: Validate slot timing before attempting to claim it ────────────
+
   const slotInfo = await appointmentDao.findSlotInfo(slotId);
   if (!slotInfo) {
     throw new AppError("Slot not found.", 404, "NOT_FOUND");
@@ -168,6 +183,7 @@ function normalize(row) {
 
   return {
     id: String(row.appt_id),
+    patientId: row.patient?.patient_id ?? null,
     patientName: row.patient?.full_name || null,
     patientPhone: row.patient?.phone || null,
     patientEmail: row.patient?.email || null,
@@ -175,6 +191,7 @@ function normalize(row) {
     patientGender: row.patient?.gender || null,
     patientAddress: row.patient?.address || null,
     patientNoShowCount: row.patient?.no_show_count ?? 0,
+
     serviceName: services.join(", ") || null,
     services: (row.appointment_service || []).map((as) => ({
       serviceId: as.dental_service?.service_id,

@@ -42,8 +42,23 @@ async function getMyTreatmentHistory(req, res, next) {
   }
 }
 
+/**
+ * PATCH /api/patients/:patientId/lift-ban
+ * Receptionist: Lift booking ban — resolves all No-Show appointments for the patient.
+ */
+async function liftBookingBan(req, res, next) {
+  try {
+    const patientId = Number(req.params.patientId);
+    const data = await patientService.liftBookingBan(patientId);
+    return sendSuccess(res, 200, data, "Booking ban lifted successfully.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
   searchPatients,
   createPatientAccount,
   getMyTreatmentHistory,
+  liftBookingBan,
 };

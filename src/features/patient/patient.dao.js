@@ -82,6 +82,48 @@ async function findProfileByPhone(phone) {
     .maybeSingle();
 }
 
+/**
+ * BR-11: Fetch patient's no_show_count to decide if they are banned from booking.
+ */
+async function findPatientById(patientId) {
+  const { data, error } = await supabase
+    .from("patient")
+    .select("patient_id, full_name, no_show_count")
+    .eq("patient_id", patientId)
+    .single();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  if (!data) throw new AppError("Patient not found.", 404, "NOT_FOUND");
+  return data;
+}
+
+/**
+ * BR-12: Transition all 'No-Show' appointments for this patient to 'Resolved No-Show'.
+ * Also resets no_show_count to 0 since it is incremented manually by the scheduler
+ * (no DB trigger auto-recomputes it).
+ */
+async function resolveNoShowAppointments(patientId) {
+  // Step 1: Update all No-Show appointments → Resolved No-Show
+  const { data, error } = await supabase
+    .from("appointment")
+    .update({ status: "Resolved No-Show" })
+    .eq("patient_id", patientId)
+    .eq("status", "No-Show")
+    .select("appt_id");
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+
+  // Step 2: Reset the penalty counter
+  const { error: resetError } = await supabase
+    .from("patient")
+    .update({ no_show_count: 0 })
+    .eq("patient_id", patientId);
+
+  if (resetError) throw new AppError(resetError.message, 500, "DB_ERROR");
+
+  return data || [];
+}
+
 async function insertProfile(payload) {
   return supabase
     .from("patient")
@@ -111,6 +153,8 @@ module.exports = {
   createPatient,
   searchPatients,
   findProfileByPhone,
+  findPatientById,
+  resolveNoShowAppointments,
   findTreatmentHistoryByPatientId,
   insertProfile,
   linkProfileAccount,
