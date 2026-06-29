@@ -5,7 +5,7 @@ const AppError = require("../../utils/AppError");
 /* ─────────────────────────────────────────────────────────────────────────────
    bookAppointment — Patient or Receptionist creates a new appointment
 ───────────────────────────────────────────────────────────────────────────── */
-async function bookAppointment({ patientId, newPatient, slotId, serviceId, note, actorAccountId, actorRole }) {
+async function bookAppointment({ patientId, newPatient, slotId, serviceId, note, actorAccountId, actorRole, slotOccupied = 1 }) {
   // ── Walk-in patient: create patient record on the fly ────────────────────
   let resolvedPatientId = patientId;
   if (!resolvedPatientId && newPatient) {
@@ -68,17 +68,61 @@ async function bookAppointment({ patientId, newPatient, slotId, serviceId, note,
   }
   // ── End BR-15 ────────────────────────────────────────────────────────────
 
-  // Step 1: Atomic slot claim — guards against concurrent bookings
-  const claimedSlot = await appointmentDao.markSlotBooked(slotId);
-  if (!claimedSlot) {
-    throw new AppError(
-      "This time slot has just been booked by another user. Please select a different slot.",
-      409,
-      "SLOT_TAKEN",
-    );
-  }
+  // ── Multi-slot: find all consecutive slots this service requires ──────────
+  const normalizedSlotCount = Math.max(1, Number(slotOccupied) || 1);
 
-  // Step 2: Create appointment record
+  let allSlotIds;
+  if (normalizedSlotCount === 1) {
+    // Fast path: single-slot service
+    const claimedSlot = await appointmentDao.markSlotBooked(slotId);
+    if (!claimedSlot) {
+      throw new AppError(
+        "This time slot has just been booked by another user. Please select a different slot.",
+        409,
+        "SLOT_TAKEN",
+      );
+    }
+    allSlotIds = [slotId];
+  } else {
+    // Multi-slot: validate consecutive slots exist and are all Available
+    const consecutiveSlots = await appointmentDao.findConsecutiveSlotsFromId(
+      slotId,
+      normalizedSlotCount,
+    );
+
+    if (consecutiveSlots.length < normalizedSlotCount) {
+      throw new AppError(
+        `This service requires ${normalizedSlotCount} consecutive time slots, but only ${consecutiveSlots.length} slots are available at the end of this schedule. Please choose an earlier time.`,
+        409,
+        "INSUFFICIENT_CONSECUTIVE_SLOTS",
+      );
+    }
+
+    // Validate all required slots are Available before claiming any
+    const unavailable = consecutiveSlots.filter((s) => s.status !== "Available");
+    if (unavailable.length > 0) {
+      throw new AppError(
+        "One or more required consecutive time slots are not available. Please choose a different start time.",
+        409,
+        "SLOT_TAKEN",
+      );
+    }
+
+    // Atomically claim all slots
+    const slotIdsToClaim = consecutiveSlots.map((s) => s.slot_id);
+    const claimedIds = await appointmentDao.markMultipleSlotsBooked(slotIdsToClaim);
+    if (!claimedIds) {
+      throw new AppError(
+        "One or more required time slots were just booked by another user. Please select a different start time.",
+        409,
+        "SLOT_TAKEN",
+      );
+    }
+    allSlotIds = claimedIds;
+  }
+  // ── End multi-slot ───────────────────────────────────────────────────────
+
+  // Step 2: Create appointment record (primary slot only — the anchor)
   const appointment = await appointmentDao.createAppointment({
     patient_id: resolvedPatientId,
     slot_id: slotId,
@@ -93,6 +137,16 @@ async function bookAppointment({ patientId, newPatient, slotId, serviceId, note,
     { appt_id: appointment.appt_id, service_id: serviceId, actual_price: actualPrice },
   ]);
 
+  // Step 4: Record all claimed slot IDs in appointment_slot junction table
+  // is_primary = true for the anchor slot (stored in appointment.slot_id),
+  // is_primary = false for each follow-on slot.
+  await appointmentDao.insertAppointmentSlots(
+    allSlotIds.map((sid) => ({
+      appt_id: appointment.appt_id,
+      slot_id: Number(sid),
+      is_primary: Number(sid) === Number(slotId),
+    })),
+  );
 
   return appointment;
 
@@ -140,9 +194,17 @@ function normalize(row) {
     scheduledTime: slotConfig?.start_time
       ? slotConfig.start_time.substring(0, 5)
       : null,
-    scheduledTimeEnd: slotConfig?.end_time
-      ? slotConfig.end_time.substring(0, 5)
-      : null,
+    scheduledTimeEnd: (() => {
+      // For multi-slot appointments, use the end_time of the LAST slot
+      // (largest start_time in appointment_slot). Falls back to primary slot end_time.
+      const allSlots = (row.appointment_slot || [])
+        .map((as) => as.work_slot?.time_slot_config)
+        .filter(Boolean)
+        .sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
+      const lastSlotConfig = allSlots[allSlots.length - 1];
+      const endTime = lastSlotConfig?.end_time || slotConfig?.end_time;
+      return endTime ? endTime.substring(0, 5) : null;
+    })(),
     status: row.status,
     notes: row.note || "",
     bookTime: row.book_time,
@@ -254,13 +316,27 @@ async function cancelAppointment(apptId, actorAccountId, reason, role, patientId
 
   const cancelled = await appointmentDao.cancelById(apptId, actorAccountId, reason);
 
-  // Release the slot back to Available (non-blocking — failure is logged, not thrown)
-  const slotId = existing.work_slot?.slot_id;
-  if (slotId) {
-    appointmentDao.releaseSlot(slotId).catch((err) =>
-      console.error("[appointment.service] releaseSlot failed:", err.message),
+  // Release all slots linked to this appointment (non-blocking).
+  // appointment_slot rows are cascade-deleted when appointment is cancelled,
+  // but we read them BEFORE cancel so we know which work_slots to free.
+  // (We already fetched `existing` above — primary slot is on existing.work_slot.slot_id;
+  //  we re-query appointment_slot for the full list to handle multi-slot services.)
+  appointmentDao
+    .findSlotsByApptId(apptId)
+    .then((slotIds) => {
+      if (slotIds.length > 0) {
+        return appointmentDao.releaseSlotsByIds(slotIds);
+      }
+      // Fallback: if junction table has no rows yet (legacy appointment),
+      // release the primary slot the old way.
+      const primarySlotId = existing.work_slot?.slot_id;
+      if (primarySlotId) {
+        return appointmentDao.releaseSlotsByIds([primarySlotId]);
+      }
+    })
+    .catch((err) =>
+      console.error("[appointment.service] slot release failed:", err.message),
     );
-  }
 
   return cancelled;
 }
