@@ -189,8 +189,33 @@ async function getTreatmentHistory(patientId, actor = {}) {
   return filterTreatmentHistoryByActor(data || [], actor).map(normalizeTreatment);
 }
 
+/**
+ * BR-12: Lift a booking ban for a patient by resolving all their No-Show appointments.
+ * no_show_count resets automatically via DB trigger once No-Shows are resolved.
+ */
+async function liftBookingBan(patientId) {
+  const patient = await patientDao.findPatientById(patientId);
+
+  if (patient.no_show_count < 3) {
+    throw new AppError(
+      "This patient does not have an active booking ban.",
+      400,
+      "NOT_BANNED",
+    );
+  }
+
+  const resolved = await patientDao.resolveNoShowAppointments(patientId);
+
+  return {
+    patientId: patient.patient_id,
+    fullName: patient.full_name,
+    resolvedCount: resolved.length,
+  };
+}
+
 module.exports = {
   searchPatients,
   createPatientAccount,
   getTreatmentHistory,
+  liftBookingBan,
 };

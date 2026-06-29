@@ -26,6 +26,13 @@ router.get(
   patientController.getMyTreatmentHistory,
 );
 
+// Receptionist: lift booking ban for a patient
+router.patch(
+  "/:patientId/lift-ban",
+  requireRole("receptionist"),
+  patientController.liftBookingBan,
+);
+
 router.get(
   "/:patientId/treatments",
   requireRole("dentist", "receptionist"),
