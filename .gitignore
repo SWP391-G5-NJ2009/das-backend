@@ -12,6 +12,7 @@ coverage/
 dist/
 
 .env
+*.env
 
 # misc
 .DS_Store
@@ -23,3 +24,4 @@ dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log

@@ -6,6 +6,7 @@ const requireRole = require("../../middlewares/role.middleware");
 
 router.get("/", dentalServiceController.getAllServices);
 router.get("/categories", dentalServiceController.getAllCategories);
+router.get("/public", dentalServiceController.getPublicServices);
 router.get("/:id/dentists", dentalServiceController.getDentistsByService);
 router.delete(
   "/:id",
