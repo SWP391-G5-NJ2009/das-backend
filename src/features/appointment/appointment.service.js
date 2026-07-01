@@ -5,7 +5,16 @@ const AppError = require("../../utils/AppError");
 /* ─────────────────────────────────────────────────────────────────────────────
    bookAppointment — Patient or Receptionist creates a new appointment
 ───────────────────────────────────────────────────────────────────────────── */
-async function bookAppointment({ patientId, newPatient, slotId, serviceId, note, actorAccountId, actorRole, slotOccupied = 1 }) {
+async function bookAppointment({
+  patientId,
+  newPatient,
+  slotId,
+  serviceId,
+  note,
+  actorAccountId,
+  actorRole,
+  slotOccupied = 1,
+}) {
   // ── Walk-in patient: create patient record on the fly ────────────────────
   let resolvedPatientId = patientId;
   if (!resolvedPatientId && newPatient) {
@@ -13,7 +22,11 @@ async function bookAppointment({ patientId, newPatient, slotId, serviceId, note,
     resolvedPatientId = created.patient_id;
   }
   if (!resolvedPatientId) {
-    throw new AppError("Patient ID could not be resolved.", 400, "VALIDATION_ERROR");
+    throw new AppError(
+      "Patient ID could not be resolved.",
+      400,
+      "VALIDATION_ERROR",
+    );
   }
 
   // ── BR-11: Block patient with ≥ 3 No-Shows from booking online ──────────
@@ -37,7 +50,7 @@ async function bookAppointment({ patientId, newPatient, slotId, serviceId, note,
     throw new AppError("Slot not found.", 404, "NOT_FOUND");
   }
 
-  const workDate = slotInfo.schedules?.work_date;         // "YYYY-MM-DD"
+  const workDate = slotInfo.schedules?.work_date; // "YYYY-MM-DD"
   const startTime = slotInfo.time_slot_config?.start_time; // "HH:MM:SS"
 
   if (workDate && startTime) {
@@ -114,7 +127,9 @@ async function bookAppointment({ patientId, newPatient, slotId, serviceId, note,
     }
 
     // Validate all required slots are Available before claiming any
-    const unavailable = consecutiveSlots.filter((s) => s.status !== "Available");
+    const unavailable = consecutiveSlots.filter(
+      (s) => s.status !== "Available",
+    );
     if (unavailable.length > 0) {
       throw new AppError(
         "One or more required consecutive time slots are not available. Please choose a different start time.",
@@ -125,7 +140,8 @@ async function bookAppointment({ patientId, newPatient, slotId, serviceId, note,
 
     // Atomically claim all slots
     const slotIdsToClaim = consecutiveSlots.map((s) => s.slot_id);
-    const claimedIds = await appointmentDao.markMultipleSlotsBooked(slotIdsToClaim);
+    const claimedIds =
+      await appointmentDao.markMultipleSlotsBooked(slotIdsToClaim);
     if (!claimedIds) {
       throw new AppError(
         "One or more required time slots were just booked by another user. Please select a different start time.",
@@ -149,7 +165,11 @@ async function bookAppointment({ patientId, newPatient, slotId, serviceId, note,
   // Step 3: Look up service price then link service to the appointment
   const actualPrice = await appointmentDao.getServicePrice(serviceId);
   await appointmentDao.insertAppointmentServices([
-    { appt_id: appointment.appt_id, service_id: serviceId, actual_price: actualPrice },
+    {
+      appt_id: appointment.appt_id,
+      service_id: serviceId,
+      actual_price: actualPrice,
+    },
   ]);
 
   // Step 4: Record all claimed slot IDs in appointment_slot junction table
@@ -164,14 +184,13 @@ async function bookAppointment({ patientId, newPatient, slotId, serviceId, note,
   );
 
   return appointment;
-
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Shape normalizer — maps raw Supabase joined row → clean frontend-ready object.
    Field names mirror the mock data shape used in the frontend hook.
 ───────────────────────────────────────────────────────────────────────────── */
-const CANCELLABLE_STATUSES = ["Confirmed", "Waiting"];
+const CANCELLABLE_STATUSES = ["Confirmed", "Checked-in", "Conflict"];
 
 function normalize(row) {
   const slotConfig = row.work_slot?.time_slot_config;
@@ -288,7 +307,13 @@ async function getAll(filters = {}) {
   return applyClientFilters((data || []).map(normalize), filters);
 }
 
-async function cancelAppointment(apptId, actorAccountId, reason, role, patientId) {
+async function cancelAppointment(
+  apptId,
+  actorAccountId,
+  reason,
+  role,
+  patientId,
+) {
   const { data: existing, error } = await appointmentDao.findById(apptId);
 
   if (error || !existing) {
@@ -331,7 +356,11 @@ async function cancelAppointment(apptId, actorAccountId, reason, role, patientId
   }
   // ── End BR-13 ────────────────────────────────────────────────────────────────
 
-  const cancelled = await appointmentDao.cancelById(apptId, actorAccountId, reason);
+  const cancelled = await appointmentDao.cancelById(
+    apptId,
+    actorAccountId,
+    reason,
+  );
 
   // Release all slots linked to this appointment (non-blocking).
   // appointment_slot rows are cascade-deleted when appointment is cancelled,
