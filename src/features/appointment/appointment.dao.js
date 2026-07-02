@@ -116,40 +116,24 @@ async function cancelById(apptId, actorAccountId, reason) {
   return data;
 }
 
-/**
- * Atomically claim a work_slot: set status = 'Booked' only if currently 'Available'.
- * Returns the updated slot row, or null if the slot was already taken/unavailable.
- */
 async function markSlotBooked(slotId) {
   const { data, error } = await supabase
     .from("work_slot")
     .update({ status: "Booked" })
     .eq("slot_id", slotId)
-    .eq("status", "Available") // atomic guard — only succeeds if still Available
+    .eq("status", "Available")
     .select("slot_id")
     .maybeSingle();
 
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
-  return data; // null means slot was already taken or unavailable
+  return data;
 }
 
-/**
- * Find `count` consecutive work_slots starting from `startSlotId` on the same schedule,
- * ordered by start_time ascending.
- *
- * Steps:
- *  1. Fetch the schedule_id and start_time of the start slot.
- *  2. Query work_slot for the same schedule_id where start_time >= that value,
- *     ordered by start_time, limited to `count`.
- *
- * Returns an array of { slot_id, status, start_time } objects (length may be < count
- * if the schedule doesn't have enough remaining slots).
- */
 async function findConsecutiveSlotsFromId(startSlotId, count) {
-  // Step 1: get the anchor slot's schedule and start time
   const { data: anchor, error: anchorError } = await supabase
     .from("work_slot")
-    .select(`
+    .select(
+      `
       slot_id,
       status,
       schedule_id,
@@ -157,7 +141,8 @@ async function findConsecutiveSlotsFromId(startSlotId, count) {
         slot_config_id,
         start_time
       )
-    `)
+    `,
+    )
     .eq("slot_id", startSlotId)
     .maybeSingle();
 
@@ -171,23 +156,22 @@ async function findConsecutiveSlotsFromId(startSlotId, count) {
     throw new AppError("Slot configuration is incomplete.", 500, "DB_ERROR");
   }
 
-  // Step 2: fetch ALL slots for the same schedule, then filter in JS.
-  // PostgREST does NOT support .gte() on embedded columns — filter by start_time in JS.
   const { data: slots, error: slotsError } = await supabase
     .from("work_slot")
-    .select(`
+    .select(
+      `
       slot_id,
       status,
       time_slot_config:slot_config_id (
         start_time
       )
-    `)
+    `,
+    )
     .eq("schedule_id", scheduleId)
     .order("slot_config_id", { ascending: true });
 
   if (slotsError) throw new AppError(slotsError.message, 500, "DB_ERROR");
 
-  // Filter slots at or after the anchor start_time, sort, then take the first `count`.
   return (slots || [])
     .filter(
       (s) =>
@@ -207,13 +191,6 @@ async function findConsecutiveSlotsFromId(startSlotId, count) {
     }));
 }
 
-/**
- * Atomically claim multiple work_slots by marking them Booked only if currently Available.
- * Claims each slot one-by-one so the atomic guard holds per-slot.
- *
- * Returns an array of successfully claimed slot_ids.
- * If any slot cannot be claimed, rolls back the already-claimed ones and returns null.
- */
 async function markMultipleSlotsBooked(slotIds) {
   const claimed = [];
 
@@ -227,7 +204,6 @@ async function markMultipleSlotsBooked(slotIds) {
       .maybeSingle();
 
     if (error) {
-      // Release already-claimed slots before surfacing the error
       if (claimed.length > 0) {
         await supabase
           .from("work_slot")
@@ -238,14 +214,13 @@ async function markMultipleSlotsBooked(slotIds) {
     }
 
     if (!data) {
-      // This slot was unavailable — rollback claimed ones and signal failure
       if (claimed.length > 0) {
         await supabase
           .from("work_slot")
           .update({ status: "Available" })
           .in("slot_id", claimed);
       }
-      return null; // caller interprets null as SLOT_TAKEN
+      return null;
     }
 
     claimed.push(slotId);
@@ -254,10 +229,6 @@ async function markMultipleSlotsBooked(slotIds) {
   return claimed;
 }
 
-/**
- * Release multiple work_slots back to 'Available'.
- * Only transitions slots that are currently 'Booked'.
- */
 async function releaseSlotsByIds(slotIds) {
   if (!slotIds || slotIds.length === 0) return;
   const { error } = await supabase
@@ -271,26 +242,18 @@ async function releaseSlotsByIds(slotIds) {
   }
 }
 
-/**
- * Release a work_slot back to 'Available' when an appointment is cancelled.
- * Only transitions from 'Booked' → 'Available' (leaves 'Unavailable' slots untouched).
- */
 async function releaseSlot(slotId) {
   const { error } = await supabase
     .from("work_slot")
     .update({ status: "Available" })
     .eq("slot_id", slotId)
-    .eq("status", "Booked"); // only release if currently Booked
+    .eq("status", "Booked");
 
   if (error) {
     console.error("[appointment.dao] releaseSlot failed:", error.message);
   }
 }
 
-/**
- * Fetch the date and start time of a slot — used for BR-14 timing validation.
- * Returns { work_date: "YYYY-MM-DD", start_time: "HH:MM:SS" } or null.
- */
 async function findSlotInfo(slotId) {
   const { data, error } = await supabase
     .from("work_slot")
@@ -308,9 +271,6 @@ async function findSlotInfo(slotId) {
   return data;
 }
 
-/**
- * Insert a new appointment row.
- */
 async function createAppointment(payload) {
   const { data, error } = await supabase
     .from("appointment")
@@ -322,29 +282,16 @@ async function createAppointment(payload) {
   return data;
 }
 
-/**
- * Insert rows into appointment_service (one per service selected).
- */
 async function insertAppointmentServices(rows) {
   const { error } = await supabase.from("appointment_service").insert(rows);
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
 }
 
-/**
- * Insert rows into the appointment_slot junction table.
- * Each row: { appt_id, slot_id, is_primary }
- * is_primary = true for the anchor slot, false for follow-on slots.
- */
 async function insertAppointmentSlots(rows) {
   const { error } = await supabase.from("appointment_slot").insert(rows);
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
 }
 
-/**
- * Fetch all slot IDs linked to an appointment via appointment_slot.
- * Returns an array of slot_id numbers.
- * Used by cancelAppointment to know which slots to release.
- */
 async function findSlotsByApptId(apptId) {
   const { data, error } = await supabase
     .from("appointment_slot")
@@ -355,10 +302,6 @@ async function findSlotsByApptId(apptId) {
   return (data || []).map((r) => r.slot_id);
 }
 
-/**
- * Fetch the price of a dental service by its ID.
- * Used to populate actual_price in appointment_service.
- */
 async function getServicePrice(serviceId) {
   const { data, error } = await supabase
     .from("dental_services")
@@ -371,10 +314,6 @@ async function getServicePrice(serviceId) {
   return data.unit_price;
 }
 
-/**
- * BR-15: Check if patient already has a 'Confirmed' appointment for a given service.
- * Returns the existing appointment row if found, null otherwise.
- */
 async function findConfirmedAppointmentByService(patientId, serviceId) {
   const { data, error } = await supabase
     .from("appointment")
@@ -391,14 +330,9 @@ async function findConfirmedAppointmentByService(patientId, serviceId) {
     .maybeSingle();
 
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
-  return data; // null if no conflict
+  return data;
 }
 
-/**
- * Guard check: returns true if any active appointment
- * (Confirmed, Conflict, Checked-in)
- * is currently linked to the given service. Used to block deactivate operations.
- */
 async function hasActiveAppointmentsByServiceId(serviceId) {
   const { data, error } = await supabase
     .from("appointment")
@@ -416,12 +350,6 @@ async function hasActiveAppointmentsByServiceId(serviceId) {
   return Array.isArray(data) && data.length > 0;
 }
 
-/**
- * BR-25 hard-deletion guard: returns true if the service has EVER been linked
- * to any appointment record, regardless of status (Confirmed, Cancelled,
- * Completed, No-Show, etc.).
- * If this returns true the service MUST NOT be hard-deleted.
- */
 async function hasAnyAppointmentByServiceId(serviceId) {
   const { data, error } = await supabase
     .from("appointment_service")
@@ -432,24 +360,15 @@ async function hasAnyAppointmentByServiceId(serviceId) {
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
   return Array.isArray(data) && data.length > 0;
 }
-/**
- * No-Show sweep: fetch all Confirmed appointments whose slot start
- * time + 15 min has already passed, mark them No-Show, and return the
- * updated rows so the caller can increment no_show_count.
- *
- * Returns an array of { appt_id, patient_id } objects.
- */
+
 async function markOverdueAsNoShow() {
   const now = new Date();
 
-  // Fetch Confirmed appointments with their slot datetime info
   const { data: candidates, error: fetchError } = await supabase
     .from("appointment")
     .select(
       `
       appt_id,
-
-
       patient_id,
       work_slot:slot_id (
         time_slot_config:slot_config_id (start_time),
@@ -457,7 +376,7 @@ async function markOverdueAsNoShow() {
       )
     `,
     )
-    .in("status", ["Confirmed"]);
+    .in("status", ["Confirmed", "Conflict"]);
 
   if (fetchError) {
     logger.error("[noShow] Failed to fetch candidates:", fetchError.message);
@@ -466,14 +385,12 @@ async function markOverdueAsNoShow() {
 
   if (!candidates || candidates.length === 0) return [];
 
-  // Filter those whose slot start + 15 min < now
-  const NO_SHOW_GRACE_MS = 15 * 60 * 1000; // 15 minutes
+  const NO_SHOW_GRACE_MS = 15 * 60 * 1000;
   const overdueIds = [];
-  const overduePatientIds = {}; // appt_id → patient_id
 
   for (const appt of candidates) {
-    const workDate = appt.work_slot?.schedules?.work_date; // "YYYY-MM-DD"
-    const startTime = appt.work_slot?.time_slot_config?.start_time; // "HH:MM:SS"
+    const workDate = appt.work_slot?.schedules?.work_date;
+    const startTime = appt.work_slot?.time_slot_config?.start_time;
     if (!workDate || !startTime) continue;
 
     const slotStart = new Date(`${workDate}T${startTime}`);
@@ -481,18 +398,16 @@ async function markOverdueAsNoShow() {
 
     if (now >= deadline) {
       overdueIds.push(appt.appt_id);
-      overduePatientIds[appt.appt_id] = appt.patient_id;
     }
   }
 
   if (overdueIds.length === 0) return [];
 
-  // Bulk update to No-Show
   const { data: updated, error: updateError } = await supabase
     .from("appointment")
     .update({ status: "No-Show" })
     .in("appt_id", overdueIds)
-    .in("status", ["Confirmed"]) // double-check: guard against race
+    .in("status", ["Confirmed", "Conflict"])
     .select("appt_id, patient_id");
 
   if (updateError) {
@@ -506,15 +421,10 @@ async function markOverdueAsNoShow() {
   return updated || [];
 }
 
-/**
- * Increment no_show_count for a list of patient IDs.
- * Uses a direct atomic UPDATE (no_show_count = no_show_count + 1).
- */
 async function incrementNoShowCount(patientIds) {
   if (!patientIds || patientIds.length === 0) return;
 
   for (const patientId of patientIds) {
-    // Read current count, then write back incremented value
     const { data: patient, error: readError } = await supabase
       .from("patient")
       .select("no_show_count")
