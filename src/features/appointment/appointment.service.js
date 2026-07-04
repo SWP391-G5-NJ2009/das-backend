@@ -137,10 +137,11 @@ async function bookAppointment({ patientId, newPatient, slotId, serviceId, note,
   }
   // ── End multi-slot ───────────────────────────────────────────────────────
 
-  // Step 2: Create appointment record (primary slot only — the anchor)
+  // Step 2: Create appointment record
+  // Note: slot_id is no longer stored on appointment directly — all slots
+  // are recorded in appointment_slot (Step 4).
   const appointment = await appointmentDao.createAppointment({
     patient_id: resolvedPatientId,
-    slot_id: slotId,
     status: "Confirmed",
     note: note || null,
     book_time: new Date().toISOString(),
@@ -174,9 +175,15 @@ async function bookAppointment({ patientId, newPatient, slotId, serviceId, note,
 const CANCELLABLE_STATUSES = ["Confirmed", "Waiting"];
 
 function normalize(row) {
-  const slotConfig = row.work_slot?.time_slot_config;
-  const schedule = row.work_slot?.schedules;
+  // All slot/schedule/dentist info now comes exclusively from appointment_slot.
+  // The primary slot (is_primary = true) is the anchor for date, time, and dentist.
+  const allSlotRows = (row.appointment_slot || []);
+  const primarySlotRow = allSlotRows.find((s) => s.is_primary) || allSlotRows[0] || null;
+
+  const slotConfig = primarySlotRow?.work_slot?.time_slot_config;
+  const schedule = primarySlotRow?.work_slot?.schedules;
   const dentist = schedule?.dentist;
+
   const services = (row.appointment_service || [])
     .map((item) => item.dental_service?.service_name)
     .filter(Boolean);
@@ -213,13 +220,13 @@ function normalize(row) {
       : null,
     scheduledTimeEnd: (() => {
       // For multi-slot appointments, use the end_time of the LAST slot
-      // (largest start_time in appointment_slot). Falls back to primary slot end_time.
-      const allSlots = (row.appointment_slot || [])
+      // (largest start_time across all appointment_slot rows).
+      const allConfigs = allSlotRows
         .map((as) => as.work_slot?.time_slot_config)
         .filter(Boolean)
         .sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
-      const lastSlotConfig = allSlots[allSlots.length - 1];
-      const endTime = lastSlotConfig?.end_time || slotConfig?.end_time;
+      const lastConfig = allConfigs[allConfigs.length - 1];
+      const endTime = lastConfig?.end_time || slotConfig?.end_time;
       return endTime ? endTime.substring(0, 5) : null;
     })(),
     status: row.status,
@@ -309,9 +316,12 @@ async function cancelAppointment(apptId, actorAccountId, reason, role, patientId
 
   // ── BR-13: Patients can only cancel at least 24 hours before scheduled time ──
   if (role === "patient") {
-    const slotId = existing.work_slot?.slot_id;
-    if (slotId) {
-      const slotInfo = await appointmentDao.findSlotInfo(slotId);
+    // appointment.slot_id no longer exists — get the primary slot from appointment_slot
+    const allSlotRows = existing.appointment_slot || [];
+    const primarySlotRow = allSlotRows.find((s) => s.is_primary) || allSlotRows[0] || null;
+    const primarySlotId = primarySlotRow?.work_slot?.slot_id;
+    if (primarySlotId) {
+      const slotInfo = await appointmentDao.findSlotInfo(primarySlotId);
       if (slotInfo) {
         const workDate = slotInfo.schedules?.work_date;
         const startTime = slotInfo.time_slot_config?.start_time;
@@ -334,21 +344,13 @@ async function cancelAppointment(apptId, actorAccountId, reason, role, patientId
   const cancelled = await appointmentDao.cancelById(apptId, actorAccountId, reason);
 
   // Release all slots linked to this appointment (non-blocking).
-  // appointment_slot rows are cascade-deleted when appointment is cancelled,
-  // but we read them BEFORE cancel so we know which work_slots to free.
-  // (We already fetched `existing` above — primary slot is on existing.work_slot.slot_id;
-  //  we re-query appointment_slot for the full list to handle multi-slot services.)
+  // We read appointment_slot BEFORE the cancel so we know which work_slots to free.
+  // appointment_slot rows are cascade-deleted after appointment status changes.
   appointmentDao
     .findSlotsByApptId(apptId)
     .then((slotIds) => {
       if (slotIds.length > 0) {
         return appointmentDao.releaseSlotsByIds(slotIds);
-      }
-      // Fallback: if junction table has no rows yet (legacy appointment),
-      // release the primary slot the old way.
-      const primarySlotId = existing.work_slot?.slot_id;
-      if (primarySlotId) {
-        return appointmentDao.releaseSlotsByIds([primarySlotId]);
       }
     })
     .catch((err) =>

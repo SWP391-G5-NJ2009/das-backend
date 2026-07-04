@@ -8,24 +8,6 @@ const APPOINTMENT_SELECT = `
   total_estimated_amount,
   note,
   book_time,
-  work_slot:slot_id (
-    slot_id,
-    time_slot_config:slot_config_id (
-      start_time,
-      end_time
-    ),
-    schedules:schedule_id (
-      schedule_id,
-      work_date,
-      status,
-      dentist:dentist_id (
-        dentist_id,
-        full_name,
-        speciality,
-        experience
-      )
-    )
-  ),
   appointment_slot (
     is_primary,
     work_slot:slot_id (
@@ -33,6 +15,17 @@ const APPOINTMENT_SELECT = `
       time_slot_config:slot_config_id (
         start_time,
         end_time
+      ),
+      schedules:schedule_id (
+        schedule_id,
+        work_date,
+        status,
+        dentist:dentist_id (
+          dentist_id,
+          full_name,
+          speciality,
+          experience
+        )
       )
     )
   ),
@@ -50,7 +43,8 @@ const APPOINTMENT_SELECT = `
     actual_price,
     dental_service:service_id (
       service_id,
-      service_name
+      service_name,
+      slot_occupied
     )
   ),
   treatment_record (
@@ -442,18 +436,21 @@ async function hasAnyAppointmentByServiceId(serviceId) {
 async function markOverdueAsNoShow() {
   const now = new Date();
 
-  // Fetch Confirmed appointments with their slot datetime info
+  // Fetch Confirmed appointments with their primary slot datetime info.
+  // Since appointment.slot_id no longer exists, we join via appointment_slot
+  // and filter to the primary slot (is_primary = true) to get the schedule datetime.
   const { data: candidates, error: fetchError } = await supabase
     .from("appointment")
     .select(
       `
       appt_id,
-
-
       patient_id,
-      work_slot:slot_id (
-        time_slot_config:slot_config_id (start_time),
-        schedules:schedule_id (work_date)
+      appointment_slot (
+        is_primary,
+        work_slot:slot_id (
+          time_slot_config:slot_config_id (start_time),
+          schedules:schedule_id (work_date)
+        )
       )
     `,
     )
@@ -466,14 +463,16 @@ async function markOverdueAsNoShow() {
 
   if (!candidates || candidates.length === 0) return [];
 
-  // Filter those whose slot start + 15 min < now
+  // Filter those whose primary slot start + 15 min < now
   const NO_SHOW_GRACE_MS = 15 * 60 * 1000; // 15 minutes
   const overdueIds = [];
   const overduePatientIds = {}; // appt_id → patient_id
 
   for (const appt of candidates) {
-    const workDate = appt.work_slot?.schedules?.work_date; // "YYYY-MM-DD"
-    const startTime = appt.work_slot?.time_slot_config?.start_time; // "HH:MM:SS"
+    // Find the primary slot row in appointment_slot
+    const primarySlot = (appt.appointment_slot || []).find((s) => s.is_primary);
+    const workDate = primarySlot?.work_slot?.schedules?.work_date; // "YYYY-MM-DD"
+    const startTime = primarySlot?.work_slot?.time_slot_config?.start_time; // "HH:MM:SS"
     if (!workDate || !startTime) continue;
 
     const slotStart = new Date(`${workDate}T${startTime}`);
