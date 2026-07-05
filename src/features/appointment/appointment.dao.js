@@ -44,7 +44,10 @@ const APPOINTMENT_SELECT = `
     birth_date,
     gender,
     address,
-    no_show_count
+    no_show_count,
+    account:account_id (
+      status
+    )
   ),
   appointment_service (
     actual_price,
@@ -388,10 +391,11 @@ async function findConfirmedAppointmentByService(patientId, serviceId) {
     .eq("patient_id", patientId)
     .eq("status", "Confirmed")
     .eq("appointment_service.service_id", serviceId)
-    .maybeSingle();
+    .limit(1);
 
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
-  return data; // null if no conflict
+  // Return the first match (or null if none) — we only need to know IF a conflict exists
+  return data && data.length > 0 ? data[0] : null;
 }
 
 /**
