@@ -11,6 +11,20 @@ async function getAllServices(req, res, next) {
   }
 }
 
+async function getPublicServices(req, res, next) {
+  try {
+    const services = await dentalServiceService.getPublicServices();
+    return sendSuccess(
+      res,
+      200,
+      services,
+      "Public services retrieved successfully.",
+    );
+  } catch (error) {
+    return next(error);
+  }
+}
+
 async function deleteService(req, res, next) {
   try {
     const { id } = req.params;
@@ -72,5 +86,6 @@ module.exports = {
   getAllCategories,
   getAllServices,
   getDentistsByService,
+  getPublicServices,
   updateService,
 };

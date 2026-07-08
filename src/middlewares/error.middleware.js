@@ -12,6 +12,7 @@ function errorMiddleware(err, req, res, next) {
   const statusCode = err.statusCode || 500;
   const message = err.isOperational ? err.message : "Internal error";
   const code = err.code || null;
+  const details = err.details || null;
 
   if (statusCode >= 500) {
     logger.error(err.message, err);
@@ -19,7 +20,7 @@ function errorMiddleware(err, req, res, next) {
     logger.warn(err.message);
   }
 
-  return sendError(res, statusCode, message, code);
+  return sendError(res, statusCode, message, code, details);
 }
 
 module.exports = {

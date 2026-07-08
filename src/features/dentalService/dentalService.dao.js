@@ -18,6 +18,24 @@ async function findAllServices() {
     .order("service_id", { ascending: true });
 }
 
+async function findActivePublicServices() {
+  return supabase
+    .from("dental_services")
+    .select(
+      `
+      service_id,
+      category_id,
+      service_name,
+      description,
+      unit_price,
+      slot_occupied,
+      service_categories (category_name)
+    `,
+    )
+    .eq("status", "Active")
+    .order("service_id", { ascending: true });
+}
+
 async function deleteService(id) {
   return supabase
     .from("dental_services")
@@ -67,6 +85,7 @@ async function findDentistsByServiceId(serviceId) {
 
 module.exports = {
   deleteService,
+  findActivePublicServices,
   findAllCategories,
   findAllServices,
   findDentistsByServiceId,

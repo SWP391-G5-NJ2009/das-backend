@@ -3,8 +3,8 @@ const AppError = require("../../utils/AppError");
 
 /**
  * Fetch work_slots for a specific dentist on a given date.
- * Returns ALL slots (Available, Booked, Unavailable) so the UI can
- * show unavailable ones greyed-out.
+ * Returns slots from published schedules only. Pending/denied dentist requests
+ * are not visible in the patient booking calendar.
  *
  * Joins: work_slot → schedules (by schedule_id) → time_slot_config (by slot_config_id)
  *
@@ -31,7 +31,8 @@ async function findSlotsByDentistAndDate(dentistId, date) {
       )
     `)
     .eq("schedules.work_date", date)
-    .eq("schedules.dentist_id", dentistId);
+    .eq("schedules.dentist_id", dentistId)
+    .eq("schedules.status", "Scheduled");
 
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
   return data || [];
