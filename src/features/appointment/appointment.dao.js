@@ -8,24 +8,6 @@ const APPOINTMENT_SELECT = `
   total_estimated_amount,
   note,
   book_time,
-  work_slot:slot_id (
-    slot_id,
-    time_slot_config:slot_config_id (
-      start_time,
-      end_time
-    ),
-    schedules:schedule_id (
-      schedule_id,
-      work_date,
-      status,
-      dentist:dentist_id (
-        dentist_id,
-        full_name,
-        speciality,
-        experience
-      )
-    )
-  ),
   appointment_slot (
     is_primary,
     work_slot:slot_id (
@@ -33,6 +15,17 @@ const APPOINTMENT_SELECT = `
       time_slot_config:slot_config_id (
         start_time,
         end_time
+      ),
+      schedules:schedule_id (
+        schedule_id,
+        work_date,
+        status,
+        dentist:dentist_id (
+          dentist_id,
+          full_name,
+          speciality,
+          experience
+        )
       )
     )
   ),
@@ -448,12 +441,13 @@ async function markOverdueAsNoShow() {
     .select(
       `
       appt_id,
-
-
       patient_id,
-      work_slot:slot_id (
-        time_slot_config:slot_config_id (start_time),
-        schedules:schedule_id (work_date)
+      appointment_slot (
+        is_primary,
+        work_slot:slot_id (
+          time_slot_config:slot_config_id (start_time),
+          schedules:schedule_id (work_date)
+        )
       )
     `,
     )
@@ -472,8 +466,10 @@ async function markOverdueAsNoShow() {
   const overduePatientIds = {}; // appt_id → patient_id
 
   for (const appt of candidates) {
-    const workDate = appt.work_slot?.schedules?.work_date; // "YYYY-MM-DD"
-    const startTime = appt.work_slot?.time_slot_config?.start_time; // "HH:MM:SS"
+    // Slot data lives in appointment_slot junction — find the primary entry
+    const primaryEntry = (appt.appointment_slot || []).find((as) => as.is_primary);
+    const workDate = primaryEntry?.work_slot?.schedules?.work_date; // "YYYY-MM-DD"
+    const startTime = primaryEntry?.work_slot?.time_slot_config?.start_time; // "HH:MM:SS"
     if (!workDate || !startTime) continue;
 
     const slotStart = new Date(`${workDate}T${startTime}`);
