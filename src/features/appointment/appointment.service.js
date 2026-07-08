@@ -87,8 +87,9 @@ async function bookAppointment({
     );
     if (conflict) {
       throw new AppError(
-        "You already have an active appointment for this service. " +
-          "Please wait until your current appointment is checked in, cancelled, or resolved before booking again.",
+        "You already have an active appointment for this service " +
+          `(current status: ${conflict.status}). ` +
+          "Please wait until it is completed, cancelled, or resolved before booking again.",
         409,
         "DUPLICATE_SERVICE_BOOKING",
       );

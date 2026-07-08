@@ -365,10 +365,16 @@ async function getServicePrice(serviceId) {
 }
 
 /**
- * BR-15: Check if patient already has a 'Confirmed' appointment for a given service.
+ * BR-15: Check if patient already has an active appointment for a given service.
+ * Active statuses: 'Confirmed', 'Checked-in', 'Conflict'.
+ * - Confirmed  → still waiting for check-in
+ * - Checked-in → currently at the clinic, appointment in progress
+ * - Conflict   → dentist schedule was cancelled; appointment is unresolved/pending rescheduling
  * Returns the existing appointment row if found, null otherwise.
  */
 async function findConfirmedAppointmentByService(patientId, serviceId) {
+  const ACTIVE_STATUSES = ["Confirmed", "Checked-in", "Conflict"];
+
   const { data, error } = await supabase
     .from("appointment")
     .select(
@@ -379,12 +385,12 @@ async function findConfirmedAppointmentByService(patientId, serviceId) {
     `,
     )
     .eq("patient_id", patientId)
-    .eq("status", "Confirmed")
+    .in("status", ACTIVE_STATUSES)
     .eq("appointment_service.service_id", serviceId)
     .maybeSingle();
 
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
-  return data; // null if no conflict
+  return data; // null if no active appointment for this service
 }
 
 /**
