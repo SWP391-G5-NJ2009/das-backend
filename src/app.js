@@ -13,6 +13,7 @@ const slotRoutes = require("./features/slot/slot.routes");
 const profileRoutes = require("./features/profile/profile.routes");
 const roomRoutes = require("./features/room/room.routes");
 const revenueRoutes = require("./features/revenue/revenue.routes");
+const patientAnalyticsRoutes = require("./features/patientAnalytics/patientAnalytics.routes");
 const {
   errorMiddleware,
   notFoundMiddleware,
@@ -47,6 +48,7 @@ app.use("/api/slots", slotRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/rooms", roomRoutes);
 app.use("/api/reports/revenue", revenueRoutes);
+app.use("/api/reports/patient", patientAnalyticsRoutes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
