@@ -51,8 +51,16 @@ async function getReturningPatient() {
     return data ?? 0;
 }
 
+async function getMonthlyNewPatient() {
+    const { data, error } = await supabase
+        .rpc('get_monthly_new_patient', { p_months: 12 });
+    if (error) throw new AppError(error.message, 500, "DB_ERROR");
+    return data ?? [];
+}
+
 module.exports = {
     getNewPatient,
     getNoShowRate,
     getReturningPatient,
+    getMonthlyNewPatient,
 };
