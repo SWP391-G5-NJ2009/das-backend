@@ -11,11 +11,25 @@ router.get(
     clinicScheduleManagementController.getWorkingHour,
 );
 
+router.put(
+    "/workingHour",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.updateWorkingHours,
+);
+
 router.get(
     "/setting",
     authMiddleware,
     requireRole("owner"),
     clinicScheduleManagementController.getClinicSetting,
+);
+
+router.put(
+    "/setting",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.updateClinicSetting,
 );
 
 router.get(
@@ -37,6 +51,20 @@ router.delete(
     authMiddleware,
     requireRole("owner"),
     clinicScheduleManagementController.deleteClosure,
+);
+
+router.delete(
+    "/workingHour/pending",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.cancelPendingWorkingHours,
+);
+
+router.delete(
+    "/setting/pending",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.cancelPendingClinicSetting,
 );
 
 module.exports = router;

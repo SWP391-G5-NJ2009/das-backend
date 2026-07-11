@@ -6,7 +6,8 @@ const sendError = (
   statusCode = 500,
   message = "Internal error",
   code = null,
-) => res.status(statusCode).json({ success: false, data: null, message, code });
+  details = null,
+) => res.status(statusCode).json({ success: false, data: null, message, code, details });
 
 module.exports = {
   sendSuccess,

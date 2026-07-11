@@ -48,10 +48,52 @@ async function deleteClosure(req, res, next) {
     }
 }
 
+async function updateWorkingHours(req, res, next) {
+    try {
+        const { hours, effectiveDate } = req.body;
+        const data = await clinicScheduleManagementService.saveWorkingHours(hours, effectiveDate || null);
+        return sendSuccess(res, 200, data, "Working hours updated successfully.");
+    } catch (err) {
+        return next(err);
+    }
+}
+
+async function updateClinicSetting(req, res, next) {
+    try {
+        const { settingId, effectiveDate, ...fields } = req.body;
+        const data = await clinicScheduleManagementService.saveClinicSetting(settingId, fields, effectiveDate || null);
+        return sendSuccess(res, 200, data, "Clinic setting updated successfully.");
+    } catch (err) {
+        return next(err);
+    }
+}
+
+async function cancelPendingWorkingHours(req, res, next) {
+    try {
+        await clinicScheduleManagementService.cancelPendingWorkingHours();
+        return sendSuccess(res, 200, null, "Pending working hours cancelled successfully.");
+    } catch (err) {
+        return next(err);
+    }
+}
+
+async function cancelPendingClinicSetting(req, res, next) {
+    try {
+        await clinicScheduleManagementService.cancelPendingClinicSetting();
+        return sendSuccess(res, 200, null, "Pending clinic setting cancelled successfully.");
+    } catch (err) {
+        return next(err);
+    }
+}
+
 module.exports = {
     getWorkingHour,
     getClinicSetting,
     getClosures,
     createClosure,
     deleteClosure,
-}
+    updateWorkingHours,
+    updateClinicSetting,
+    cancelPendingWorkingHours,
+    cancelPendingClinicSetting,
+};
