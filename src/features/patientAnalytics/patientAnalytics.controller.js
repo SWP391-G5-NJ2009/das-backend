@@ -46,10 +46,20 @@ async function getMonthlyReturningPatient(req, res, next) {
     }
 }
 
+async function getMonthlyNoShowRate(req, res, next) {
+    try {
+        const data = await patientAnalytics.getMonthlyNoShowRate();
+        return sendSuccess(res, 200, data, "Monthly no show rate retrieved successfully.");
+    } catch (err) {
+        return next(err);
+    }
+}
+
 module.exports = {
     getNewPatient,
     getNoShowRate,
     getReturningPatient,
     getMonthlyNewPatient,
     getMonthlyReturningPatient,
+    getMonthlyNoShowRate,
 }

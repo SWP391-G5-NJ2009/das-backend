@@ -39,4 +39,11 @@ router.get(
     patientAnalyticsController.getMonthlyReturningPatient,
 );
 
+router.get(
+    "/noShowRateMonthly",
+    authMiddleware,
+    requireRole("owner"),
+    patientAnalyticsController.getMonthlyNoShowRate,
+);
+
 module.exports = router;
