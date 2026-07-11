@@ -32,4 +32,11 @@ router.get(
     patientAnalyticsController.getMonthlyNewPatient,
 );
 
+router.get(
+    "/returningPatientMonthly",
+    authMiddleware,
+    requireRole("owner"),
+    patientAnalyticsController.getMonthlyReturningPatient,
+);
+
 module.exports = router;

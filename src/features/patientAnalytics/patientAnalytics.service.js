@@ -16,9 +16,15 @@ async function getMonthlyNewPatient() {
     return patientAnalytics.getMonthlyNewPatient();
 }
 
+async function getMonthlyReturningPatient() {
+    return patientAnalytics.getMonthlyReturningPatient();
+}
+
+
 module.exports = {
     getNewPatient,
     getNoShowRate,
     getReturningPatient,
     getMonthlyNewPatient,
+    getMonthlyReturningPatient,
 }
