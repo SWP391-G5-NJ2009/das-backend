@@ -6,6 +6,20 @@ const requireRole = require("../../middlewares/role.middleware");
 const router = express.Router();
 
 router.get(
+  "/dentist-accounts/available",
+  authMiddleware,
+  requireRole("owner"),
+  staffController.getAvailableDentistAccounts,
+);
+
+router.post(
+  "/dentists",
+  authMiddleware,
+  requireRole("owner"),
+  staffController.createDentistProfile,
+);
+
+router.get(
   "/",
   authMiddleware,
   requireRole("owner"),
