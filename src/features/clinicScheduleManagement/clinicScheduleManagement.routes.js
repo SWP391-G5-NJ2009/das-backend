@@ -11,4 +11,32 @@ router.get(
     clinicScheduleManagementController.getWorkingHour,
 );
 
+router.get(
+    "/setting",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.getClinicSetting,
+);
+
+router.get(
+    "/closures",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.getClosures,
+);
+
+router.post(
+    "/closures",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.createClosure,
+);
+
+router.delete(
+    "/closures/:id",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.deleteClosure,
+);
+
 module.exports = router;

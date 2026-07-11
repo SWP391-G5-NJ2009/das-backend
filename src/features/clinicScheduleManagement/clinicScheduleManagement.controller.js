@@ -10,6 +10,48 @@ async function getWorkingHour(req, res, next) {
     }
 }
 
+async function getClinicSetting(req, res, next) {
+    try {
+        const data = await clinicScheduleManagementService.getClinicSetting();
+        return sendSuccess(res, 200, data, "Clinic setting retrieved successfully.");
+    } catch (err) {
+        return next(err);
+    }
+}
+
+async function getClosures(req, res, next) {
+    try {
+        const data = await clinicScheduleManagementService.getClosures();
+        return sendSuccess(res, 200, data, "Closures retrieved successfully.");
+    } catch (err) {
+        return next(err);
+    }
+}
+
+async function createClosure(req, res, next) {
+    try {
+        const { closureDate, reason } = req.body;
+        const data = await clinicScheduleManagementService.createClosure(closureDate, reason);
+        return sendSuccess(res, 201, data, "Closure added successfully.");
+    } catch (err) {
+        return next(err);
+    }
+}
+
+async function deleteClosure(req, res, next) {
+    try {
+        const { id } = req.params;
+        const data = await clinicScheduleManagementService.deleteClosure(id);
+        return sendSuccess(res, 200, data, "Closure removed successfully.");
+    } catch (err) {
+        return next(err);
+    }
+}
+
 module.exports = {
     getWorkingHour,
+    getClinicSetting,
+    getClosures,
+    createClosure,
+    deleteClosure,
 }
