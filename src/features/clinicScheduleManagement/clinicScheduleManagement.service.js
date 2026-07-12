@@ -1,11 +1,6 @@
 const clinicScheduleManagementDao = require("./clinicScheduleManagement.dao");
 const AppError = require("../../utils/AppError");
 
-const DEFAULT_SETTINGS = {
-    booking_lead_days: 30,
-    max_booking_per_slot: 1,
-};
-
 const SLOT_DURATION_MINUTES = 30;
 
 function todayStr() {
@@ -47,9 +42,6 @@ async function createVersion(name, effectiveDate) {
     const prevHours = activeVersion
         ? await clinicScheduleManagementDao.getWorkingHourByVersionId(activeVersion.version_id)
         : [];
-    const prevSetting = activeVersion
-        ? await clinicScheduleManagementDao.getClinicSettingByVersionId(activeVersion.version_id)
-        : null;
 
     const hoursToCopy = prevHours.length > 0
         ? prevHours.map((h) => ({
@@ -71,24 +63,10 @@ async function createVersion(name, effectiveDate) {
             { day_of_week: 6, start_time: "08:00", end_time: "12:00" },
         ];
 
-    const settingToCopy = prevSetting
-        ? {
-            booking_lead_days: prevSetting.booking_lead_days,
-            max_booking_per_slot: prevSetting.max_booking_per_slot,
-        }
-        : { ...DEFAULT_SETTINGS };
-
-    await Promise.all([
-        clinicScheduleManagementDao.insertWorkingHours(version.version_id, hoursToCopy),
-        clinicScheduleManagementDao.insertClinicSetting(version.version_id, settingToCopy),
-    ]);
+    await clinicScheduleManagementDao.insertWorkingHours(version.version_id, hoursToCopy);
 
     if (hoursToCopy.length > 0) {
-        await generateTimeSlotConfigs(
-            version.version_id,
-            hoursToCopy,
-            SLOT_DURATION_MINUTES,
-        );
+        await generateTimeSlotConfigs(version.version_id, hoursToCopy, SLOT_DURATION_MINUTES);
     }
 
     if (initialStatus === "Active") {
@@ -176,24 +154,6 @@ async function saveWorkingHours(versionId, hours) {
     return clinicScheduleManagementDao.replaceWorkingHours(versionId, hours);
 }
 
-// ── Clinic Settings ──────────────────────────────────────────────
-
-async function getClinicSetting() {
-    return clinicScheduleManagementDao.getClinicSetting();
-}
-
-async function saveClinicSetting(versionId, fields) {
-    if (!versionId) {
-        throw new AppError("versionId is required.", 400, "MISSING_VERSION");
-    }
-
-    const existing = await clinicScheduleManagementDao.getClinicSettingByVersionId(versionId);
-    if (existing) {
-        return clinicScheduleManagementDao.updateClinicSetting(existing.setting_id, fields);
-    }
-    return clinicScheduleManagementDao.insertClinicSetting(versionId, fields);
-}
-
 // ── Time Slot Config Generation ────────────────────────────────
 
 function parseTime(timeStr) {
@@ -233,7 +193,7 @@ async function generateTimeSlotConfigs(versionId, hours, slotDurationMinutes) {
 
 // ── Combined Save ────────────────────────────────────────────────
 
-async function saveAll(versionId, hours, settingFields, force = false) {
+async function saveAll(versionId, hours, force = false) {
     if (!force && hours && hours.length > 0) {
         const conflicting =
             await clinicScheduleManagementDao.findConflictingAppointments(hours);
@@ -248,7 +208,6 @@ async function saveAll(versionId, hours, settingFields, force = false) {
     }
 
     await saveWorkingHours(versionId, hours);
-    await saveClinicSetting(versionId, settingFields);
 
     if (hours && hours.length > 0) {
         await generateTimeSlotConfigs(versionId, hours, SLOT_DURATION_MINUTES);
@@ -325,12 +284,9 @@ async function getVersionById(versionId) {
     const version = await clinicScheduleManagementDao.getVersionById(versionId);
     if (!version) throw new AppError("Version not found.", 404, "NOT_FOUND");
 
-    const [hours, setting] = await Promise.all([
-        clinicScheduleManagementDao.getWorkingHourByVersionId(versionId),
-        clinicScheduleManagementDao.getClinicSettingByVersionId(versionId),
-    ]);
+    const hours = await clinicScheduleManagementDao.getWorkingHourByVersionId(versionId);
 
-    return { version, hours, setting };
+    return { version, hours };
 }
 
 async function updateEffectiveDate(versionId, effectiveDate) {
@@ -374,8 +330,6 @@ module.exports = {
     getAllVersions,
     getWorkingHour,
     saveWorkingHours,
-    getClinicSetting,
-    saveClinicSetting,
     saveAll,
     cancelPendingVersion,
     deleteVersion,

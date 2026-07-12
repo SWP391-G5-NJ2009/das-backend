@@ -209,75 +209,6 @@ async function replaceTimeSlotConfigs(versionId, configs) {
     return data || [];
 }
 
-// ── Clinic Setting Queries ───────────────────────────────────────
-
-async function getClinicSettingByVersionId(versionId) {
-    const { data, error } = await supabase
-        .from("clinic_setting")
-        .select("*")
-        .eq("version_id", versionId)
-        .order("setting_id")
-        .limit(1)
-        .maybeSingle();
-
-    if (error) throw new AppError(error.message, 500, "DB_ERROR");
-    return data;
-}
-
-async function getClinicSetting() {
-    const activeVersion = await getActiveVersion();
-    const pendingVersion = await getPendingVersion();
-
-    const activeSetting = activeVersion
-        ? await getClinicSettingByVersionId(activeVersion.version_id)
-        : null;
-    const pendingSetting = pendingVersion
-        ? await getClinicSettingByVersionId(pendingVersion.version_id)
-        : null;
-
-    return {
-        active: { version: activeVersion, setting: activeSetting },
-        pending: { version: pendingVersion, setting: pendingSetting },
-    };
-}
-
-async function insertClinicSetting(versionId, fields) {
-    const { data, error } = await supabase
-        .from("clinic_setting")
-        .insert({ ...fields, version_id: versionId })
-        .select()
-        .single();
-
-    if (error) throw new AppError(error.message, 500, "DB_ERROR");
-    return data;
-}
-
-async function updateClinicSetting(settingId, fields) {
-    const { data, error } = await supabase
-        .from("clinic_setting")
-        .update(fields)
-        .eq("setting_id", settingId)
-        .select()
-        .single();
-
-    if (error) throw new AppError(error.message, 500, "DB_ERROR");
-    return data;
-}
-
-async function deleteClinicSettingByVersionId(versionId) {
-    const { error } = await supabase
-        .from("clinic_setting")
-        .delete()
-        .eq("version_id", versionId);
-
-    if (error) throw new AppError(error.message, 500, "DB_ERROR");
-}
-
-async function replaceClinicSetting(versionId, fields) {
-    await deleteClinicSettingByVersionId(versionId);
-    return insertClinicSetting(versionId, fields);
-}
-
 // ── Closure Queries ──────────────────────────────────────────────
 
 async function getClosures() {
@@ -516,12 +447,6 @@ module.exports = {
     replaceWorkingHours,
     getTimeSlotConfigsByVersionId,
     replaceTimeSlotConfigs,
-    getClinicSetting,
-    getClinicSettingByVersionId,
-    insertClinicSetting,
-    updateClinicSetting,
-    deleteClinicSettingByVersionId,
-    replaceClinicSetting,
     getClosures,
     createClosure,
     deleteClosure,

@@ -43,33 +43,12 @@ async function updateWorkingHours(req, res, next) {
     }
 }
 
-// ── Clinic Settings ──────────────────────────────────────────────
-
-async function getClinicSetting(req, res, next) {
-    try {
-        const data = await clinicScheduleManagementService.getClinicSetting();
-        return sendSuccess(res, 200, data, "Clinic setting retrieved successfully.");
-    } catch (err) {
-        return next(err);
-    }
-}
-
-async function updateClinicSetting(req, res, next) {
-    try {
-        const { versionId, ...fields } = req.body;
-        const data = await clinicScheduleManagementService.saveClinicSetting(versionId, fields);
-        return sendSuccess(res, 200, data, "Clinic setting updated successfully.");
-    } catch (err) {
-        return next(err);
-    }
-}
-
 // ── Combined ─────────────────────────────────────────────────────
 
 async function saveAll(req, res, next) {
     try {
-        const { versionId, hours, settingFields, force } = req.body;
-        await clinicScheduleManagementService.saveAll(versionId, hours, settingFields, force);
+        const { versionId, hours, force } = req.body;
+        await clinicScheduleManagementService.saveAll(versionId, hours, force);
         return sendSuccess(res, 200, null, "Schedule updated successfully.");
     } catch (err) {
         return next(err);
@@ -173,8 +152,6 @@ module.exports = {
     getVersions,
     getWorkingHour,
     updateWorkingHours,
-    getClinicSetting,
-    updateClinicSetting,
     saveAll,
     cancelPending,
     deleteVersion,

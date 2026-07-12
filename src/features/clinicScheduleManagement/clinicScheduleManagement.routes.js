@@ -36,22 +36,6 @@ router.put(
     clinicScheduleManagementController.updateWorkingHours,
 );
 
-// ── Clinic Settings ──────────────────────────────────────────────
-
-router.get(
-    "/setting",
-    authMiddleware,
-    requireRole("owner"),
-    clinicScheduleManagementController.getClinicSetting,
-);
-
-router.put(
-    "/setting",
-    authMiddleware,
-    requireRole("owner"),
-    clinicScheduleManagementController.updateClinicSetting,
-);
-
 // ── Combined Save ────────────────────────────────────────────────
 
 router.put(
