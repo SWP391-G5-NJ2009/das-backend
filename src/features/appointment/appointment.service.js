@@ -87,8 +87,9 @@ async function bookAppointment({
     );
     if (conflict) {
       throw new AppError(
-        "You already have an active appointment for this service. " +
-          "Please wait until your current appointment is checked in, cancelled, or resolved before booking again.",
+        "You already have an active appointment for this service " +
+          `(current status: ${conflict.status}). ` +
+          "Please wait until it is completed, cancelled, or resolved before booking again.",
         409,
         "DUPLICATE_SERVICE_BOOKING",
       );
@@ -156,7 +157,6 @@ async function bookAppointment({
   // Step 2: Create appointment record (primary slot only — the anchor)
   const appointment = await appointmentDao.createAppointment({
     patient_id: resolvedPatientId,
-    slot_id: slotId,
     status: "Confirmed",
     note: note || null,
     book_time: new Date().toISOString(),
@@ -193,12 +193,14 @@ async function bookAppointment({
 const CANCELLABLE_STATUSES = ["Confirmed", "Checked-in", "Conflict"];
 
 function normalize(row) {
-  const slotConfig = row.work_slot?.time_slot_config;
-  const schedule = row.work_slot?.schedules;
+  // Primary slot data lives in appointment_slot (is_primary = true)
+  const primarySlotEntry = (row.appointment_slot || []).find(
+    (as) => as.is_primary,
+  );
+  const primarySlot = primarySlotEntry?.work_slot;
+  const slotConfig = primarySlot?.time_slot_config;
+  const schedule = primarySlot?.schedules;
   const dentist = schedule?.dentist;
-  const services = (row.appointment_service || [])
-    .map((item) => item.dental_service?.service_name)
-    .filter(Boolean);
 
   return {
     id: String(row.appt_id),
@@ -212,7 +214,11 @@ function normalize(row) {
     patientNoShowCount: row.patient?.no_show_count ?? 0,
     patientAccountStatus: row.patient?.account?.status || null,
 
-    serviceName: services.join(", ") || null,
+    serviceName:
+      (row.appointment_service || [])
+        .map((item) => item.dental_service?.service_name)
+        .filter(Boolean)
+        .join(", ") || null,
     services: (row.appointment_service || []).map((as) => ({
       serviceId: as.dental_service?.service_id,
       serviceName: as.dental_service?.service_name,
@@ -335,7 +341,11 @@ async function cancelAppointment(
 
   // ── BR-13: Patients can only cancel at least 24 hours before scheduled time ──
   if (role === "patient") {
-    const slotId = existing.work_slot?.slot_id;
+    // Get primary slot from appointment_slot junction (appointment table has no slot_id column)
+    const primarySlotEntry = (existing.appointment_slot || []).find(
+      (as) => as.is_primary,
+    );
+    const slotId = primarySlotEntry?.work_slot?.slot_id;
     if (slotId) {
       const slotInfo = await appointmentDao.findSlotInfo(slotId);
       if (slotInfo) {

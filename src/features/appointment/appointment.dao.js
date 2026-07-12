@@ -8,24 +8,6 @@ const APPOINTMENT_SELECT = `
   total_estimated_amount,
   note,
   book_time,
-  work_slot:slot_id (
-    slot_id,
-    time_slot_config:slot_config_id (
-      start_time,
-      end_time
-    ),
-    schedules:schedule_id (
-      schedule_id,
-      work_date,
-      status,
-      dentist:dentist_id (
-        dentist_id,
-        full_name,
-        speciality,
-        experience
-      )
-    )
-  ),
   appointment_slot (
     is_primary,
     work_slot:slot_id (
@@ -33,6 +15,17 @@ const APPOINTMENT_SELECT = `
       time_slot_config:slot_config_id (
         start_time,
         end_time
+      ),
+      schedules:schedule_id (
+        schedule_id,
+        work_date,
+        status,
+        dentist:dentist_id (
+          dentist_id,
+          full_name,
+          speciality,
+          experience
+        )
       )
     )
   ),
@@ -152,7 +145,8 @@ async function findConsecutiveSlotsFromId(startSlotId, count) {
   // Step 1: get the anchor slot's schedule and start time
   const { data: anchor, error: anchorError } = await supabase
     .from("work_slot")
-    .select(`
+    .select(
+      `
       slot_id,
       status,
       schedule_id,
@@ -160,7 +154,8 @@ async function findConsecutiveSlotsFromId(startSlotId, count) {
         slot_config_id,
         start_time
       )
-    `)
+    `,
+    )
     .eq("slot_id", startSlotId)
     .maybeSingle();
 
@@ -178,13 +173,15 @@ async function findConsecutiveSlotsFromId(startSlotId, count) {
   // PostgREST does NOT support .gte() on embedded columns — filter by start_time in JS.
   const { data: slots, error: slotsError } = await supabase
     .from("work_slot")
-    .select(`
+    .select(
+      `
       slot_id,
       status,
       time_slot_config:slot_config_id (
         start_time
       )
-    `)
+    `,
+    )
     .eq("schedule_id", scheduleId)
     .order("slot_config_id", { ascending: true });
 
@@ -375,10 +372,16 @@ async function getServicePrice(serviceId) {
 }
 
 /**
- * BR-15: Check if patient already has a 'Confirmed' appointment for a given service.
+ * BR-15: Check if patient already has an active appointment for a given service.
+ * Active statuses: 'Confirmed', 'Checked-in', 'Conflict'.
+ * - Confirmed  → still waiting for check-in
+ * - Checked-in → currently at the clinic, appointment in progress
+ * - Conflict   → dentist schedule was cancelled; appointment is unresolved/pending rescheduling
  * Returns the existing appointment row if found, null otherwise.
  */
 async function findConfirmedAppointmentByService(patientId, serviceId) {
+  const ACTIVE_STATUSES = ["Confirmed", "Checked-in", "Conflict"];
+
   const { data, error } = await supabase
     .from("appointment")
     .select(
@@ -389,7 +392,7 @@ async function findConfirmedAppointmentByService(patientId, serviceId) {
     `,
     )
     .eq("patient_id", patientId)
-    .eq("status", "Confirmed")
+    .in("status", ACTIVE_STATUSES)
     .eq("appointment_service.service_id", serviceId)
     .limit(1);
 
@@ -452,12 +455,13 @@ async function markOverdueAsNoShow() {
     .select(
       `
       appt_id,
-
-
       patient_id,
-      work_slot:slot_id (
-        time_slot_config:slot_config_id (start_time),
-        schedules:schedule_id (work_date)
+      appointment_slot (
+        is_primary,
+        work_slot:slot_id (
+          time_slot_config:slot_config_id (start_time),
+          schedules:schedule_id (work_date)
+        )
       )
     `,
     )
@@ -476,8 +480,12 @@ async function markOverdueAsNoShow() {
   const overduePatientIds = {}; // appt_id → patient_id
 
   for (const appt of candidates) {
-    const workDate = appt.work_slot?.schedules?.work_date; // "YYYY-MM-DD"
-    const startTime = appt.work_slot?.time_slot_config?.start_time; // "HH:MM:SS"
+    // Slot data lives in appointment_slot junction — find the primary entry
+    const primaryEntry = (appt.appointment_slot || []).find(
+      (as) => as.is_primary,
+    );
+    const workDate = primaryEntry?.work_slot?.schedules?.work_date; // "YYYY-MM-DD"
+    const startTime = primaryEntry?.work_slot?.time_slot_config?.start_time; // "HH:MM:SS"
     if (!workDate || !startTime) continue;
 
     const slotStart = new Date(`${workDate}T${startTime}`);
