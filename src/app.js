@@ -15,6 +15,7 @@ const slotRoutes = require("./features/slot/slot.routes");
 const profileRoutes = require("./features/profile/profile.routes");
 const roomRoutes = require("./features/room/room.routes");
 const scheduleRoutes = require("./features/schedule/schedule.routes");
+const staffRoutes = require("./features/staff/staff.routes");
 const {
   errorMiddleware,
   notFoundMiddleware,
@@ -63,6 +64,7 @@ app.use("/api/slots", slotRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/rooms", roomRoutes);
 app.use("/api/schedules", scheduleRoutes);
+app.use("/api/staff", staffRoutes);
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 
