@@ -4,6 +4,24 @@ const requireRole = require("../../middlewares/role.middleware");
 const clinicScheduleManagementController = require("./clinicScheduleManagement.controller");
 const router = express.Router();
 
+// ── Versions ─────────────────────────────────────────────────────
+
+router.get(
+    "/versions",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.getVersions,
+);
+
+router.post(
+    "/versions",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.createVersion,
+);
+
+// ── Working Hours ────────────────────────────────────────────────
+
 router.get(
     "/workingHour",
     authMiddleware,
@@ -18,6 +36,8 @@ router.put(
     clinicScheduleManagementController.updateWorkingHours,
 );
 
+// ── Clinic Settings ──────────────────────────────────────────────
+
 router.get(
     "/setting",
     authMiddleware,
@@ -31,6 +51,54 @@ router.put(
     requireRole("owner"),
     clinicScheduleManagementController.updateClinicSetting,
 );
+
+// ── Combined Save ────────────────────────────────────────────────
+
+router.put(
+    "/save-all",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.saveAll,
+);
+
+// ── Cancel Pending ───────────────────────────────────────────────
+
+router.delete(
+    "/pending",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.cancelPending,
+);
+
+router.delete(
+    "/versions/:id",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.deleteVersion,
+);
+
+router.get(
+    "/versions/:id",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.getVersionById,
+);
+
+router.patch(
+    "/versions/:id/effective-date",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.updateEffectiveDate,
+);
+
+router.get(
+    "/min-effective-date",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.getMinEffectiveDate,
+);
+
+// ── Closures ─────────────────────────────────────────────────────
 
 router.get(
     "/closures",
@@ -51,20 +119,6 @@ router.delete(
     authMiddleware,
     requireRole("owner"),
     clinicScheduleManagementController.deleteClosure,
-);
-
-router.delete(
-    "/workingHour/pending",
-    authMiddleware,
-    requireRole("owner"),
-    clinicScheduleManagementController.cancelPendingWorkingHours,
-);
-
-router.delete(
-    "/setting/pending",
-    authMiddleware,
-    requireRole("owner"),
-    clinicScheduleManagementController.cancelPendingClinicSetting,
 );
 
 module.exports = router;
