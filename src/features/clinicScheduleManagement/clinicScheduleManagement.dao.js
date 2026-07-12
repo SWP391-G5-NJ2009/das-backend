@@ -5,7 +5,7 @@ const AppError = require("../../utils/AppError");
 
 async function getActiveVersion() {
     const { data, error } = await supabase
-        .from("clinic_working_hour_version")
+        .from("clinic_schedule_version")
         .select("*")
         .eq("status", "Active")
         .order("effective_date", { ascending: false })
@@ -18,7 +18,7 @@ async function getActiveVersion() {
 
 async function getPendingVersion() {
     const { data, error } = await supabase
-        .from("clinic_working_hour_version")
+        .from("clinic_schedule_version")
         .select("*")
         .eq("status", "Pending")
         .order("effective_date")
@@ -31,7 +31,7 @@ async function getPendingVersion() {
 
 async function getAllVersions() {
     const { data, error } = await supabase
-        .from("clinic_working_hour_version")
+        .from("clinic_schedule_version")
         .select("*")
         .order("effective_date", { ascending: false });
 
@@ -41,7 +41,7 @@ async function getAllVersions() {
 
 async function createVersion(name, effectiveDate, status) {
     const { data, error } = await supabase
-        .from("clinic_working_hour_version")
+        .from("clinic_schedule_version")
         .insert({ name: name || null, effective_date: effectiveDate, status })
         .select()
         .single();
@@ -55,32 +55,9 @@ async function createVersion(name, effectiveDate, status) {
     return data;
 }
 
-async function createSettingVersion(name, effectiveDate, status) {
-    const { data, error } = await supabase
-        .from("clinic_setting_version")
-        .insert({ name: name || null, effective_date: effectiveDate, status })
-        .select()
-        .single();
-
-    if (error) throw new AppError(error.message, 500, "DB_ERROR");
-    return data;
-}
-
 async function activateVersion(versionId) {
     const { data, error } = await supabase
-        .from("clinic_working_hour_version")
-        .update({ status: "Active" })
-        .eq("version_id", versionId)
-        .select()
-        .single();
-
-    if (error) throw new AppError(error.message, 500, "DB_ERROR");
-    return data;
-}
-
-async function activateSettingVersion(versionId) {
-    const { data, error } = await supabase
-        .from("clinic_setting_version")
+        .from("clinic_schedule_version")
         .update({ status: "Active" })
         .eq("version_id", versionId)
         .select()
@@ -91,86 +68,28 @@ async function activateSettingVersion(versionId) {
 }
 
 async function expireAllActiveVersions() {
-    const { error: e1 } = await supabase
-        .from("clinic_working_hour_version")
-        .update({ status: "Expired" })
-        .eq("status", "Active");
-
-    if (e1) throw new AppError(e1.message, 500, "DB_ERROR");
-
-    const { error: e2 } = await supabase
-        .from("clinic_setting_version")
-        .update({ status: "Expired" })
-        .eq("status", "Active");
-
-    if (e2) throw new AppError(e2.message, 500, "DB_ERROR");
-}
-
-async function deletePendingVersions() {
-    const { data: pendingWHVersions, error: fetchErr } = await supabase
-        .from("clinic_working_hour_version")
-        .select("version_id")
-        .eq("status", "Pending");
-
-    if (fetchErr) throw new AppError(fetchErr.message, 500, "DB_ERROR");
-
-    const pendingVersionIds = (pendingWHVersions || []).map((v) => v.version_id);
-
-    if (pendingVersionIds.length > 0) {
-        const { error: e0 } = await supabase
-            .from("clinic_working_hour")
-            .delete()
-            .in("version_id", pendingVersionIds);
-        if (e0) throw new AppError(e0.message, 500, "DB_ERROR");
-
-        const { error: e1 } = await supabase
-            .from("clinic_setting")
-            .delete()
-            .in("version_id", pendingVersionIds);
-        if (e1) throw new AppError(e1.message, 500, "DB_ERROR");
-    }
-
-    const { data: deletedWH, error: e2 } = await supabase
-        .from("clinic_working_hour_version")
-        .delete()
-        .eq("status", "Pending")
-        .select("version_id");
-    if (e2) throw new AppError(e2.message, 500, "DB_ERROR");
-
-    const { data: deletedCS, error: e3 } = await supabase
-        .from("clinic_setting_version")
-        .delete()
-        .eq("status", "Pending")
-        .select("version_id");
-    if (e3) throw new AppError(e3.message, 500, "DB_ERROR");
-
-    return { deletedWHVersions: deletedWH || [], deletedCSVersions: deletedCS || [] };
-}
-
-async function deleteVersionById(versionId) {
-    const { error: e1 } = await supabase
-        .from("clinic_working_hour")
-        .delete()
-        .eq("version_id", versionId);
-    if (e1) throw new AppError(e1.message, 500, "DB_ERROR");
-
     const { error } = await supabase
-        .from("clinic_working_hour_version")
-        .delete()
-        .eq("version_id", versionId);
+        .from("clinic_schedule_version")
+        .update({ status: "Expired" })
+        .eq("status", "Active");
 
     if (error) throw new AppError(error.message, 500, "DB_ERROR");
 }
 
-async function deleteSettingVersionById(versionId) {
-    const { error: e1 } = await supabase
-        .from("clinic_setting")
+async function deletePendingVersions() {
+    const { data, error } = await supabase
+        .from("clinic_schedule_version")
         .delete()
-        .eq("version_id", versionId);
-    if (e1) throw new AppError(e1.message, 500, "DB_ERROR");
+        .eq("status", "Pending")
+        .select("version_id");
 
+    if (error) throw new AppError(error.message, 500, "DB_ERROR");
+    return { deletedVersions: data || [] };
+}
+
+async function deleteVersionById(versionId) {
     const { error } = await supabase
-        .from("clinic_setting_version")
+        .from("clinic_schedule_version")
         .delete()
         .eq("version_id", versionId);
 
@@ -181,7 +100,7 @@ async function getPendingVersionsDueForActivation() {
     const today = new Date().toISOString().slice(0, 10);
 
     const { data, error } = await supabase
-        .from("clinic_working_hour_version")
+        .from("clinic_schedule_version")
         .select("*")
         .eq("status", "Pending")
         .lte("effective_date", today);
@@ -257,6 +176,37 @@ async function deleteWorkingHoursByVersionId(versionId) {
 async function replaceWorkingHours(versionId, hours) {
     await deleteWorkingHoursByVersionId(versionId);
     return insertWorkingHours(versionId, hours);
+}
+
+// ── Time Slot Config Queries ────────────────────────────────────
+
+async function getTimeSlotConfigsByVersionId(versionId) {
+    const { data, error } = await supabase
+        .from("time_slot_config")
+        .select("*")
+        .eq("version_id", versionId);
+
+    if (error) throw new AppError(error.message, 500, "DB_ERROR");
+    return data || [];
+}
+
+async function replaceTimeSlotConfigs(versionId, configs) {
+    const { error: delErr } = await supabase
+        .from("time_slot_config")
+        .delete()
+        .eq("version_id", versionId);
+
+    if (delErr) throw new AppError(delErr.message, 500, "DB_ERROR");
+
+    if (!configs || configs.length === 0) return [];
+
+    const { data, error: insErr } = await supabase
+        .from("time_slot_config")
+        .insert(configs)
+        .select();
+
+    if (insErr) throw new AppError(insErr.message, 500, "DB_ERROR");
+    return data || [];
 }
 
 // ── Clinic Setting Queries ───────────────────────────────────────
@@ -498,7 +448,7 @@ async function markSlotsAsUnavailable(slotIds) {
 
 async function getVersionById(versionId) {
     const { data, error } = await supabase
-        .from("clinic_working_hour_version")
+        .from("clinic_schedule_version")
         .select("*")
         .eq("version_id", versionId)
         .maybeSingle();
@@ -508,19 +458,45 @@ async function getVersionById(versionId) {
 }
 
 async function updateEffectiveDate(versionId, effectiveDate) {
-    const { error: e1 } = await supabase
-        .from("clinic_working_hour_version")
+    const { error } = await supabase
+        .from("clinic_schedule_version")
         .update({ effective_date: effectiveDate })
         .eq("version_id", versionId);
 
-    if (e1) throw new AppError(e1.message, 500, "DB_ERROR");
+    if (error) throw new AppError(error.message, 500, "DB_ERROR");
+}
 
-    const { error: e2 } = await supabase
-        .from("clinic_setting_version")
-        .update({ effective_date: effectiveDate })
-        .eq("version_id", versionId);
+async function getWorkSlotCountsByVersionIds(versionIds) {
+    if (!versionIds || versionIds.length === 0) return {};
 
-    if (e2) throw new AppError(e2.message, 500, "DB_ERROR");
+    const { data, error } = await supabase
+        .from("time_slot_config")
+        .select("slot_config_id, version_id")
+        .in("version_id", versionIds);
+
+    if (error || !data || data.length === 0) return {};
+
+    const configIds = data.map((r) => r.slot_config_id);
+    if (configIds.length === 0) return {};
+
+    const { data: slots, error: slotErr } = await supabase
+        .from("work_slot")
+        .select("slot_config_id")
+        .in("slot_config_id", configIds);
+
+    if (slotErr || !slots || slots.length === 0) return {};
+
+    const configToVersion = {};
+    for (const row of data) {
+        configToVersion[row.slot_config_id] = row.version_id;
+    }
+
+    const counts = {};
+    for (const s of slots) {
+        const vid = configToVersion[s.slot_config_id];
+        if (vid) counts[vid] = (counts[vid] || 0) + 1;
+    }
+    return counts;
 }
 
 module.exports = {
@@ -528,19 +504,18 @@ module.exports = {
     getPendingVersion,
     getAllVersions,
     createVersion,
-    createSettingVersion,
     activateVersion,
-    activateSettingVersion,
     expireAllActiveVersions,
     deletePendingVersions,
     deleteVersionById,
-    deleteSettingVersionById,
     getPendingVersionsDueForActivation,
     getWorkingHour,
     getWorkingHourByVersionId,
     insertWorkingHours,
     deleteWorkingHoursByVersionId,
     replaceWorkingHours,
+    getTimeSlotConfigsByVersionId,
+    replaceTimeSlotConfigs,
     getClinicSetting,
     getClinicSettingByVersionId,
     insertClinicSetting,
@@ -556,4 +531,5 @@ module.exports = {
     markSlotsAsUnavailable,
     getVersionById,
     updateEffectiveDate,
+    getWorkSlotCountsByVersionIds,
 };

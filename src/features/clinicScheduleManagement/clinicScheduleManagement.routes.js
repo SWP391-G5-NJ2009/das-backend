@@ -77,6 +77,13 @@ router.delete(
     clinicScheduleManagementController.deleteVersion,
 );
 
+router.patch(
+    "/versions/:id/activate",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.activateVersion,
+);
+
 router.get(
     "/versions/:id",
     authMiddleware,

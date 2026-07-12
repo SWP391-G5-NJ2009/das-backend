@@ -97,6 +97,16 @@ async function deleteVersion(req, res, next) {
     }
 }
 
+async function activateVersion(req, res, next) {
+    try {
+        const { id } = req.params;
+        const data = await clinicScheduleManagementService.activatePendingVersion(Number(id));
+        return sendSuccess(res, 200, data, "Version activated successfully.");
+    } catch (err) {
+        return next(err);
+    }
+}
+
 // ── Closures ─────────────────────────────────────────────────────
 
 async function getClosures(req, res, next) {
@@ -168,6 +178,7 @@ module.exports = {
     saveAll,
     cancelPending,
     deleteVersion,
+    activateVersion,
     getClosures,
     createClosure,
     deleteClosure,
