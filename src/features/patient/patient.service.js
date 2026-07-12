@@ -68,8 +68,7 @@ function normalizeTreatment(row) {
     id: String(treatment?.record_id || row.appt_id),
     appointmentId: row.appt_id,
     date: schedule?.work_date || row.book_time?.slice(0, 10) || "",
-    startTime:
-      row.work_slot?.slot_config?.start_time?.substring(0, 5) || "",
+    startTime: row.work_slot?.slot_config?.start_time?.substring(0, 5) || "",
     endTime: row.work_slot?.slot_config?.end_time?.substring(0, 5) || "",
     treatment:
       services
@@ -94,7 +93,10 @@ function getTreatmentDentistId(row) {
   return row.work_slot?.schedules?.dentist?.dentist_id || null;
 }
 
-function filterTreatmentHistoryByActor(rows, { actorProfileId, actorRole } = {}) {
+function filterTreatmentHistoryByActor(
+  rows,
+  { actorProfileId, actorRole } = {},
+) {
   if (normalizeRole(actorRole) !== "dentist") {
     return rows;
   }
@@ -186,12 +188,16 @@ async function getTreatmentHistory(patientId, actor = {}) {
     throw new AppError(error.message, 500, "DB_ERROR");
   }
 
-  return filterTreatmentHistoryByActor(data || [], actor).map(normalizeTreatment);
+  return filterTreatmentHistoryByActor(data || [], actor).map(
+    normalizeTreatment,
+  );
 }
 
 /**
- * BR-12: Lift a booking ban for a patient by resolving all their No-Show appointments.
- * no_show_count resets automatically via DB trigger once No-Shows are resolved.
+ * BR-12: Lift a booking ban for a patient:
+ *  1. Resolve all No-Show appointments → "Resolved No-Show"
+ *  2. Reset no_show_count to 0
+ *  3. Restore account.status → "Active" so the patient can log in and book again
  */
 async function liftBookingBan(patientId) {
   const patient = await patientDao.findPatientById(patientId);
@@ -205,6 +211,11 @@ async function liftBookingBan(patientId) {
   }
 
   const resolved = await patientDao.resolveNoShowAppointments(patientId);
+
+  // Restore account status to Active so the patient can log in and book again
+  if (patient.account_id) {
+    await patientDao.setAccountStatusForPatients([patient.account_id], "Active");
+  }
 
   return {
     patientId: patient.patient_id,

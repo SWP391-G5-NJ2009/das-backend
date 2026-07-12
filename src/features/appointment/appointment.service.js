@@ -212,6 +212,8 @@ function normalize(row) {
     patientGender: row.patient?.gender || null,
     patientAddress: row.patient?.address || null,
     patientNoShowCount: row.patient?.no_show_count ?? 0,
+    patientAccountStatus: row.patient?.account?.status || null,
+
     serviceName:
       (row.appointment_service || [])
         .map((item) => item.dental_service?.service_name)

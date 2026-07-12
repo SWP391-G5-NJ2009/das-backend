@@ -37,7 +37,10 @@ const APPOINTMENT_SELECT = `
     birth_date,
     gender,
     address,
-    no_show_count
+    no_show_count,
+    account:account_id (
+      status
+    )
   ),
   appointment_service (
     actual_price,
@@ -142,7 +145,8 @@ async function findConsecutiveSlotsFromId(startSlotId, count) {
   // Step 1: get the anchor slot's schedule and start time
   const { data: anchor, error: anchorError } = await supabase
     .from("work_slot")
-    .select(`
+    .select(
+      `
       slot_id,
       status,
       schedule_id,
@@ -150,7 +154,8 @@ async function findConsecutiveSlotsFromId(startSlotId, count) {
         slot_config_id,
         start_time
       )
-    `)
+    `,
+    )
     .eq("slot_id", startSlotId)
     .maybeSingle();
 
@@ -168,13 +173,15 @@ async function findConsecutiveSlotsFromId(startSlotId, count) {
   // PostgREST does NOT support .gte() on embedded columns — filter by start_time in JS.
   const { data: slots, error: slotsError } = await supabase
     .from("work_slot")
-    .select(`
+    .select(
+      `
       slot_id,
       status,
       time_slot_config:slot_config_id (
         start_time
       )
-    `)
+    `,
+    )
     .eq("schedule_id", scheduleId)
     .order("slot_config_id", { ascending: true });
 
@@ -387,10 +394,11 @@ async function findConfirmedAppointmentByService(patientId, serviceId) {
     .eq("patient_id", patientId)
     .in("status", ACTIVE_STATUSES)
     .eq("appointment_service.service_id", serviceId)
-    .maybeSingle();
+    .limit(1);
 
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
-  return data; // null if no active appointment for this service
+  // Return the first match (or null if none) — we only need to know IF a conflict exists
+  return data && data.length > 0 ? data[0] : null;
 }
 
 /**
@@ -473,7 +481,9 @@ async function markOverdueAsNoShow() {
 
   for (const appt of candidates) {
     // Slot data lives in appointment_slot junction — find the primary entry
-    const primaryEntry = (appt.appointment_slot || []).find((as) => as.is_primary);
+    const primaryEntry = (appt.appointment_slot || []).find(
+      (as) => as.is_primary,
+    );
     const workDate = primaryEntry?.work_slot?.schedules?.work_date; // "YYYY-MM-DD"
     const startTime = primaryEntry?.work_slot?.time_slot_config?.start_time; // "HH:MM:SS"
     if (!workDate || !startTime) continue;

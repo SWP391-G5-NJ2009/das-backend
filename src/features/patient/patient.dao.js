@@ -97,18 +97,49 @@ async function findProfileByPhone(phone) {
 }
 
 /**
- * BR-11: Fetch patient's no_show_count to decide if they are banned from booking.
+ * BR-11: Fetch patient's no_show_count (and account_id) to decide if they are banned.
  */
 async function findPatientById(patientId) {
   const { data, error } = await supabase
     .from("patient")
-    .select("patient_id, full_name, no_show_count")
+    .select("patient_id, account_id, full_name, no_show_count")
     .eq("patient_id", patientId)
     .single();
 
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
   if (!data) throw new AppError("Patient not found.", 404, "NOT_FOUND");
   return data;
+}
+
+/**
+ * Fetch account_ids for a list of patient_ids (patients who have an account).
+ * @param {number[]} patientIds
+ * @returns {Promise<string[]>} array of account_ids (uuid strings)
+ */
+async function findPatientAccountIds(patientIds) {
+  if (!patientIds || patientIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("patient")
+    .select("account_id")
+    .in("patient_id", patientIds)
+    .not("account_id", "is", null);
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return (data || []).map((r) => r.account_id).filter(Boolean);
+}
+
+/**
+ * Set the status field on the account table for a list of account_ids.
+ * Used to Restrict (ban) or Activate (unban) a patient's login account.
+ * @param {string[]} accountIds
+ * @param {'Restricted'|'Active'} status
+ */
+async function setAccountStatusForPatients(accountIds, status) {
+  if (!accountIds || accountIds.length === 0) return;
+  const { error } = await supabase
+    .from("account")
+    .update({ status })
+    .in("account_id", accountIds);
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
 }
 
 /**
@@ -168,6 +199,8 @@ module.exports = {
   searchPatients,
   findProfileByPhone,
   findPatientById,
+  findPatientAccountIds,
+  setAccountStatusForPatients,
   resolveNoShowAppointments,
   findTreatmentHistoryByPatientId,
   insertProfile,
