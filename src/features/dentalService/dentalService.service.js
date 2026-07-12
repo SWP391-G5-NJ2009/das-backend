@@ -34,6 +34,39 @@ async function getAllServices() {
   return data || [];
 }
 
+function mapPublicService(row) {
+  const slotOccupied = Number(row.slot_occupied) || 1;
+  const durationMinutes = slotOccupied * 30;
+
+  return {
+    service_id: row.service_id,
+    category_id: row.category_id,
+    service_name: row.service_name,
+    description: row.description || "",
+    category_name: row.service_categories?.category_name || "",
+    unit_price: Number(row.unit_price) || 0,
+    price: Number(row.unit_price) || 0,
+    slot_occupied: slotOccupied,
+    duration_minutes: durationMinutes,
+    duration: `${durationMinutes} minutes`,
+    process: null,
+  };
+}
+
+async function getPublicServices() {
+  const { data, error } = await dentalServiceDao.findActivePublicServices();
+
+  if (error) {
+    throw new AppError(
+      "Failed to load public service list. Please try again later.",
+      500,
+      "DB_ERROR",
+    );
+  }
+
+  return (data || []).map(mapPublicService);
+}
+
 async function deleteService(id) {
   // BR-25: Hard-deletion is blocked if the service has EVER been linked to
   // any appointment record, regardless of status (past, cancelled, completed…).
@@ -151,5 +184,6 @@ module.exports = {
   getAllCategories,
   getAllServices,
   getDentistsByServiceId,
+  getPublicServices,
   updateService,
 };

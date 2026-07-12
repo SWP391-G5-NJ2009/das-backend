@@ -1,9 +1,11 @@
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 
 const cors = require("cors");
 const express = require("express");
 const accountRoutes = require("./features/account/account.routes");
 const authRoutes = require("./features/auth/auth.routes");
+const clinicInfoRoutes = require("./features/clinicInfo/clinicInfo.routes");
 const consultationRoutes = require("./features/consultation/consultation.routes");
 const dentalServiceRoutes = require("./features/dentalService/dentalService.routes");
 const paymentRoutes = require("./features/payment/payment.routes");
@@ -15,6 +17,8 @@ const roomRoutes = require("./features/room/room.routes");
 const revenueRoutes = require("./features/revenue/revenue.routes");
 const patientAnalyticsRoutes = require("./features/patientAnalytics/patientAnalytics.routes");
 const clinicScheduleManagementRoutes = require("./features/clinicScheduleManagement/clinicScheduleManagement.routes");
+const scheduleRoutes = require("./features/schedule/schedule.routes");
+const staffRoutes = require("./features/staff/staff.routes");
 const {
   errorMiddleware,
   notFoundMiddleware,
@@ -22,10 +26,23 @@ const {
 const { sendSuccess } = require("./utils/response");
 
 const app = express();
+const allowedOrigins = new Set(
+  [
+    process.env.FRONTEND_URL,
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+  ].filter(Boolean),
+);
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -39,6 +56,7 @@ app.get("/api/health", (req, res) =>
 );
 
 app.use("/api/consultations", consultationRoutes);
+app.use("/api/clinic-info", clinicInfoRoutes);
 app.use("/api/services", dentalServiceRoutes);
 app.use("/api/admin", accountRoutes);
 app.use("/api/auth", authRoutes);
@@ -51,7 +69,8 @@ app.use("/api/rooms", roomRoutes);
 app.use("/api/reports/revenue", revenueRoutes);
 app.use("/api/reports/patient", patientAnalyticsRoutes);
 app.use("/api/schedule/management", clinicScheduleManagementRoutes);
-
+app.use("/api/schedules", scheduleRoutes);
+app.use("/api/staff", staffRoutes);
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 

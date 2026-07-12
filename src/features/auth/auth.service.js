@@ -119,7 +119,14 @@ async function loginWithAccount(account, password, allowedRoles) {
   }
 
   if (!isActiveStatus(account.status)) {
-    throw new AppError("Account is not active.", 403, "ACCOUNT_INACTIVE");
+    const isRestricted = String(account.status || "").toLowerCase() === "restricted";
+    throw new AppError(
+      isRestricted
+        ? "Your account has been temporarily restricted due to repeated no-shows. Please contact the clinic to lift the restriction."
+        : "Account is not active.",
+      403,
+      isRestricted ? "ACCOUNT_RESTRICTED" : "ACCOUNT_INACTIVE",
+    );
   }
 
   const passwordMatches = await verifyPassword(account, password);
