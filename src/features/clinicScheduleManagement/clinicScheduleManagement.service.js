@@ -2,10 +2,11 @@ const clinicScheduleManagementDao = require("./clinicScheduleManagement.dao");
 const AppError = require("../../utils/AppError");
 
 const DEFAULT_SETTINGS = {
-    slot_duration_minutes: 30,
     booking_lead_days: 30,
     max_booking_per_slot: 1,
 };
+
+const SLOT_DURATION_MINUTES = 30;
 
 function todayStr() {
     const now = new Date();
@@ -72,7 +73,6 @@ async function createVersion(name, effectiveDate) {
 
     const settingToCopy = prevSetting
         ? {
-            slot_duration_minutes: prevSetting.slot_duration_minutes,
             booking_lead_days: prevSetting.booking_lead_days,
             max_booking_per_slot: prevSetting.max_booking_per_slot,
         }
@@ -87,7 +87,7 @@ async function createVersion(name, effectiveDate) {
         await generateTimeSlotConfigs(
             version.version_id,
             hoursToCopy,
-            settingToCopy.slot_duration_minutes || 30,
+            SLOT_DURATION_MINUTES,
         );
     }
 
@@ -251,8 +251,7 @@ async function saveAll(versionId, hours, settingFields, force = false) {
     await saveClinicSetting(versionId, settingFields);
 
     if (hours && hours.length > 0) {
-        const slotDuration = settingFields?.slot_duration_minutes || 30;
-        await generateTimeSlotConfigs(versionId, hours, slotDuration);
+        await generateTimeSlotConfigs(versionId, hours, SLOT_DURATION_MINUTES);
     }
 
     if (force && hours && hours.length > 0) {
