@@ -4,7 +4,13 @@ const { validateCreateAccount, validateUpdateAccount } = require("./account.vali
 
 async function getAllAccounts(req, res, next) {
   try {
-    const data = await accountService.getAllAccounts();
+    const filters = {
+      status: req.query.status || null,
+      date: req.query.date || null,
+      search: req.query.search || null,
+      pagination: req.query.pagination || null,
+    };
+    const data = await accountService.getAllAccounts(filters);
     return sendSuccess(res, 200, data, "Accounts retrieved successfully.");
   } catch (err) {
     return next(err);

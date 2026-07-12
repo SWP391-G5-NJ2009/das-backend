@@ -14,6 +14,19 @@ async function findAllConsultationRequests(filters = {}) {
     query = query.eq("status", filters.status)
   }
 
+  if (filters.search) {
+    const s = `%${filters.search}%`;
+    query = query.or(`full_name.ilike.${s},phone.ilike.${s},email.ilike.${s},description.ilike.${s}`);
+  }
+
+  if (filters.date) {
+    const start = new Date(filters.date);
+    //const end = new Date(start);
+    query = query.gte("created_at", start.toISOString());
+    // .lt("created_at", end.toISOString());
+
+  }
+
   return query;
 }
 

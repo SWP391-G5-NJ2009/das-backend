@@ -7,10 +7,7 @@ const sendError = (
   message = "Internal error",
   code = null,
   details = null,
-) =>
-  res
-    .status(statusCode)
-    .json({ success: false, data: null, message, code, details });
+) => res.status(statusCode).json({ success: false, data: null, message, code, details });
 
 module.exports = {
   sendSuccess,
