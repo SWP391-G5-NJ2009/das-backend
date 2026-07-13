@@ -353,17 +353,6 @@ async function findConflictingAppointments(newHours) {
     return conflicting;
 }
 
-async function markSlotsAsUnavailable(slotIds) {
-    if (!slotIds || slotIds.length === 0) return;
-
-    const { error } = await supabase
-        .from("work_slot")
-        .update({ status: "Unavailable" })
-        .in("slot_id", slotIds)
-        .eq("status", "Booked");
-
-    if (error) throw new AppError(error.message, 500, "DB_ERROR");
-}
 
 async function getVersionById(versionId) {
     const { data, error } = await supabase
@@ -441,7 +430,6 @@ module.exports = {
     countBookedWorkSlots,
     getLastBookedSlotDate,
     findConflictingAppointments,
-    markSlotsAsUnavailable,
     getVersionById,
     updateEffectiveDate,
     getWorkSlotCountsByVersionIds,

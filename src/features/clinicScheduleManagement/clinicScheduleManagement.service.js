@@ -185,8 +185,8 @@ async function generateTimeSlotConfigs(versionId, hours, slotDurationMinutes) {
     return clinicScheduleManagementDao.replaceTimeSlotConfigs(versionId, configs);
 }
 
-async function saveAll(versionId, hours, force = false) {
-    if (!force && hours && hours.length > 0) {
+async function saveAll(versionId, hours) {
+    if (hours && hours.length > 0) {
         const conflicting =
             await clinicScheduleManagementDao.findConflictingAppointments(hours);
         if (conflicting.length > 0) {
@@ -203,15 +203,6 @@ async function saveAll(versionId, hours, force = false) {
 
     if (hours && hours.length > 0) {
         await generateTimeSlotConfigs(versionId, hours, SLOT_DURATION_MINUTES);
-    }
-
-    if (force && hours && hours.length > 0) {
-        const conflicting =
-            await clinicScheduleManagementDao.findConflictingAppointments(hours);
-        if (conflicting.length > 0) {
-            const slotIds = conflicting.map((c) => c.slot_id);
-            await clinicScheduleManagementDao.markSlotsAsUnavailable(slotIds);
-        }
     }
 }
 
