@@ -73,7 +73,7 @@ async function getPublicClinicInfo() {
 
   if (error) {
     throw new AppError(
-      "Failed to load clinic information. Please try again later.",
+      "Không thể tải thông tin phòng khám. Vui lòng thử lại sau.",
       500,
       "DB_ERROR",
     );

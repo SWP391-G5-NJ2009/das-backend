@@ -139,7 +139,7 @@ async function createPatientAccount({
   }
 
   if (existing?.account_id) {
-    throw new AppError("Phone number already exists.", 409, "DUPLICATE_PHONE");
+    throw new AppError("Số điện thoại đã tồn tại.", 409, "DUPLICATE_PHONE");
   }
 
   const account = await accountService.createAccount({

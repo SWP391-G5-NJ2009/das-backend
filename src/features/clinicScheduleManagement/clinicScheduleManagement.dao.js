@@ -46,7 +46,7 @@ async function createVersion(name, effectiveDate, status) {
 
     if (error) {
         if (error.code === "23514") {
-            throw new AppError(error.message || "Invalid data: a database constraint was violated.", 400, "VALIDATION_ERROR");
+            throw new AppError(error.message || "Dữ liệu không hợp lệ: vi phạm ràng buộc cơ sở dữ liệu.", 400, "VALIDATION_ERROR");
         }
         throw new AppError(error.message, 500, "DB_ERROR");
     }
@@ -153,7 +153,7 @@ async function insertWorkingHours(versionId, hours) {
 
     if (error) {
         if (error.code === "23514") {
-            throw new AppError(error.message || "Invalid data: a database constraint was violated.", 400, "VALIDATION_ERROR");
+            throw new AppError(error.message || "Dữ liệu không hợp lệ: vi phạm ràng buộc cơ sở dữ liệu.", 400, "VALIDATION_ERROR");
         }
         throw new AppError(error.message, 500, "DB_ERROR");
     }
@@ -222,7 +222,7 @@ async function createClosure(closureDate, reason) {
 
     if (error) {
         if (error.code === "23505") {
-            throw new AppError("This date is already marked as a closure.", 409, "DUPLICATE_CLOSURE");
+            throw new AppError("Ngày này đã được đánh dấu là ngày nghỉ.", 409, "DUPLICATE_CLOSURE");
         }
         throw new AppError(error.message, 500, "DB_ERROR");
     }
@@ -238,7 +238,7 @@ async function deleteClosure(closureId) {
         .single();
 
     if (error) throw new AppError(error.message, 500, "DB_ERROR");
-    if (!data) throw new AppError("Closure not found.", 404, "NOT_FOUND");
+    if (!data) throw new AppError("Không tìm thấy ngày nghỉ.", 404, "NOT_FOUND");
     return data;
 }
 

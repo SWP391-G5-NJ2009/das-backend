@@ -106,7 +106,7 @@ async function cancelById(apptId, actorAccountId, reason) {
     .single();
 
   if (error || !data) {
-    throw new AppError("Failed to cancel appointment.", 500, "DB_ERROR");
+    throw new AppError("Không thể hủy lịch hẹn.", 500, "DB_ERROR");
   }
 
   return data;
@@ -143,13 +143,13 @@ async function findConsecutiveSlotsFromId(startSlotId, count) {
     .maybeSingle();
 
   if (anchorError) throw new AppError(anchorError.message, 500, "DB_ERROR");
-  if (!anchor) throw new AppError("Start slot not found.", 404, "NOT_FOUND");
+  if (!anchor) throw new AppError("Không tìm thấy khung giờ bắt đầu.", 404, "NOT_FOUND");
 
   const scheduleId = anchor.schedule_id;
   const anchorStartTime = anchor.time_slot_config?.start_time;
 
   if (!scheduleId || !anchorStartTime) {
-    throw new AppError("Slot configuration is incomplete.", 500, "DB_ERROR");
+    throw new AppError("Cấu hình khung giờ chưa đầy đủ.", 500, "DB_ERROR");
   }
 
   const { data: slots, error: slotsError } = await supabase
@@ -311,7 +311,7 @@ async function getServicePrice(serviceId) {
     .single();
 
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
-  if (!data) throw new AppError("Service not found.", 404, "NOT_FOUND");
+  if (!data) throw new AppError("Không tìm thấy dịch vụ.", 404, "NOT_FOUND");
   return data.unit_price;
 }
 

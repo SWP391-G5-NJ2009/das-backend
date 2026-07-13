@@ -107,7 +107,7 @@ async function findPatientById(patientId) {
     .single();
 
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
-  if (!data) throw new AppError("Patient not found.", 404, "NOT_FOUND");
+  if (!data) throw new AppError("Không tìm thấy bệnh nhân.", 404, "NOT_FOUND");
   return data;
 }
 

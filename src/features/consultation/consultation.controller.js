@@ -14,7 +14,7 @@ async function getAllConsultationRequests(req, res, next) {
       pagination: req.query.pagination || null,
     };
     const data = await consultationService.getAllConsultationRequests(filters);
-    return sendSuccess(res, 200, data, "Requests retrieved successfully.");
+    return sendSuccess(res, 200, data, "Lấy danh sách yêu cầu thành công.");
   } catch (err) {
     return next(err);
   }
@@ -25,11 +25,11 @@ async function createConsultationRequest(req, res, next) {
     const payload = validateCreateConsultation(req.body);
 
     if (Date.now() - payload.loadedAt < 3000) {
-      throw new AppError("Form submitted too quickly.", 400, "SPAM_DETECTED");
+      throw new AppError("Biểu mẫu được gửi quá nhanh.", 400, "SPAM_DETECTED");
     }
 
     const data = await consultationService.createConsultationRequest(payload);
-    return sendSuccess(res, 201, data, "Consultation created successfully.");
+    return sendSuccess(res, 201, data, "Tạo yêu cầu tư vấn thành công.");
   } catch (err) {
     return next(err);
   }
@@ -40,7 +40,7 @@ async function updateConsultationRequest(req, res, next) {
     const { id } = req.params;
     const payload = validateUpdateConsultation(req.body);
     const data = await consultationService.updateConsultationRequest(id, payload);
-    return sendSuccess(res, 200, data, "Request updated successfully.");
+    return sendSuccess(res, 200, data, "Cập nhật yêu cầu thành công.");
   } catch (err) {
     return next(err);
   }

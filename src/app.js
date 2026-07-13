@@ -53,7 +53,7 @@ app.use(
 app.use(express.json());
 
 app.get("/api/health", (req, res) =>
-  sendSuccess(res, 200, { status: "ok" }, "OK"),
+  sendSuccess(res, 200, { status: "ok" }, "Thành công"),
 );
 
 app.use("/api/consultations", consultationRoutes);

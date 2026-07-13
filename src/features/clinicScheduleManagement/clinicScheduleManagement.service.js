@@ -29,7 +29,7 @@ async function createVersion(name, effectiveDate) {
     }
 
     if (dateStr < todayStr()) {
-        throw new AppError("Effective date cannot be in the past.", 400, "INVALID_DATE");
+        throw new AppError("Ngày hiệu lực không được ở quá khứ.", 400, "INVALID_DATE");
     }
 
     const initialStatus = dateStr <= todayStr() ? "Active" : "Pending";
@@ -79,10 +79,10 @@ async function activatePendingVersion(versionId) {
     const versions = await clinicScheduleManagementDao.getAllVersions();
     const version = versions.find((v) => v.version_id === versionId);
     if (!version) {
-        throw new AppError("Version not found.", 404, "NOT_FOUND");
+        throw new AppError("Không tìm thấy phiên bản.", 404, "NOT_FOUND");
     }
     if (version.status === "Active") {
-        throw new AppError("This version is already active.", 400, "ALREADY_ACTIVE");
+        throw new AppError("Phiên bản này đang hoạt động.", 400, "ALREADY_ACTIVE");
     }
 
     const pending = await clinicScheduleManagementDao.getPendingVersion();
@@ -132,7 +132,7 @@ async function getWorkingHour() {
 
 async function saveWorkingHours(versionId, hours) {
     if (!versionId) {
-        throw new AppError("versionId is required.", 400, "MISSING_VERSION");
+        throw new AppError("Thiếu versionId.", 400, "MISSING_VERSION");
     }
 
     if (hours && hours.length > 0) {
@@ -223,10 +223,10 @@ async function deleteVersion(versionId) {
     const versions = await clinicScheduleManagementDao.getAllVersions();
     const version = versions.find((v) => v.version_id === versionId);
     if (!version) {
-        throw new AppError("Version not found.", 404, "NOT_FOUND");
+        throw new AppError("Không tìm thấy phiên bản.", 404, "NOT_FOUND");
     }
     if (version.status === "Active") {
-        throw new AppError("Cannot delete the active version.", 400, "CANNOT_DELETE_ACTIVE");
+        throw new AppError("Không thể xóa phiên bản đang hoạt động.", 400, "CANNOT_DELETE_ACTIVE");
     }
 
     const counts = await clinicScheduleManagementDao.getWorkSlotCountsByVersionIds([versionId]);
@@ -268,7 +268,7 @@ async function deleteClosure(closureId) {
 
 async function getVersionById(versionId) {
     const version = await clinicScheduleManagementDao.getVersionById(versionId);
-    if (!version) throw new AppError("Version not found.", 404, "NOT_FOUND");
+    if (!version) throw new AppError("Không tìm thấy phiên bản.", 404, "NOT_FOUND");
 
     const hours = await clinicScheduleManagementDao.getWorkingHourByVersionId(versionId);
 
@@ -276,19 +276,19 @@ async function getVersionById(versionId) {
 }
 
 async function updateEffectiveDate(versionId, effectiveDate) {
-    if (!versionId) throw new AppError("versionId is required.", 400, "MISSING_VERSION");
-    if (!effectiveDate) throw new AppError("effectiveDate is required.", 400, "MISSING_DATE");
+    if (!versionId) throw new AppError("Thiếu versionId.", 400, "MISSING_VERSION");
+    if (!effectiveDate) throw new AppError("Thiếu effectiveDate.", 400, "MISSING_DATE");
 
     const dateStr = typeof effectiveDate === "string"
         ? effectiveDate
         : `${effectiveDate.getFullYear()}-${String(effectiveDate.getMonth() + 1).padStart(2, "0")}-${String(effectiveDate.getDate()).padStart(2, "0")}`;
 
     if (dateStr < todayStr()) {
-        throw new AppError("Effective date cannot be in the past.", 400, "INVALID_DATE");
+        throw new AppError("Ngày hiệu lực không được ở quá khứ.", 400, "INVALID_DATE");
     }
 
     const version = await clinicScheduleManagementDao.getVersionById(versionId);
-    if (!version) throw new AppError("Version not found.", 404, "NOT_FOUND");
+    if (!version) throw new AppError("Không tìm thấy phiên bản.", 404, "NOT_FOUND");
 
     await clinicScheduleManagementDao.updateEffectiveDate(versionId, dateStr);
     return { version_id: versionId, effective_date: dateStr };

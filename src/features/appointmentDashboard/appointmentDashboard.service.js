@@ -6,7 +6,7 @@ async function getMonthlyCounts(year, month) {
   const m = Number(month);
 
   if (!y || !m || m < 1 || m > 12) {
-    throw new AppError("Invalid year or month.", 400, "VALIDATION_ERROR");
+    throw new AppError("Năm hoặc tháng không hợp lệ.", 400, "VALIDATION_ERROR");
   }
 
   return appointmentDashboardDao.countAppointmentsByDay(y, m);
@@ -14,7 +14,7 @@ async function getMonthlyCounts(year, month) {
 
 async function getDailyAppointments(date) {
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    throw new AppError("Invalid date format. Use YYYY-MM-DD.", 400, "VALIDATION_ERROR");
+    throw new AppError("Định dạng ngày không hợp lệ. Vui lòng dùng YYYY-MM-DD.", 400, "VALIDATION_ERROR");
   }
 
   const appointments = await appointmentDashboardDao.findAppointmentsByDate(date);

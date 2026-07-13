@@ -5,7 +5,7 @@ function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader?.startsWith("Bearer ")) {
-    return next(new AppError("Authentication required.", 401, "UNAUTHORIZED"));
+    return next(new AppError("Vui lòng đăng nhập để tiếp tục.", 401, "UNAUTHORIZED"));
   }
 
   try {
@@ -14,7 +14,7 @@ function authMiddleware(req, res, next) {
     return next();
   } catch {
     return next(
-      new AppError("Invalid or expired token.", 401, "TOKEN_INVALID"),
+      new AppError("Token không hợp lệ hoặc đã hết hạn.", 401, "TThành côngEN_INVALID"),
     );
   }
 }

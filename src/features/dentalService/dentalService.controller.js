@@ -5,7 +5,7 @@ const { validateServicePayload } = require("./dentalService.validator");
 async function getAllServices(req, res, next) {
   try {
     const services = await dentalServiceService.getAllServices();
-    return sendSuccess(res, 200, services, "Services retrieved successfully.");
+    return sendSuccess(res, 200, services, "Lấy danh sách dịch vụ thành công.");
   } catch (error) {
     return next(error);
   }
@@ -18,7 +18,7 @@ async function getPublicServices(req, res, next) {
       res,
       200,
       services,
-      "Public services retrieved successfully.",
+      "Lấy danh sách dịch vụ công khai thành công.",
     );
   } catch (error) {
     return next(error);
@@ -29,7 +29,7 @@ async function deleteService(req, res, next) {
   try {
     const { id } = req.params;
     const data = await dentalServiceService.deleteService(id);
-    return sendSuccess(res, 200, data, "Service deleted successfully.");
+    return sendSuccess(res, 200, data, "Xóa dịch vụ thành công.");
   } catch (error) {
     return next(error);
   }
@@ -39,7 +39,7 @@ async function createService(req, res, next) {
   try {
     const payload = validateServicePayload(req.body);
     const data = await dentalServiceService.createService(payload);
-    return sendSuccess(res, 201, data, "Service created successfully.");
+    return sendSuccess(res, 201, data, "Tạo dịch vụ thành công.");
   } catch (error) {
     return next(error);
   }
@@ -52,7 +52,7 @@ async function getAllCategories(req, res, next) {
       res,
       200,
       categories,
-      "Service categories retrieved successfully.",
+      "Lấy danh mục dịch vụ thành công.",
     );
   } catch (error) {
     return next(error);
@@ -64,7 +64,7 @@ async function updateService(req, res, next) {
     const { id } = req.params;
     const payload = validateServicePayload(req.body);
     const data = await dentalServiceService.updateService(id, payload);
-    return sendSuccess(res, 200, data, "Service updated successfully.");
+    return sendSuccess(res, 200, data, "Cập nhật dịch vụ thành công.");
   } catch (error) {
     return next(error);
   }
@@ -74,7 +74,7 @@ async function getDentistsByService(req, res, next) {
   try {
     const { id } = req.params;
     const dentists = await dentalServiceService.getDentistsByServiceId(id);
-    return sendSuccess(res, 200, dentists, "Dentists retrieved successfully.");
+    return sendSuccess(res, 200, dentists, "Lấy danh sách nha sĩ thành công.");
   } catch (error) {
     return next(error);
   }

@@ -26,7 +26,7 @@ async function ensureUsernameAvailable(username, accountId = null) {
   const { data: existing } = await lookup;
 
   if (existing) {
-    throw new AppError("Username already exists.", 409, "DUPLICATE_USERNAME");
+    throw new AppError("Tên đăng nhập đã tồn tại.", 409, "DUPLICATE_USERNAME");
   }
 }
 
@@ -92,7 +92,7 @@ async function updateAccount(
   }
 
   if (Object.keys(updateFields).length === 0) {
-    throw new AppError("No fields to update.", 400, "NO_UPDATES");
+    throw new AppError("Không có trường nào để cập nhật.", 400, "NO_UPDATES");
   }
 
   const { data, error } = await accountDao.updateAccount(
@@ -111,7 +111,7 @@ async function deleteAccount(accountId) {
   const { data: existing } = await accountDao.findAccountById(accountId);
 
   if (!existing) {
-    throw new AppError("Account not found.", 404, "NOT_FOUND");
+    throw new AppError("Không tìm thấy tài khoản.", 404, "NOT_FOUND");
   }
 
   const { error } = await accountDao.deleteAccount(accountId);

@@ -8,7 +8,7 @@ async function getPublicClinicInfo(req, res, next) {
       res,
       200,
       clinicInfo,
-      "Clinic information retrieved successfully.",
+      "Lấy thông tin phòng khám thành công.",
     );
   } catch (error) {
     return next(error);

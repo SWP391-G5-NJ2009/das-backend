@@ -8,7 +8,7 @@ const router = express.Router();
 const spamLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 3,
-  message: { success: false, message: "Too many requests. Please try again later." },
+  message: { success: false, message: "Quá nhiều yêu cầu. Vui lòng thử lại sau." },
 });
 
 

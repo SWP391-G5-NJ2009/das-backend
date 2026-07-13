@@ -78,7 +78,7 @@ async function createDentistProfile(payload) {
 
   if (!account || normalizeRoleName(account) !== "dentist") {
     throw new AppError(
-      "The selected Dentist account was not found.",
+      "Không tìm thấy tài khoản nha sĩ đã chọn.",
       404,
       "DENTIST_ACCOUNT_NOT_FOUND",
     );

@@ -21,11 +21,11 @@ const ROLE_PROFILE_TABLE = {
 };
 
 const STAFF_ROLES = ["receptionist", "dentist", "owner", "admin"];
-const INVALID_CREDENTIALS_MESSAGE = "Invalid credentials. Please try again.";
+const INVALID_CREDENTIALS_MESSAGE = "Thông tin đăng nhập không hợp lệ. Vui lòng thử lại.";
 const PROCESSING_ERROR_MESSAGE =
-  "Unable to process data. Please try again later.";
+  "Không thể xử lý dữ liệu. Vui lòng thử lại sau.";
 const PASSWORD_UPDATE_ERROR_MESSAGE =
-  "Unable to update password. Please try again later.";
+  "Không thể cập nhật mật khẩu. Vui lòng thử lại sau.";
 
 function invalidCredentialsError() {
   return new AppError(INVALID_CREDENTIALS_MESSAGE, 401, "INVALID_CREDENTIALS");
@@ -56,7 +56,7 @@ async function getAccountById(accountId) {
   const { data, error } = await authDao.findAccountById(accountId);
 
   if (error || !data) {
-    throw new AppError("Account not found.", 404, "ACCOUNT_NOT_FOUND");
+    throw new AppError("Không tìm thấy tài khoản.", 404, "ACCOUNT_NOT_FOUND");
   }
 
   return data;
@@ -142,7 +142,7 @@ async function patientLogin({ phone, password }) {
 
   if (error || !patient?.account) {
     throw new AppError(
-      "Phone number not found. Please check and try again.",
+      "Không tìm thấy số điện thoại. Vui lòng kiểm tra và thử lại.",
       404,
       "PHONE_NOT_FOUND",
     );
@@ -183,7 +183,7 @@ async function findAccountForIdentifier(identifier) {
 
   if (!account) {
     throw new AppError(
-      "Account not found. Please check and try again.",
+      "Không tìm thấy tài khoản. Please check and try again.",
       404,
       "ACCOUNT_NOT_FOUND",
     );
@@ -234,7 +234,7 @@ async function createPasswordResetOtp({ account, recipient }) {
 
     if (process.env.NODE_ENV === "production") {
       throw new AppError(
-        "Unable to send OTP right now. Please try again later.",
+        "Hiện không thể gửi OTP. Vui lòng thử lại sau.",
         502,
         "OTP_DELIVERY_FAILED",
       );
@@ -281,7 +281,7 @@ async function staffForgotPassword({ username }) {
     String(account.username || "").toLowerCase() !== normalizedUsername
   ) {
     throw new AppError(
-      "Account not found. Please check and try again.",
+      "Không tìm thấy tài khoản. Please check and try again.",
       404,
       "ACCOUNT_NOT_FOUND",
     );
@@ -306,7 +306,7 @@ async function getLatestValidOtp({ accountId, identifier, otp }) {
   }
 
   if (!data || !(await compareOtp(otp, data.otp_hash))) {
-    throw new AppError("Invalid OTP. Please try again.", 400, "OTP_INVALID");
+    throw new AppError("OTP không hợp lệ. Vui lòng thử lại.", 400, "OTP_INVALID");
   }
 
   return { account, otpToken: data };
@@ -340,7 +340,7 @@ async function resetPassword({ accountId, identifier, otp, newPassword }) {
 
   if (consumeError) {
     throw new AppError(
-      "Unable to complete password reset. Please try again later.",
+      "Không thể hoàn tất đặt lại mật khẩu. Vui lòng thử lại sau.",
       500,
       "DB_ERROR",
     );
@@ -355,7 +355,7 @@ async function changePassword({ accountId, oldPassword, newPassword }) {
 
   if (!passwordMatches) {
     throw new AppError(
-      "Current password is incorrect. Please try again.",
+      "Mật khẩu hiện tại không đúng. Vui lòng thử lại.",
       401,
       "INVALID_PASSWORD",
     );

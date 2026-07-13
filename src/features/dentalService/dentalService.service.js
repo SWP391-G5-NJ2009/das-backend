@@ -25,7 +25,7 @@ async function getAllServices() {
 
   if (error) {
     throw new AppError(
-      "Failed to load service list. Please try again later.",
+      "Không thể tải danh sách dịch vụ. Vui lòng thử lại sau.",
       500,
       "DB_ERROR",
     );
@@ -58,7 +58,7 @@ async function getPublicServices() {
 
   if (error) {
     throw new AppError(
-      "Failed to load public service list. Please try again later.",
+      "Không thể tải danh sách dịch vụ công khai. Vui lòng thử lại sau.",
       500,
       "DB_ERROR",
     );
@@ -83,7 +83,7 @@ async function deleteService(id) {
 
   if (error) {
     throw new AppError(
-      "Failed to delete service. Please try again later.",
+      "Không thể xóa dịch vụ. Vui lòng thử lại sau.",
       500,
       "DB_ERROR",
     );
@@ -121,7 +121,7 @@ async function getAllCategories() {
 
   if (error) {
     throw new AppError(
-      "Failed to load service categories. Please try again later.",
+      "Không thể tải danh mục dịch vụ. Vui lòng thử lại sau.",
       500,
       "DB_ERROR",
     );

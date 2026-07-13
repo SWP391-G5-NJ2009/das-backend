@@ -14,7 +14,7 @@ async function getAllRooms() {
 
   if (error) {
     throw new AppError(
-      "Failed to load rooms. Please try again later.",
+      "Không thể tải danh sách phòng. Vui lòng thử lại sau.",
       500,
       "DB_ERROR",
     );
@@ -28,7 +28,7 @@ async function createRoom(payload) {
 
   if (error) {
     throw new AppError(
-      "Failed to create room. Please try again later.",
+      "Không thể tạo phòng. Vui lòng thử lại sau.",
       500,
       "DB_ERROR",
     );
@@ -42,14 +42,14 @@ async function updateRoom(id, payload) {
 
   if (error) {
     throw new AppError(
-      "Failed to update room. Please try again later.",
+      "Không thể cập nhật phòng. Vui lòng thử lại sau.",
       500,
       "DB_ERROR",
     );
   }
 
   if (!data || data.length === 0) {
-    throw new AppError("Room not found.", 404, "NOT_FOUND");
+    throw new AppError("Không tìm thấy phòng.", 404, "NOT_FOUND");
   }
 
   return data[0];
@@ -78,14 +78,14 @@ async function deleteRoom(id) {
 
   if (error) {
     throw new AppError(
-      "Failed to delete room. Please try again later.",
+      "Không thể xóa phòng. Vui lòng thử lại sau.",
       500,
       "DB_ERROR",
     );
   }
 
   if (!data || data.length === 0) {
-    throw new AppError("Room not found.", 404, "NOT_FOUND");
+    throw new AppError("Không tìm thấy phòng.", 404, "NOT_FOUND");
   }
 
   return { room_id: Number(id) };

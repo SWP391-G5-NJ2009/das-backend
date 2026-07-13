@@ -4,7 +4,7 @@ const { sendSuccess } = require("../../utils/response");
 async function getScheduleMeta(req, res, next) {
   try {
     const meta = await scheduleService.getScheduleMeta();
-    return sendSuccess(res, 200, meta, "Schedule setup data retrieved.");
+    return sendSuccess(res, 200, meta, "Lấy dữ liệu thiết lập lịch thành công.");
   } catch (error) {
     return next(error);
   }
@@ -13,7 +13,7 @@ async function getScheduleMeta(req, res, next) {
 async function getMySchedule(req, res, next) {
   try {
     const schedules = await scheduleService.getMySchedule(req.user, req.query);
-    return sendSuccess(res, 200, schedules, "Schedule retrieved successfully.");
+    return sendSuccess(res, 200, schedules, "Lấy lịch thành công.");
   } catch (error) {
     return next(error);
   }
@@ -43,7 +43,7 @@ async function listScheduleRequests(req, res, next) {
       res,
       200,
       schedules,
-      "Schedule requests retrieved successfully.",
+      "Lấy danh sách yêu cầu lịch thành công.",
     );
   } catch (error) {
     return next(error);

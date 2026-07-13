@@ -16,7 +16,7 @@ async function getMyAppointments(req, res, next) {
       search: req.query.search || null,
     };
     const data = await appointmentService.getMyAppointments(patientId, filters);
-    return sendSuccess(res, 200, data, "Appointments fetched successfully.");
+    return sendSuccess(res, 200, data, "Lấy danh sách lịch hẹn thành công.");
   } catch (err) {
     return next(err);
   }
@@ -33,7 +33,7 @@ async function getAllAppointments(req, res, next) {
       dentistId: req.user.role === "dentist" ? req.user.profileId : null,
     };
     const data = await appointmentService.getAll(filters);
-    return sendSuccess(res, 200, data, "Appointments fetched successfully.");
+    return sendSuccess(res, 200, data, "Lấy danh sách lịch hẹn thành công.");
   } catch (err) {
     return next(err);
   }
@@ -52,7 +52,7 @@ async function cancelAppointment(req, res, next) {
       role,
       profileId,
     );
-    return sendSuccess(res, 200, data, "Appointment cancelled successfully.");
+    return sendSuccess(res, 200, data, "Hủy lịch hẹn thành công.");
   } catch (err) {
     return next(err);
   }
@@ -95,7 +95,7 @@ async function bookAppointment(req, res, next) {
       actorRole: role,
       slotOccupied: slotOccupied ?? 1,
     });
-    return sendSuccess(res, 201, data, "Appointment booked successfully.");
+    return sendSuccess(res, 201, data, "Đặt lịch hẹn thành công.");
   } catch (err) {
     return next(err);
   }

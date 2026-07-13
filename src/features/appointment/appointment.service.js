@@ -33,7 +33,7 @@ async function bookAppointment({
         "Your account has been restricted from booking appointments online due to 3 or more no-shows. " +
           "Please contact the clinic directly for assistance.",
         403,
-        "BOOKING_BANNED_NO_SHOW",
+        "BOThành côngING_BANNED_NO_SHOW",
       );
     }
   }
@@ -43,7 +43,7 @@ async function bookAppointment({
 
   const slotInfo = await appointmentDao.findSlotInfo(slotId);
   if (!slotInfo) {
-    throw new AppError("Slot not found.", 404, "NOT_FOUND");
+    throw new AppError("Không tìm thấy khung giờ.", 404, "NOT_FOUND");
   }
 
   const workDate = slotInfo.schedules?.work_date; // "YYYY-MM-DD"
@@ -87,7 +87,7 @@ async function bookAppointment({
           `(current status: ${conflict.status}). ` +
           "Please wait until it is completed, cancelled, or resolved before booking again.",
         409,
-        "DUPLICATE_SERVICE_BOOKING",
+        "DUPLICATE_SERVICE_BOThành côngING",
       );
     }
   }
@@ -304,11 +304,11 @@ async function cancelAppointment(
   const { data: existing, error } = await appointmentDao.findById(apptId);
 
   if (error || !existing) {
-    throw new AppError("Appointment not found.", 404, "NOT_FOUND");
+    throw new AppError("Không tìm thấy lịch hẹn.", 404, "NOT_FOUND");
   }
 
   if (role === "patient" && existing.patient_id !== patientId) {
-    throw new AppError("Access denied.", 403, "FORBIDDEN");
+    throw new AppError("Bạn không có quyền truy cập.", 403, "FORBIDDEN");
   }
 
   if (!CANCELLABLE_STATUSES.includes(existing.status)) {
