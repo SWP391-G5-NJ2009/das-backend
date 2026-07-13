@@ -18,6 +18,7 @@ const revenueRoutes = require("./features/revenue/revenue.routes");
 const patientAnalyticsRoutes = require("./features/patientAnalytics/patientAnalytics.routes");
 const clinicScheduleManagementRoutes = require("./features/clinicScheduleManagement/clinicScheduleManagement.routes");
 const scheduleRoutes = require("./features/schedule/schedule.routes");
+const appointmentDashboardRoutes = require("./features/appointmentDashboard/appointmentDashboard.routes");
 const staffRoutes = require("./features/staff/staff.routes");
 const {
   errorMiddleware,
@@ -70,6 +71,7 @@ app.use("/api/reports/revenue", revenueRoutes);
 app.use("/api/reports/patient", patientAnalyticsRoutes);
 app.use("/api/schedule/management", clinicScheduleManagementRoutes);
 app.use("/api/schedules", scheduleRoutes);
+app.use("/api/owner/appointment-dashboard", appointmentDashboardRoutes);
 app.use("/api/staff", staffRoutes);
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);

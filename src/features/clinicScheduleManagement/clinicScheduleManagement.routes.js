@@ -4,8 +4,6 @@ const requireRole = require("../../middlewares/role.middleware");
 const clinicScheduleManagementController = require("./clinicScheduleManagement.controller");
 const router = express.Router();
 
-// ── Versions ─────────────────────────────────────────────────────
-
 router.get(
     "/versions",
     authMiddleware,
@@ -19,8 +17,6 @@ router.post(
     requireRole("owner"),
     clinicScheduleManagementController.createVersion,
 );
-
-// ── Working Hours ────────────────────────────────────────────────
 
 router.get(
     "/workingHour",
@@ -36,16 +32,12 @@ router.put(
     clinicScheduleManagementController.updateWorkingHours,
 );
 
-// ── Combined Save ────────────────────────────────────────────────
-
 router.put(
     "/save-all",
     authMiddleware,
     requireRole("owner"),
     clinicScheduleManagementController.saveAll,
 );
-
-// ── Cancel Pending ───────────────────────────────────────────────
 
 router.delete(
     "/pending",
@@ -88,8 +80,6 @@ router.get(
     requireRole("owner"),
     clinicScheduleManagementController.getMinEffectiveDate,
 );
-
-// ── Closures ─────────────────────────────────────────────────────
 
 router.get(
     "/closures",

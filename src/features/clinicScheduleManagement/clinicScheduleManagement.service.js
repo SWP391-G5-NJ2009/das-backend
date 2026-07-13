@@ -8,8 +8,6 @@ function todayStr() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
-// ── Version Management ───────────────────────────────────────────
-
 async function createVersion(name, effectiveDate) {
     const pending = await clinicScheduleManagementDao.getPendingVersion();
     if (pending) {
@@ -128,8 +126,6 @@ async function getAllVersions() {
     }));
 }
 
-// ── Working Hours ────────────────────────────────────────────────
-
 async function getWorkingHour() {
     return clinicScheduleManagementDao.getWorkingHour();
 }
@@ -153,8 +149,6 @@ async function saveWorkingHours(versionId, hours) {
 
     return clinicScheduleManagementDao.replaceWorkingHours(versionId, hours);
 }
-
-// ── Time Slot Config Generation ────────────────────────────────
 
 function parseTime(timeStr) {
     const [h, m] = timeStr.split(":").map(Number);
@@ -191,8 +185,6 @@ async function generateTimeSlotConfigs(versionId, hours, slotDurationMinutes) {
     return clinicScheduleManagementDao.replaceTimeSlotConfigs(versionId, configs);
 }
 
-// ── Combined Save ────────────────────────────────────────────────
-
 async function saveAll(versionId, hours, force = false) {
     if (!force && hours && hours.length > 0) {
         const conflicting =
@@ -223,8 +215,6 @@ async function saveAll(versionId, hours, force = false) {
     }
 }
 
-// ── Cancel Pending ───────────────────────────────────────────────
-
 async function cancelPendingVersion() {
     return clinicScheduleManagementDao.deletePendingVersions();
 }
@@ -252,8 +242,6 @@ async function deleteVersion(versionId) {
     return { deleted: true };
 }
 
-// ── Background Activation ────────────────────────────────────────
-
 async function activateDueVersions() {
     const dueVersions = await clinicScheduleManagementDao.getPendingVersionsDueForActivation();
     let activated = 0;
@@ -265,8 +253,6 @@ async function activateDueVersions() {
 
     return activated;
 }
-
-// ── Closures ─────────────────────────────────────────────────────
 
 async function getClosures() {
     return clinicScheduleManagementDao.getClosures();
