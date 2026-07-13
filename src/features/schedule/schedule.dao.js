@@ -26,7 +26,9 @@ const SCHEDULE_SELECT = `
     time_slot_config:slot_config_id (
       slot_config_id,
       start_time,
-      end_time
+      end_time,
+      version_id,
+      day_of_week
     )
   )
 `.trim();
@@ -34,8 +36,47 @@ const SCHEDULE_SELECT = `
 function findTimeSlotConfigs() {
   return supabase
     .from("time_slot_config")
-    .select("slot_config_id, slot_name, start_time, end_time")
+    .select("slot_config_id, slot_name, start_time, end_time, version_id, day_of_week")
+    .order("day_of_week", { ascending: true })
     .order("slot_config_id", { ascending: true });
+}
+
+function findTimeSlotConfigsByVersion(versionId) {
+  return supabase
+    .from("time_slot_config")
+    .select("slot_config_id, slot_name, start_time, end_time, version_id, day_of_week")
+    .eq("version_id", versionId)
+    .order("day_of_week", { ascending: true })
+    .order("slot_config_id", { ascending: true });
+}
+
+function findWorkingHoursByVersion(versionId) {
+  return supabase
+    .from("clinic_working_hour")
+    .select("working_hour_id, version_id, day_of_week, start_time, end_time")
+    .eq("version_id", versionId)
+    .order("day_of_week", { ascending: true })
+    .order("start_time", { ascending: true });
+}
+
+function findTimeSlotConfigsByVersionAndDay(versionId, dayOfWeek) {
+  return supabase
+    .from("time_slot_config")
+    .select("slot_config_id, slot_name, start_time, end_time, version_id, day_of_week")
+    .eq("version_id", versionId)
+    .eq("day_of_week", dayOfWeek)
+    .order("slot_config_id", { ascending: true });
+}
+
+function findClinicScheduleVersionForDate(workDate) {
+  return supabase
+    .from("clinic_schedule_version")
+    .select("version_id, name, effective_date, status")
+    .in("status", ["Active", "Pending"])
+    .lte("effective_date", workDate)
+    .order("effective_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 }
 
 function findClinicInfo() {
@@ -161,6 +202,15 @@ function findAffectedAppointmentsBySlotIds(slotIds) {
     .select(
       `
       slot_id,
+      work_slot:slot_id (
+        time_slot_config:slot_config_id (
+          start_time,
+          end_time
+        ),
+        schedules:schedule_id (
+          work_date
+        )
+      ),
       appointment:appt_id!inner (
         appt_id,
         status,
@@ -174,15 +224,6 @@ function findAffectedAppointmentsBySlotIds(slotIds) {
         appointment_service (
           dental_service:service_id (
             service_name
-          )
-        ),
-        work_slot:slot_id (
-          time_slot_config:slot_config_id (
-            start_time,
-            end_time
-          ),
-          schedules:schedule_id (
-            work_date
           )
         )
       )
@@ -265,6 +306,7 @@ module.exports = {
   deleteEditableWorkSlots,
   findAvailableRooms,
   findAffectedAppointmentsBySlotIds,
+  findClinicScheduleVersionForDate,
   findClinicInfo,
   findDentistByAccountId,
   findScheduleByDentistAndDate,
@@ -272,6 +314,9 @@ module.exports = {
   findSchedulesByDentist,
   findSchedulesForOwner,
   findTimeSlotConfigs,
+  findTimeSlotConfigsByVersion,
+  findTimeSlotConfigsByVersionAndDay,
+  findWorkingHoursByVersion,
   findWorkSlotsByIdsForDentist,
   findWorkSlotsByScheduleId,
   insertSchedule,

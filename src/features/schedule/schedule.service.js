@@ -7,7 +7,6 @@ const MAX_RANGE_DAYS = 31;
 const REQUEST_STATUS = "Pending";
 const APPROVED_STATUS = "Scheduled";
 const DENIED_PREFIX = "Denied";
-const SLOT_MINUTES = 30;
 
 function toDate(value, fieldName) {
   const date = new Date(`${value}T00:00:00`);
@@ -34,23 +33,6 @@ function normalizeTime(value, fieldName) {
   }
 
   return `${text}:00`;
-}
-
-function timeToMinutes(value) {
-  const [hours, minutes] = String(value || "00:00").split(":").map(Number);
-  return hours * 60 + minutes;
-}
-
-function assertThirtyMinuteBoundary(value, fieldName) {
-  const minutes = timeToMinutes(value);
-
-  if (minutes % SLOT_MINUTES !== 0) {
-    throw new AppError(
-      `${fieldName} must align to a ${SLOT_MINUTES}-minute slot boundary.`,
-      400,
-      "VALIDATION_ERROR",
-    );
-  }
 }
 
 function getNextMonthBounds(referenceDate = new Date()) {
@@ -152,6 +134,8 @@ function normalizeSchedule(row) {
       slot_id: slot.slot_id,
       status: slot.status,
       slot_config_id: slot.time_slot_config.slot_config_id,
+      versionId: slot.time_slot_config.version_id,
+      dayOfWeek: slot.time_slot_config.day_of_week,
       startTime: slot.time_slot_config.start_time.substring(0, 5),
       endTime: slot.time_slot_config.end_time.substring(0, 5),
     })),
@@ -205,29 +189,62 @@ function generateDates({ startDate, endDate, weekdays }) {
   return dates;
 }
 
-function selectSlotConfigs(slotConfigs, startTime, endTime, clinicInfo = {}) {
+function toClinicDayOfWeek(dateText) {
+  const day = toDate(dateText, "workDate").getDay();
+  return day === 0 ? 7 : day;
+}
+
+function buildClinicWindow(slots = [], fallback = {}) {
+  const startTimes = slots.map((slot) => slot.start_time).filter(Boolean).sort();
+  const endTimes = slots.map((slot) => slot.end_time).filter(Boolean).sort();
+
+  return {
+    openTime:
+      (startTimes[0] || fallback.open_time || "08:00:00").substring(0, 5),
+    closeTime:
+      (endTimes[endTimes.length - 1] || fallback.close_time || "20:00:00")
+        .substring(0, 5),
+  };
+}
+
+async function getSlotConfigsForWorkDate(workDate, cache = new Map()) {
+  const { data: version, error: versionError } =
+    await scheduleDao.findClinicScheduleVersionForDate(workDate);
+
+  if (versionError || !version) {
+    throw new AppError(
+      "No clinic working-hour version is available for the selected date.",
+      400,
+      "CLINIC_SCHEDULE_VERSION_NOT_FOUND",
+    );
+  }
+
+  const dayOfWeek = toClinicDayOfWeek(workDate);
+  const cacheKey = `${version.version_id}:${dayOfWeek}`;
+
+  if (!cache.has(cacheKey)) {
+    const { data, error } =
+      await scheduleDao.findTimeSlotConfigsByVersionAndDay(
+        version.version_id,
+        dayOfWeek,
+      );
+
+    if (error) {
+      throw new AppError("Failed to load clinic slots.", 500, "DB_ERROR");
+    }
+
+    cache.set(cacheKey, data || []);
+  }
+
+  return cache.get(cacheKey);
+}
+
+function selectSlotConfigs(slotConfigs, startTime, endTime) {
   const start = normalizeTime(startTime, "startTime");
   const end = normalizeTime(endTime, "endTime");
-  const clinicOpen = clinicInfo.open_time || "08:00:00";
-  const clinicClose = clinicInfo.close_time || "20:00:00";
-
-  assertThirtyMinuteBoundary(start, "startTime");
-  assertThirtyMinuteBoundary(end, "endTime");
 
   if (start >= end) {
     throw new AppError("End time must be later than start time.", 400, "VALIDATION_ERROR");
-  }
-
-  if (start < clinicOpen || end > clinicClose) {
-    throw new AppError(
-      "Working hours must stay within the clinic operating hours.",
-      400,
-      "OUTSIDE_CLINIC_HOURS",
-      {
-        openTime: clinicOpen.substring(0, 5),
-        closeTime: clinicClose.substring(0, 5),
-      },
-    );
   }
 
   const selected = slotConfigs.filter(
@@ -239,20 +256,6 @@ function selectSlotConfigs(slotConfigs, startTime, endTime, clinicInfo = {}) {
       "No configured clinic slots match the selected working hours.",
       400,
       "VALIDATION_ERROR",
-    );
-  }
-
-  const invalidSlot = selected.find(
-    (slot) =>
-      timeToMinutes(slot.end_time) - timeToMinutes(slot.start_time) !==
-      SLOT_MINUTES,
-  );
-
-  if (invalidSlot) {
-    throw new AppError(
-      `Clinic slot configuration must be split into ${SLOT_MINUTES}-minute slots.`,
-      500,
-      "CLINIC_SLOT_CONFIG_INVALID",
     );
   }
 
@@ -272,18 +275,34 @@ async function resolveDentistId(user) {
 }
 
 async function getScheduleMeta() {
+  const nextMonth = getNextMonthBounds();
+  const { data: clinicVersion, error: clinicVersionError } =
+    await scheduleDao.findClinicScheduleVersionForDate(nextMonth.startDate);
+  const slotConfigRequest = clinicVersion
+    ? scheduleDao.findTimeSlotConfigsByVersion(clinicVersion.version_id)
+    : Promise.resolve({ data: [], error: null });
+  const workingHourRequest = clinicVersion
+    ? scheduleDao.findWorkingHoursByVersion(clinicVersion.version_id)
+    : Promise.resolve({ data: [], error: null });
   const [
     { data: rooms, error: roomError },
     { data: slots, error: slotError },
+    { data: workingHours, error: workingHourError },
     { data: clinicInfo, error: clinicError },
-  ] =
-    await Promise.all([
-      scheduleDao.findAvailableRooms(),
-      scheduleDao.findTimeSlotConfigs(),
-      scheduleDao.findClinicInfo(),
-    ]);
+  ] = await Promise.all([
+    scheduleDao.findAvailableRooms(),
+    slotConfigRequest,
+    workingHourRequest,
+    scheduleDao.findClinicInfo(),
+  ]);
 
-  if (roomError || slotError || clinicError) {
+  if (
+    roomError ||
+    slotError ||
+    workingHourError ||
+    clinicError ||
+    clinicVersionError
+  ) {
     throw new AppError(
       "Failed to load schedule setup data.",
       500,
@@ -291,12 +310,27 @@ async function getScheduleMeta() {
     );
   }
 
-  const nextMonth = getNextMonthBounds();
+  const clinicWindow = buildClinicWindow(slots || [], clinicInfo || {});
+  const workingDays = [
+    ...new Set(
+      (workingHours || [])
+        .map((hour) => Number(hour.day_of_week))
+        .filter(Boolean),
+    ),
+  ].sort((first, second) => first - second);
 
   return {
+    scheduleVersion: clinicVersion
+      ? {
+          versionId: clinicVersion.version_id,
+          name: clinicVersion.name,
+          effectiveDate: clinicVersion.effective_date,
+          status: clinicVersion.status,
+        }
+      : null,
     clinic: {
-      openTime: (clinicInfo?.open_time || "08:00:00").substring(0, 5),
-      closeTime: (clinicInfo?.close_time || "20:00:00").substring(0, 5),
+      openTime: clinicWindow.openTime,
+      closeTime: clinicWindow.closeTime,
     },
     scheduleWindow: {
       isOpen: new Date().getDate() <= 15,
@@ -306,9 +340,19 @@ async function getScheduleMeta() {
       targetMonthEnd: nextMonth.endDate,
     },
     rooms: rooms || [],
+    workingDays,
+    workingHours: (workingHours || []).map((hour) => ({
+      workingHourId: hour.working_hour_id,
+      versionId: hour.version_id,
+      dayOfWeek: hour.day_of_week,
+      startTime: hour.start_time.substring(0, 5),
+      endTime: hour.end_time.substring(0, 5),
+    })),
     timeSlots: (slots || []).map((slot) => ({
       slot_config_id: slot.slot_config_id,
       slotName: slot.slot_name,
+      versionId: slot.version_id,
+      dayOfWeek: slot.day_of_week,
       startTime: slot.start_time.substring(0, 5),
       endTime: slot.end_time.substring(0, 5),
     })),
@@ -344,8 +388,8 @@ function normalizeAffectedAppointment(row) {
   const services = (appointment.appointment_service || [])
     .map((item) => item.dental_service?.service_name)
     .filter(Boolean);
-  const slotConfig = appointment.work_slot?.time_slot_config;
-  const workDate = appointment.work_slot?.schedules?.work_date;
+  const slotConfig = row.work_slot?.time_slot_config;
+  const workDate = row.work_slot?.schedules?.work_date;
 
   return {
     appointmentId: appointment.appt_id,
@@ -523,27 +567,19 @@ async function submitMyScheduleRequest(user, payload = {}) {
 
   const dates = generateDates(payload);
   assertScheduleSubmissionWindow(dates);
-  const [
-    { data: slotConfigs, error: slotError },
-    { data: clinicInfo, error: clinicError },
-  ] = await Promise.all([
-    scheduleDao.findTimeSlotConfigs(),
-    scheduleDao.findClinicInfo(),
-  ]);
-
-  if (slotError || clinicError) {
-    throw new AppError("Failed to load clinic slots.", 500, "DB_ERROR");
-  }
-
-  const selectedSlots = selectSlotConfigs(
-    slotConfigs || [],
-    payload.startTime || payload.start_time,
-    payload.endTime || payload.end_time,
-    clinicInfo || {},
-  );
   const savedSchedules = [];
+  const slotConfigCache = new Map();
 
   for (const workDate of dates) {
+    const slotConfigs = await getSlotConfigsForWorkDate(
+      workDate,
+      slotConfigCache,
+    );
+    const selectedSlots = selectSlotConfigs(
+      slotConfigs || [],
+      payload.startTime || payload.start_time,
+      payload.endTime || payload.end_time,
+    );
     const { data: existing, error: lookupError } =
       await scheduleDao.findScheduleByDentistAndDate(dentistId, workDate);
 
@@ -783,6 +819,20 @@ async function updateAvailabilityStatus(user, payload = {}) {
   }
 
   const affectedAppointments = await getAffectedAppointments(slotIds);
+  const bookedWithoutActiveConflict = slots.filter(
+    (slot) => slot.status === "Booked",
+  );
+
+  if (bookedWithoutActiveConflict.length > 0 && affectedAppointments.length === 0) {
+    throw new AppError(
+      "Booked slots cannot be blocked until the linked appointment is resolved.",
+      409,
+      "SLOT_ALREADY_BOOKED",
+      {
+        slotIds: bookedWithoutActiveConflict.map((slot) => slot.slot_id),
+      },
+    );
+  }
 
   if (affectedAppointments.length > 0 && !force) {
     throw new AppError(
