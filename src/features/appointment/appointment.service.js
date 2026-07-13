@@ -165,9 +165,6 @@ async function bookAppointment({
     },
   ]);
 
-  // Step 4: Record all claimed slot IDs in appointment_slot junction table
-  // is_primary = true for the anchor slot (stored in appointment.slot_id),
-  // is_primary = false for each follow-on slot.
   await appointmentDao.insertAppointmentSlots(
     allSlotIds.map((sid) => ({
       appt_id: appointment.appt_id,
