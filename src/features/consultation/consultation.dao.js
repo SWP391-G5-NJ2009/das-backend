@@ -7,7 +7,7 @@ async function findAllConsultationRequests(filters = {}) {
   let query = supabase
     .from("consultation_request")
     .select("*", { count: "exact" })
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: true })
     .range((page-1)*PAGE_SIZE, page*PAGE_SIZE-1);
 
   if (filters.status && filters.status !== "All") {
