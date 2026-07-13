@@ -2,9 +2,6 @@ const appointmentDao = require("./appointment.dao");
 const patientDao = require("../patient/patient.dao");
 const AppError = require("../../utils/AppError");
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   bookAppointment — Patient or Receptionist creates a new appointment
-───────────────────────────────────────────────────────────────────────────── */
 async function bookAppointment({
   patientId,
   newPatient,
@@ -15,7 +12,6 @@ async function bookAppointment({
   actorRole,
   slotOccupied = 1,
 }) {
-  // ── Walk-in patient: create patient record on the fly ────────────────────
   let resolvedPatientId = patientId;
   if (!resolvedPatientId && newPatient) {
     const created = await patientDao.createPatient(newPatient);
@@ -29,7 +25,7 @@ async function bookAppointment({
     );
   }
 
-  // ── BR-11: Block patient with ≥ 3 No-Shows from booking online ──────────
+  // BR-11: Block patient with >= 3 No-Shows from booking online
   if (actorRole === "patient") {
     const patientInfo = await patientDao.findPatientById(resolvedPatientId);
     if (patientInfo.no_show_count >= 3) {
@@ -41,9 +37,9 @@ async function bookAppointment({
       );
     }
   }
-  // ── End BR-11 ────────────────────────────────────────────────────────────
+  // End BR-11
 
-  // ── BR-14: Validate slot timing before attempting to claim it ────────────
+  // BR-14: Validate slot timing before attempting to claim it
 
   const slotInfo = await appointmentDao.findSlotInfo(slotId);
   if (!slotInfo) {
@@ -77,9 +73,9 @@ async function bookAppointment({
       );
     }
   }
-  // ── End BR-14 ────────────────────────────────────────────────────────────
+  // End BR-14
 
-  // ── BR-15: One active appointment per service per patient (patient only) ──
+  // BR-15: One active appointment per service per patient (patient only)
   if (actorRole === "patient") {
     const conflict = await appointmentDao.findConfirmedAppointmentByService(
       resolvedPatientId,
@@ -95,14 +91,13 @@ async function bookAppointment({
       );
     }
   }
-  // ── End BR-15 ────────────────────────────────────────────────────────────
+  // End BR-15
 
-  // ── Multi-slot: find all consecutive slots this service requires ──────────
+  // Multi-slot: find all consecutive slots this service requires
   const normalizedSlotCount = Math.max(1, Number(slotOccupied) || 1);
 
   let allSlotIds;
   if (normalizedSlotCount === 1) {
-    // Fast path: single-slot service
     const claimedSlot = await appointmentDao.markSlotBooked(slotId);
     if (!claimedSlot) {
       throw new AppError(
@@ -152,9 +147,7 @@ async function bookAppointment({
     }
     allSlotIds = claimedIds;
   }
-  // ── End multi-slot ───────────────────────────────────────────────────────
 
-  // Step 2: Create appointment record (primary slot only — the anchor)
   const appointment = await appointmentDao.createAppointment({
     patient_id: resolvedPatientId,
     status: "Confirmed",
@@ -172,9 +165,6 @@ async function bookAppointment({
     },
   ]);
 
-  // Step 4: Record all claimed slot IDs in appointment_slot junction table
-  // is_primary = true for the anchor slot (stored in appointment.slot_id),
-  // is_primary = false for each follow-on slot.
   await appointmentDao.insertAppointmentSlots(
     allSlotIds.map((sid) => ({
       appt_id: appointment.appt_id,
@@ -186,14 +176,9 @@ async function bookAppointment({
   return appointment;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Shape normalizer — maps raw Supabase joined row → clean frontend-ready object.
-   Field names mirror the mock data shape used in the frontend hook.
-───────────────────────────────────────────────────────────────────────────── */
 const CANCELLABLE_STATUSES = ["Confirmed", "Checked-in", "Conflict"];
 
 function normalize(row) {
-  // Primary slot data lives in appointment_slot (is_primary = true)
   const primarySlotEntry = (row.appointment_slot || []).find(
     (as) => as.is_primary,
   );
@@ -238,8 +223,6 @@ function normalize(row) {
       ? slotConfig.start_time.substring(0, 5)
       : null,
     scheduledTimeEnd: (() => {
-      // For multi-slot appointments, use the end_time of the LAST slot
-      // (largest start_time in appointment_slot). Falls back to primary slot end_time.
       const allSlots = (row.appointment_slot || [])
         .map((as) => as.work_slot?.time_slot_config)
         .filter(Boolean)
@@ -260,14 +243,11 @@ function normalize(row) {
 function applyClientFilters(list, filters) {
   let result = list;
 
-  // Exact day takes priority; otherwise fall through to month, then year
   if (filters.date) {
     result = result.filter((a) => a.scheduledDate === filters.date);
   } else if (filters.month) {
-    // filters.month is "YYYY-MM"
     result = result.filter((a) => a.scheduledDate?.startsWith(filters.month));
   } else if (filters.year) {
-    // filters.year is "YYYY"
     result = result.filter((a) => a.scheduledDate?.startsWith(filters.year));
   }
 
@@ -339,9 +319,8 @@ async function cancelAppointment(
     );
   }
 
-  // ── BR-13: Patients can only cancel at least 24 hours before scheduled time ──
+  // BR-13: Patients can only cancel at least 24 hours before scheduled time
   if (role === "patient") {
-    // Get primary slot from appointment_slot junction (appointment table has no slot_id column)
     const primarySlotEntry = (existing.appointment_slot || []).find(
       (as) => as.is_primary,
     );
@@ -365,7 +344,7 @@ async function cancelAppointment(
       }
     }
   }
-  // ── End BR-13 ────────────────────────────────────────────────────────────────
+  // End BR-13
 
   const cancelled = await appointmentDao.cancelById(
     apptId,
@@ -373,19 +352,12 @@ async function cancelAppointment(
     reason,
   );
 
-  // Release all slots linked to this appointment (non-blocking).
-  // appointment_slot rows are cascade-deleted when appointment is cancelled,
-  // but we read them BEFORE cancel so we know which work_slots to free.
-  // (We already fetched `existing` above — primary slot is on existing.work_slot.slot_id;
-  //  we re-query appointment_slot for the full list to handle multi-slot services.)
   appointmentDao
     .findSlotsByApptId(apptId)
     .then((slotIds) => {
       if (slotIds.length > 0) {
         return appointmentDao.releaseSlotsByIds(slotIds);
       }
-      // Fallback: if junction table has no rows yet (legacy appointment),
-      // release the primary slot the old way.
       const primarySlotId = existing.work_slot?.slot_id;
       if (primarySlotId) {
         return appointmentDao.releaseSlotsByIds([primarySlotId]);

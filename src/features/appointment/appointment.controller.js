@@ -5,10 +5,6 @@ const {
   validateCancelAppointment,
 } = require("./appointment.validator");
 
-/**
- * GET /api/appointments/my
- * Patient: fetch own appointments (filtered by JWT patientId).
- */
 async function getMyAppointments(req, res, next) {
   try {
     const patientId = req.user.profileId;
@@ -26,11 +22,6 @@ async function getMyAppointments(req, res, next) {
   }
 }
 
-/**
- * GET /api/appointments
- * Receptionist: fetch all clinic appointments.
- * Dentist: fetch own assigned appointments.
- */
 async function getAllAppointments(req, res, next) {
   try {
     const filters = {
@@ -48,10 +39,6 @@ async function getAllAppointments(req, res, next) {
   }
 }
 
-/**
- * PATCH /api/appointments/:id/cancel
- * Patient or Staff: cancel an appointment.
- */
 async function cancelAppointment(req, res, next) {
   try {
     const apptId = parseInt(req.params.id, 10);
@@ -71,14 +58,16 @@ async function cancelAppointment(req, res, next) {
   }
 }
 
-/**
- * POST /api/appointments
- * Patient or Receptionist: create a new appointment.
- */
 async function bookAppointment(req, res, next) {
   try {
-    const { slotId, serviceId, note, patientId: bodyPatientId, newPatient, slotOccupied } =
-      validateBookAppointment(req.body);
+    const {
+      slotId,
+      serviceId,
+      note,
+      patientId: bodyPatientId,
+      newPatient,
+      slotOccupied,
+    } = validateBookAppointment(req.body);
     const { role, profileId, id: actorAccountId } = req.user;
 
     if (role === "receptionist" && !bodyPatientId && !newPatient) {
@@ -92,9 +81,13 @@ async function bookAppointment(req, res, next) {
     }
 
     const data = await appointmentService.bookAppointment({
-      // Patient books for themselves; receptionist supplies patientId or newPatient
-      patientId: role === "patient" ? Number(profileId) : bodyPatientId ? Number(bodyPatientId) : null,
-      newPatient: role === "receptionist" ? (newPatient || null) : null,
+      patientId:
+        role === "patient"
+          ? Number(profileId)
+          : bodyPatientId
+            ? Number(bodyPatientId)
+            : null,
+      newPatient: role === "receptionist" ? newPatient || null : null,
       slotId: Number(slotId),
       serviceId: Number(serviceId),
       note,
