@@ -1,8 +1,6 @@
 const clinicScheduleManagementService = require("./clinicScheduleManagement.service");
 const { sendSuccess } = require("../../utils/response");
 
-// ── Versions ─────────────────────────────────────────────────────
-
 async function createVersion(req, res, next) {
     try {
         const { name, effectiveDate } = req.body;
@@ -21,8 +19,6 @@ async function getVersions(req, res, next) {
         return next(err);
     }
 }
-
-// ── Working Hours ────────────────────────────────────────────────
 
 async function getWorkingHour(req, res, next) {
     try {
@@ -43,8 +39,6 @@ async function updateWorkingHours(req, res, next) {
     }
 }
 
-// ── Combined ─────────────────────────────────────────────────────
-
 async function saveAll(req, res, next) {
     try {
         const { versionId, hours, force } = req.body;
@@ -54,8 +48,6 @@ async function saveAll(req, res, next) {
         return next(err);
     }
 }
-
-// ── Cancel Pending ───────────────────────────────────────────────
 
 async function cancelPending(req, res, next) {
     try {
@@ -85,8 +77,6 @@ async function activateVersion(req, res, next) {
         return next(err);
     }
 }
-
-// ── Closures ─────────────────────────────────────────────────────
 
 async function getClosures(req, res, next) {
     try {

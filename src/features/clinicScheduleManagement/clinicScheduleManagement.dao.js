@@ -1,8 +1,6 @@
 const supabase = require("../../config/supabase");
 const AppError = require("../../utils/AppError");
 
-// ── Version Queries ──────────────────────────────────────────────
-
 async function getActiveVersion() {
     const { data, error } = await supabase
         .from("clinic_schedule_version")
@@ -109,8 +107,6 @@ async function getPendingVersionsDueForActivation() {
     return data || [];
 }
 
-// ── Working Hour Queries ─────────────────────────────────────────
-
 async function getWorkingHourByVersionId(versionId) {
     const { data, error } = await supabase
         .from("clinic_working_hour")
@@ -178,8 +174,6 @@ async function replaceWorkingHours(versionId, hours) {
     return insertWorkingHours(versionId, hours);
 }
 
-// ── Time Slot Config Queries ────────────────────────────────────
-
 async function getTimeSlotConfigsByVersionId(versionId) {
     const { data, error } = await supabase
         .from("time_slot_config")
@@ -208,8 +202,6 @@ async function replaceTimeSlotConfigs(versionId, configs) {
     if (insErr) throw new AppError(insErr.message, 500, "DB_ERROR");
     return data || [];
 }
-
-// ── Closure Queries ──────────────────────────────────────────────
 
 async function getClosures() {
     const { data, error } = await supabase
@@ -249,8 +241,6 @@ async function deleteClosure(closureId) {
     if (!data) throw new AppError("Closure not found.", 404, "NOT_FOUND");
     return data;
 }
-
-// ── Work Slot Queries ────────────────────────────────────────────
 
 async function countBookedWorkSlots() {
     const { count, error } = await supabase
@@ -292,8 +282,6 @@ async function getLastBookedSlotDate() {
 
     return dates.length > 0 ? dates[dates.length - 1] : null;
 }
-
-// ── Conflict Detection ──────────────────────────────────────────
 
 async function findConflictingAppointments(newHours) {
     const { data: bookedSlots, error: slotErr } = await supabase
