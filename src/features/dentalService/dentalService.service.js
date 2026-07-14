@@ -73,7 +73,7 @@ async function deleteService(id) {
   const everBooked = await appointmentDao.hasAnyAppointmentByServiceId(id);
   if (everBooked) {
     throw new AppError(
-      "Deletion Denied. This service cannot be deleted because it contains linked appointment record. Please use the Inactivate status instead to hide it.",
+      "Không thể xóa dịch vụ này vì đã có lịch hẹn liên kết. Vui lòng chuyển trạng thái sang 'Ngừng hoạt động' để ẩn dịch vụ thay vì xóa.",
       409,
       "SERVICE_HAS_HISTORY",
     );
