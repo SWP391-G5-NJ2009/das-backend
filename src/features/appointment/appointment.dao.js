@@ -66,8 +66,7 @@ async function findByPatientId(patientId, filters = {}) {
   let query = supabase
     .from("appointment")
     .select(APPOINTMENT_SELECT)
-    .eq("patient_id", patientId)
-    .order("book_time", { ascending: true });
+    .eq("patient_id", patientId);
 
   if (filters.status && filters.status !== "all") {
     query = query.eq("status", filters.status);
@@ -79,8 +78,7 @@ async function findByPatientId(patientId, filters = {}) {
 async function findAll(filters = {}) {
   let query = supabase
     .from("appointment")
-    .select(APPOINTMENT_SELECT)
-    .order("book_time", { ascending: true });
+    .select(APPOINTMENT_SELECT);
 
   if (filters.status && filters.status !== "all") {
     query = query.eq("status", filters.status);
