@@ -1,6 +1,11 @@
 const staffService = require("./staff.service");
 const { sendSuccess } = require("../../utils/response");
-const { validateCreateDentistProfile } = require("./staff.validator");
+const {
+    validateCreateDentistProfile,
+    validateCreateStaffProfile,
+    validateUpdateDentistProfile,
+    validateUpdateReceptionistProfile,
+} = require("./staff.validator");
 
 async function getAllStaff(req, res, next) {
     try {
@@ -30,8 +35,46 @@ async function createDentistProfile(req, res, next) {
     }
 }
 
+async function getAvailableStaffAccounts(req, res, next) {
+    try {
+        const data = await staffService.getAvailableStaffAccounts();
+        return sendSuccess(res, 200, data, "Lấy danh sách tài khoản nhân viên khả dụng thành công.");
+    } catch (error) { return next(error); }
+}
+
+async function createStaffProfile(req, res, next) {
+    try {
+        const data = await staffService.createStaffProfile(validateCreateStaffProfile(req.body));
+        return sendSuccess(res, 201, data, "Tạo hồ sơ nhân viên thành công.");
+    } catch (error) { return next(error); }
+}
+
+async function updateDentistProfile(req, res, next) {
+    try {
+        const payload = validateUpdateDentistProfile(req.body);
+        const data = await staffService.updateDentistProfile(req.params.id, payload);
+        return sendSuccess(res, 200, data, "Cập nhật hồ sơ nha sĩ thành công.");
+    } catch (error) {
+        return next(error);
+    }
+}
+
+async function updateReceptionistProfile(req, res, next) {
+    try {
+        const payload = validateUpdateReceptionistProfile(req.body);
+        const data = await staffService.updateReceptionistProfile(req.params.id, payload);
+        return sendSuccess(res, 200, data, "Cáº­p nháº­t há»“ sÆ¡ lá»… tĂ¢n thĂ nh cĂ´ng.");
+    } catch (error) {
+        return next(error);
+    }
+}
+
 module.exports = {
     createDentistProfile,
     getAvailableDentistAccounts,
     getAllStaff,
+    getAvailableStaffAccounts,
+    createStaffProfile,
+    updateDentistProfile,
+    updateReceptionistProfile,
 };
