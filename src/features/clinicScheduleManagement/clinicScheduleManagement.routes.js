@@ -5,20 +5,6 @@ const clinicScheduleManagementController = require("./clinicScheduleManagement.c
 const router = express.Router();
 
 router.get(
-    "/versions",
-    authMiddleware,
-    requireRole("owner"),
-    clinicScheduleManagementController.getVersions,
-);
-
-router.post(
-    "/versions",
-    authMiddleware,
-    requireRole("owner"),
-    clinicScheduleManagementController.createVersion,
-);
-
-router.get(
     "/workingHour",
     authMiddleware,
     requireRole("owner"),
@@ -40,24 +26,10 @@ router.put(
 );
 
 router.delete(
-    "/pending",
-    authMiddleware,
-    requireRole("owner"),
-    clinicScheduleManagementController.cancelPending,
-);
-
-router.delete(
     "/versions/:id",
     authMiddleware,
     requireRole("owner"),
     clinicScheduleManagementController.deleteVersion,
-);
-
-router.patch(
-    "/versions/:id/activate",
-    authMiddleware,
-    requireRole("owner"),
-    clinicScheduleManagementController.activateVersion,
 );
 
 router.get(
@@ -100,6 +72,13 @@ router.delete(
     authMiddleware,
     requireRole("owner"),
     clinicScheduleManagementController.deleteClosure,
+);
+
+router.post(
+    "/versions-with-hours",
+    authMiddleware,
+    requireRole("owner"),
+    clinicScheduleManagementController.createVersionWithHours,
 );
 
 module.exports = router;
