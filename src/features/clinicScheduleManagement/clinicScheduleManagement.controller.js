@@ -138,18 +138,15 @@ async function getMinEffectiveDate(req, res, next) {
 }
 
 module.exports = {
-    createVersion,
-    getVersions,
     getWorkingHour,
     updateWorkingHours,
     saveAll,
-    cancelPending,
     deleteVersion,
-    activateVersion,
     getClosures,
     createClosure,
     deleteClosure,
     getVersionById,
     updateEffectiveDate,
     getMinEffectiveDate,
+    createVersionWithHours,
 };
