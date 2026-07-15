@@ -271,6 +271,7 @@ function applyClientFilters(list, filters) {
   return result;
 }
 
+
 async function getMyAppointments(patientId, filters = {}) {
   const { data, error } = await appointmentDao.findByPatientId(
     patientId,

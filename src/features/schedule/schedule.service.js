@@ -122,8 +122,6 @@ function normalizeSchedule(row) {
     dentistName: row.dentist?.full_name || `Dentist #${row.dentist_id}`,
     date: row.work_date,
     work_date: row.work_date,
-    room_id: row.room_id,
-    roomName: row.room_info?.room_name || "Unassigned room",
     status: status.label,
     rawStatus: row.status,
     ownerNote: status.ownerNote,
@@ -559,12 +557,6 @@ async function replaceScheduleSlots(scheduleId, selectedSlotConfigs, status) {
 
 async function submitMyScheduleRequest(user, payload = {}) {
   const dentistId = await resolveDentistId(user);
-  const roomId = Number(payload.roomId || payload.room_id);
-
-  if (!roomId) {
-    throw new AppError("Vui lòng chọn phòng điều trị.", 400, "VALIDATION_ERROR");
-  }
-
   const dates = generateDates(payload);
   assertScheduleSubmissionWindow(dates);
   const savedSchedules = [];
@@ -615,7 +607,6 @@ async function submitMyScheduleRequest(user, payload = {}) {
 
       const { data: updated, error: updateError } =
         await scheduleDao.updateSchedule(schedule.schedule_id, {
-          room_id: roomId,
           status: REQUEST_STATUS,
         });
 
@@ -628,7 +619,6 @@ async function submitMyScheduleRequest(user, payload = {}) {
       const { data: inserted, error: insertError } =
         await scheduleDao.insertSchedule({
           dentist_id: dentistId,
-          room_id: roomId,
           work_date: workDate,
           status: REQUEST_STATUS,
         });

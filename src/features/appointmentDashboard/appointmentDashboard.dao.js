@@ -66,9 +66,6 @@ async function findAppointmentsByDate(date) {
         dentist:dentist_id (
           dentist_id,
           full_name
-        ),
-        room_info:room_id (
-          room_name
         )
       ),
       appointment_slot (
