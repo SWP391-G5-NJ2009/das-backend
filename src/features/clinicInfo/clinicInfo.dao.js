@@ -11,4 +11,13 @@ function findClinicInfo() {
   return supabase.from("clinic_info").select("*").limit(1);
 }
 
-module.exports = { findClinicInfo };
+function updateClinicInfo(clinicId, payload) {
+  return supabase
+    .from("clinic_info")
+    .update(payload)
+    .eq("clinic_id", clinicId)
+    .select("*")
+    .single();
+}
+
+module.exports = { findClinicInfo, updateClinicInfo };
