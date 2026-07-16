@@ -268,18 +268,6 @@ async function activateDueVersions() {
     return activated;
 }
 
-async function getClosures() {
-    return clinicScheduleManagementDao.getClosures();
-}
-
-async function createClosure(closureDate, reason) {
-    return clinicScheduleManagementDao.createClosure(closureDate, reason);
-}
-
-async function deleteClosure(closureId) {
-    return clinicScheduleManagementDao.deleteClosure(closureId);
-}
-
 async function getVersionById(versionId) {
     const version = await clinicScheduleManagementDao.getVersionById(versionId);
     if (!version) throw new AppError("Không tìm thấy phiên bản.", 404, "NOT_FOUND");
@@ -373,9 +361,6 @@ module.exports = {
     saveWorkingHours,
     saveAll,
     deleteVersion,
-    getClosures,
-    createClosure,
-    deleteClosure,
     getVersionById,
     updateEffectiveDate,
     getMinEffectiveDate,

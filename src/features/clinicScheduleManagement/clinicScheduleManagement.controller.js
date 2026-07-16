@@ -78,35 +78,6 @@ async function activateVersion(req, res, next) {
     }
 }
 
-async function getClosures(req, res, next) {
-    try {
-        const data = await clinicScheduleManagementService.getClosures();
-        return sendSuccess(res, 200, data, "Lấy danh sách ngày nghỉ thành công.");
-    } catch (err) {
-        return next(err);
-    }
-}
-
-async function createClosure(req, res, next) {
-    try {
-        const { closureDate, reason } = req.body;
-        const data = await clinicScheduleManagementService.createClosure(closureDate, reason);
-        return sendSuccess(res, 201, data, "Thêm ngày nghỉ thành công.");
-    } catch (err) {
-        return next(err);
-    }
-}
-
-async function deleteClosure(req, res, next) {
-    try {
-        const { id } = req.params;
-        const data = await clinicScheduleManagementService.deleteClosure(id);
-        return sendSuccess(res, 200, data, "Xóa ngày nghỉ thành công.");
-    } catch (err) {
-        return next(err);
-    }
-}
-
 async function getVersionById(req, res, next) {
     try {
         const { id } = req.params;
@@ -152,9 +123,6 @@ module.exports = {
     updateWorkingHours,
     saveAll,
     deleteVersion,
-    getClosures,
-    createClosure,
-    deleteClosure,
     getVersionById,
     updateEffectiveDate,
     getMinEffectiveDate,

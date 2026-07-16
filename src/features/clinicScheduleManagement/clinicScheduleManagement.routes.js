@@ -53,27 +53,6 @@ router.get(
     clinicScheduleManagementController.getMinEffectiveDate,
 );
 
-router.get(
-    "/closures",
-    authMiddleware,
-    requireRole("owner"),
-    clinicScheduleManagementController.getClosures,
-);
-
-router.post(
-    "/closures",
-    authMiddleware,
-    requireRole("owner"),
-    clinicScheduleManagementController.createClosure,
-);
-
-router.delete(
-    "/closures/:id",
-    authMiddleware,
-    requireRole("owner"),
-    clinicScheduleManagementController.deleteClosure,
-);
-
 router.post(
     "/versions-with-hours",
     authMiddleware,

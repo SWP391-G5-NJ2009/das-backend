@@ -173,45 +173,6 @@ async function replaceTimeSlotConfigs(versionId, configs) {
     return data || [];
 }
 
-async function getClosures() {
-    const { data, error } = await supabase
-        .from("clinic_closure")
-        .select("*")
-        .order("closure_date");
-
-    if (error) throw new AppError(error.message, 500, "DB_ERROR");
-    return data || [];
-}
-
-async function createClosure(closureDate, reason) {
-    const { data, error } = await supabase
-        .from("clinic_closure")
-        .insert({ closure_date: closureDate, reason: reason || null })
-        .select()
-        .single();
-
-    if (error) {
-        if (error.code === "23505") {
-            throw new AppError("Ngày này đã được đánh dấu là ngày nghỉ.", 409, "DUPLICATE_CLOSURE");
-        }
-        throw new AppError(error.message, 500, "DB_ERROR");
-    }
-    return data;
-}
-
-async function deleteClosure(closureId) {
-    const { data, error } = await supabase
-        .from("clinic_closure")
-        .delete()
-        .eq("closure_id", closureId)
-        .select()
-        .single();
-
-    if (error) throw new AppError(error.message, 500, "DB_ERROR");
-    if (!data) throw new AppError("Không tìm thấy ngày nghỉ.", 404, "NOT_FOUND");
-    return data;
-}
-
 async function countBookedWorkSlots() {
     const { count, error } = await supabase
         .from("work_slot")
@@ -416,9 +377,6 @@ module.exports = {
     replaceWorkingHours,
     getTimeSlotConfigsByVersionId,
     replaceTimeSlotConfigs,
-    getClosures,
-    createClosure,
-    deleteClosure,
     countBookedWorkSlots,
     getLastBookedSlotDate,
     findConflictingAppointments,
