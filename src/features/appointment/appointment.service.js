@@ -19,7 +19,7 @@ async function bookAppointment({
   }
   if (!resolvedPatientId) {
     throw new AppError(
-      "Patient ID could not be resolved.",
+      "Không thể xác định bệnh nhân.",
       400,
       "VALIDATION_ERROR",
     );
@@ -30,10 +30,10 @@ async function bookAppointment({
     const patientInfo = await patientDao.findPatientById(resolvedPatientId);
     if (patientInfo.no_show_count >= 3) {
       throw new AppError(
-        "Your account has been restricted from booking appointments online due to 3 or more no-shows. " +
-          "Please contact the clinic directly for assistance.",
+        "Tài khoản của bạn đã bị hạn chế đặt lịch trực tuyến do vắng mặt từ 3 lần trở lên. " +
+          "Vui lòng liên hệ trực tiếp với phòng khám để được hỗ trợ.",
         403,
-        "BOThành côngING_BANNED_NO_SHOW",
+        "BOOKING_BANNED_NO_SHOW",
       );
     }
   }
@@ -58,7 +58,7 @@ async function bookAppointment({
     // Block everyone: slot start time has already passed
     if (diffMs <= 0) {
       throw new AppError(
-        "This time slot has already passed and can no longer be booked.",
+        "Khung giờ này đã qua và không thể đặt lịch nữa.",
         400,
         "SLOT_PAST",
       );
@@ -67,7 +67,7 @@ async function bookAppointment({
     // Block patients only: slot starts within 30 minutes
     if (actorRole === "patient" && diffMs < 30 * 60 * 1000) {
       throw new AppError(
-        "Appointments must be booked at least 30 minutes in advance.",
+        "Lịch hẹn phải được đặt trước ít nhất 30 phút.",
         400,
         "SLOT_TOO_SOON",
       );
@@ -83,11 +83,11 @@ async function bookAppointment({
     );
     if (conflict) {
       throw new AppError(
-        "You already have an active appointment for this service " +
-          `(current status: ${conflict.status}). ` +
-          "Please wait until it is completed, cancelled, or resolved before booking again.",
+        "Bạn đã có một lịch hẹn đang hoạt động cho dịch vụ này " +
+          `(trạng thái hiện tại: ${conflict.status}). ` +
+          "Vui lòng chờ đến khi lịch hẹn đủ điều kiện trước khi đặt lịch mới.",
         409,
-        "DUPLICATE_SERVICE_BOThành côngING",
+        "DUPLICATE_SERVICE_BOOKING",
       );
     }
   }
@@ -101,7 +101,7 @@ async function bookAppointment({
     const claimedSlot = await appointmentDao.markSlotBooked(slotId);
     if (!claimedSlot) {
       throw new AppError(
-        "This time slot has just been booked by another user. Please select a different slot.",
+        "Khung giờ này vừa được đặt bởi người khác. Vui lòng chọn khung giờ khác.",
         409,
         "SLOT_TAKEN",
       );
@@ -116,7 +116,7 @@ async function bookAppointment({
 
     if (consecutiveSlots.length < normalizedSlotCount) {
       throw new AppError(
-        `This service requires ${normalizedSlotCount} consecutive time slots, but only ${consecutiveSlots.length} slots are available at the end of this schedule. Please choose an earlier time.`,
+        `Dịch vụ này yêu cầu ${normalizedSlotCount} khung giờ liên tiếp, nhưng chỉ cón ${consecutiveSlots.length} khung giờ trống ở cuối lịch này. Vui lòng chọn giờ sớm hơn.`,
         409,
         "INSUFFICIENT_CONSECUTIVE_SLOTS",
       );
@@ -128,7 +128,7 @@ async function bookAppointment({
     );
     if (unavailable.length > 0) {
       throw new AppError(
-        "One or more required consecutive time slots are not available. Please choose a different start time.",
+        "Một hoặc nhiều khung giờ liên tiếp cần thiết không còn trống. Vui lòng chọn giờ bắt đầu khác.",
         409,
         "SLOT_TAKEN",
       );
@@ -140,7 +140,7 @@ async function bookAppointment({
       await appointmentDao.markMultipleSlotsBooked(slotIdsToClaim);
     if (!claimedIds) {
       throw new AppError(
-        "One or more required time slots were just booked by another user. Please select a different start time.",
+        "Một hoặc nhiều khung giờ liên tiếp vừa bị đặt bởi người khác. Vui lòng chọn giờ bắt đầu khác.",
         409,
         "SLOT_TAKEN",
       );
@@ -271,6 +271,7 @@ function applyClientFilters(list, filters) {
   return result;
 }
 
+
 async function getMyAppointments(patientId, filters = {}) {
   const { data, error } = await appointmentDao.findByPatientId(
     patientId,
@@ -313,7 +314,7 @@ async function cancelAppointment(
 
   if (!CANCELLABLE_STATUSES.includes(existing.status)) {
     throw new AppError(
-      `Cannot cancel an appointment with status "${existing.status}".`,
+      `Không thể hủy lịch hẹn có trạng thái "${existing.status}".`,
       400,
       "INVALID_STATUS_TRANSITION",
     );
@@ -335,7 +336,7 @@ async function cancelAppointment(
           const diffMs = slotDateTime.getTime() - Date.now();
           if (diffMs < 24 * 60 * 60 * 1000) {
             throw new AppError(
-              "Appointments can only be cancelled at least 24 hours before the scheduled time. Please contact the receptionist directly for assistance.",
+              "Chỉ có thể hủy lịch hẹn trước ít nhất 24 giờ so với giờ đã đặt. Vui lòng liên hệ trực tiếp với lễ tân để được hỗ trợ.",
               400,
               "CANCEL_TOO_LATE",
             );

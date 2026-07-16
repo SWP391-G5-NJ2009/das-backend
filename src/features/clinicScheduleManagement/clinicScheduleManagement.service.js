@@ -1,5 +1,6 @@
 const clinicScheduleManagementDao = require("./clinicScheduleManagement.dao");
 const AppError = require("../../utils/AppError");
+const { todayVietnam } = require("../../utils/dateUtils");
 
 const SLOT_DURATION_MINUTES = 30;
 
@@ -185,17 +186,41 @@ async function generateTimeSlotConfigs(versionId, hours, slotDurationMinutes) {
     return clinicScheduleManagementDao.replaceTimeSlotConfigs(versionId, configs);
 }
 
-async function saveAll(versionId, hours, force = false) {
-    if (!force && hours && hours.length > 0) {
-        const conflicting =
-            await clinicScheduleManagementDao.findConflictingAppointments(hours);
-        if (conflicting.length > 0) {
-            throw new AppError(
-                `${conflicting.length} appointment(s) will be affected by this schedule change.`,
-                409,
-                "CONFLICT_DETECTED",
-                { affected: conflicting },
-            );
+async function saveAll(versionId, hours, { force = false } = {}) {
+    let conflicts = [];
+
+    const version = await clinicScheduleManagementDao.getVersionById(versionId);
+
+    const today = todayVietnam();
+    if (version && version.effective_date <= today) {
+        const counts = await clinicScheduleManagementDao.getWorkSlotCountsByVersionIds([versionId]);
+        const hasWorkSlots = (counts[versionId] || 0) > 0;
+
+        if (hasWorkSlots) {
+            if (hours && hours.length > 0) {
+                conflicts = await clinicScheduleManagementDao.findConflictingAppointments(hours);
+            }
+            return {
+                success: false,
+                conflicts,
+                message: `${conflicts.length} appointment(s) will be affected by this schedule change.`,
+            };
+        }
+    }
+
+    if (hours && hours.length > 0) {
+        conflicts = await clinicScheduleManagementDao.findConflictingAppointments(hours);
+
+        if (!force && conflicts.length > 0) {
+            return {
+                success: false,
+                conflicts,
+                message: `${conflicts.length} appointment(s) will be affected by this schedule change.`,
+            };
+        }
+
+        if (force && conflicts.length > 0) {
+            await markAppointmentsConflict(conflicts);
         }
     }
 
@@ -205,18 +230,7 @@ async function saveAll(versionId, hours, force = false) {
         await generateTimeSlotConfigs(versionId, hours, SLOT_DURATION_MINUTES);
     }
 
-    if (force && hours && hours.length > 0) {
-        const conflicting =
-            await clinicScheduleManagementDao.findConflictingAppointments(hours);
-        if (conflicting.length > 0) {
-            const slotIds = conflicting.map((c) => c.slot_id);
-            await clinicScheduleManagementDao.markSlotsAsUnavailable(slotIds);
-        }
-    }
-}
-
-async function cancelPendingVersion() {
-    return clinicScheduleManagementDao.deletePendingVersions();
+    return { success: true, conflicts: [] };
 }
 
 async function deleteVersion(versionId) {
@@ -302,28 +316,69 @@ async function getMinEffectiveDate() {
         const parts = lastBookedDate.split("-").map(Number);
         const d = new Date(parts[0], parts[1] - 1, parts[2] + 1);
         const bookedMin = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        minDate = bookedMin > todayStr() ? bookedMin : todayStr();
+        minDate = bookedMin > todayVietnam() ? bookedMin : todayVietnam();
     } else {
-        minDate = todayStr();
+        minDate = todayVietnam();
     }
 
     return { minEffectiveDate: minDate, lastBookedDate };
 }
 
+async function markAppointmentsConflict(conflicts) {
+    if (!conflicts || conflicts.length === 0) return;
+
+    const slotIds = conflicts.map((c) => c.slot_id).filter(Boolean);
+    if (slotIds.length === 0) return;
+
+    const result = await clinicScheduleManagementDao.markAppointmentsConflictBySlotIds(slotIds);
+    return result;
+}
+
+async function createVersionWithHours(name, effectiveDate, hours) {
+    let dateStr;
+    if (effectiveDate) {
+        dateStr = typeof effectiveDate === "string"
+            ? effectiveDate
+            : `${effectiveDate.getFullYear()}-${String(effectiveDate.getMonth() + 1).padStart(2, "0")}-${String(effectiveDate.getDate()).padStart(2, "0")}`;
+    } else {
+        const min = await getMinEffectiveDate();
+        dateStr = min.minEffectiveDate;
+    }
+
+    if (dateStr < todayVietnam()) {
+        throw new AppError("Effective date cannot be in the past.", 400, "INVALID_DATE");
+    }
+
+    const duplicate = await clinicScheduleManagementDao.findVersionByEffectiveDate(dateStr);
+    if (duplicate) {
+        throw new AppError(
+            `A version (ID: ${duplicate.version_id}) already has the effective date ${dateStr}.`,
+            409,
+            "DUPLICATE_DATE",
+        );
+    }
+
+    const version = await clinicScheduleManagementDao.createVersion(name || null, dateStr);
+
+    if (hours && hours.length > 0) {
+        await clinicScheduleManagementDao.insertWorkingHours(version.version_id, hours);
+        await generateTimeSlotConfigs(version.version_id, hours, SLOT_DURATION_MINUTES);
+    }
+
+    return { version };
+}
+
 module.exports = {
-    createVersion,
-    activatePendingVersion,
-    getAllVersions,
     getWorkingHour,
     saveWorkingHours,
     saveAll,
-    cancelPendingVersion,
     deleteVersion,
-    activateDueVersions,
     getClosures,
     createClosure,
     deleteClosure,
     getVersionById,
     updateEffectiveDate,
     getMinEffectiveDate,
+    markAppointmentsConflict,
+    createVersionWithHours,
 };

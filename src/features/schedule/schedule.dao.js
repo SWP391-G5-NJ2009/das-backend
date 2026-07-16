@@ -2,16 +2,9 @@ const supabase = require("../../config/supabase");
 
 const SCHEDULE_SELECT = `
   schedule_id,
-  room_id,
   dentist_id,
   work_date,
   status,
-  room_info:room_id (
-    room_id,
-    room_name,
-    specialization,
-    status
-  ),
   dentist:dentist_id (
     dentist_id,
     full_name,

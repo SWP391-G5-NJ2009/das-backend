@@ -137,19 +137,26 @@ async function getMinEffectiveDate(req, res, next) {
     }
 }
 
+async function createVersionWithHours(req, res, next) {
+    try {
+        const { name, effectiveDate, hours } = req.body;
+        const data = await clinicScheduleManagementService.createVersionWithHours(name, effectiveDate, hours);
+        return sendSuccess(res, 201, data, "Tạo phiên bản với giờ làm việc thành công.");
+    } catch (err) {
+        return next(err);
+    }
+}
+
 module.exports = {
-    createVersion,
-    getVersions,
     getWorkingHour,
     updateWorkingHours,
     saveAll,
-    cancelPending,
     deleteVersion,
-    activateVersion,
     getClosures,
     createClosure,
     deleteClosure,
     getVersionById,
     updateEffectiveDate,
     getMinEffectiveDate,
+    createVersionWithHours,
 };
