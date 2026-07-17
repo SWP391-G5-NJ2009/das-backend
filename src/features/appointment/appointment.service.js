@@ -235,6 +235,8 @@ function normalize(row) {
     notes: row.note || "",
     bookTime: row.book_time,
     totalEstimatedAmount: row.total_estimated_amount || null,
+    roomId: dentist?.room_info?.[0]?.room_id || null,
+    roomName: dentist?.room_info?.[0]?.room_name || null,
     treatmentRecord: row.treatment_record?.[0] || null,
     invoice: row.invoice?.[0] || null,
   };

@@ -24,7 +24,11 @@ const APPOINTMENT_SELECT = `
           dentist_id,
           full_name,
           speciality,
-          experience
+          experience,
+          room_info (
+            room_id,
+            room_name
+          )
         )
       )
     )
