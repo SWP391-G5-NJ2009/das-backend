@@ -8,7 +8,7 @@ const router = express.Router();
 router.get(
   "/",
   authMiddleware,
-  requireRole("owner", "receptionist"),
+  requireRole("owner"),
   roomController.getAllRooms,
 );
 

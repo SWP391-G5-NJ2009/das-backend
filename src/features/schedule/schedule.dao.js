@@ -83,7 +83,7 @@ function findClinicInfo() {
 function findAvailableRooms() {
   return supabase
     .from("room_info")
-    .select("room_id, room_name, specialization, status")
+    .select("room_id, room_name, dentist_id, status")
     .in("status", ["Available", "Active"])
     .order("room_name", { ascending: true });
 }
