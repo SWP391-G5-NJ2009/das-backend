@@ -38,7 +38,7 @@ async function createDentistProfile(req, res, next) {
 async function getAvailableStaffAccounts(req, res, next) {
     try {
         const data = await staffService.getAvailableStaffAccounts();
-        return sendSuccess(res, 200, data, "Lấy danh sách tài khoản nhân viên khả dụng thành công.");
+        return sendSuccess(res, 200, data, "Lấy danh sách tài khoản nhân viên thành công.");
     } catch (error) { return next(error); }
 }
 
@@ -63,7 +63,7 @@ async function updateReceptionistProfile(req, res, next) {
     try {
         const payload = validateUpdateReceptionistProfile(req.body);
         const data = await staffService.updateReceptionistProfile(req.params.id, payload);
-        return sendSuccess(res, 200, data, "Cáº­p nháº­t há»“ sÆ¡ lá»… tĂ¢n thĂ nh cĂ´ng.");
+        return sendSuccess(res, 200, data, "Cập nhật hồ sơ lễ tân thành công.");
     } catch (error) {
         return next(error);
     }
