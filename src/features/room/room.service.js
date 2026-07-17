@@ -1,10 +1,10 @@
 const roomDao = require("./room.dao");
 const AppError = require("../../utils/AppError");
 
-function mapRoomPayload({ room_name, specialization, status }) {
+function mapRoomPayload({ room_name, dentist_id, status }) {
   return {
     room_name,
-    specialization: specialization || null,
+    dentist_id: dentist_id ? Number(dentist_id) : null,
     status: status || "Available",
   };
 }
