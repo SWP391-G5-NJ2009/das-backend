@@ -83,6 +83,40 @@ async function getPublicClinicInfo() {
   return serializeClinicInfo(row || {});
 }
 
+async function updateClinicInfo(payload) {
+  const { data: currentData, error: findError } =
+    await clinicInfoDao.findClinicInfo();
+
+  if (findError) {
+    throw new AppError(findError.message, 500, "DB_ERROR");
+  }
+
+  const current = Array.isArray(currentData) ? currentData[0] : currentData;
+  if (!current) {
+    throw new AppError(
+      "Không tìm thấy thông tin phòng khám.",
+      404,
+      "CLINIC_INFO_NOT_FOUND",
+    );
+  }
+
+  const { data, error } = await clinicInfoDao.updateClinicInfo(
+    current.clinic_id,
+    {
+      name: payload.clinicName,
+      address: payload.address,
+      hotline: payload.hotline,
+    },
+  );
+
+  if (error) {
+    throw new AppError(error.message, 500, "DB_ERROR");
+  }
+
+  return serializeClinicInfo(data);
+}
+
 module.exports = {
   getPublicClinicInfo,
+  updateClinicInfo,
 };
