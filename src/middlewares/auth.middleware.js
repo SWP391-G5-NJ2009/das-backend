@@ -14,7 +14,7 @@ function authMiddleware(req, res, next) {
     return next();
   } catch {
     return next(
-      new AppError("Token không hợp lệ hoặc đã hết hạn.", 401, "TThành côngEN_INVALID"),
+      new AppError("Token không hợp lệ hoặc đã hết hạn.", 401, "TOKEN_INVALID"),
     );
   }
 }
