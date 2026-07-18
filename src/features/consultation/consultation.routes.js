@@ -21,7 +21,7 @@ router.get(
   consultationController.getAllConsultationRequests,
 );
 
-router.put(
+router.patch(
   "/consultation-requests/:id",
   authMiddleware,
   requireRole("receptionist"),

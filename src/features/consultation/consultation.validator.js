@@ -8,10 +8,10 @@ const createConsultationSchema = Joi.object({
     "string.max": "Họ và tên không được vượt quá 100 ký tự.",
     "any.required": "Họ và tên là bắt buộc.",
   }),
-  phone: Joi.string().trim().min(10).max(11).required().messages({
+  phone: Joi.string().trim().min(7).max(15).required().messages({
     "string.empty": "Số điện thoại không được để trống.", 
-    "string.min": "Số điện thoại phải có ít nhất 10 chữ số.",
-    "string.max": "Số điện thoại không được vượt quá 11 chữ số.",
+    "string.min": "Số điện thoại phải có ít nhất 7 chữ số.",
+    "string.max": "Số điện thoại không được vượt quá 15 chữ số.",
     "any.required": "Số điện thoại là bắt buộc.",
   }),
   email: Joi.string().trim().email().max(254).allow("", null).messages({

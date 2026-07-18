@@ -21,10 +21,7 @@ async function findAllAccounts(filters = {}) {
 
   if (filters.date) {
     const start = new Date(filters.date);
-    //const end = new Date(start);
     query = query.gte("created_date", start.toISOString());
-    // .lt("created_at", end.toISOString());
-
   }
 
   return query;
@@ -66,7 +63,7 @@ async function findRoleByName(roleName) {
 async function insertAccount(account) {
   return supabase
     .from("account")
-    .insert(account)
+    .insert(account, status = "active")
     .select("account_id, email, username, status, created_date, role(role_name)")
     .single();
 }
