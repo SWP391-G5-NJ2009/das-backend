@@ -37,6 +37,22 @@ async function ensureUsernameAvailable(username, accountId = null) {
   }
 }
 
+async function ensureEmailAvailable(email, accountId = null) {
+  const lookup = accountId
+    ? accountDao.findAccountByEmailExcept(email, accountId)
+    : accountDao.findAccountByEmail(email);
+  const { data, error } = await lookup;
+
+  if (error) {
+    logger.error("Failed to check email availability", error);
+    throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
+  }
+
+  if (data) {
+    throw new AppError("Email đã tồn tại.", 409, "DUPLICATE_EMAIL");
+  }
+}
+
 async function getRoleId(roleName) {
   const { data: role, error } = await accountDao.findRoleByName(roleName);
 
@@ -61,13 +77,16 @@ async function createAccount({
   role_name,
 }) {
   await ensureUsernameAvailable(username);
+  if (email) {
+    await ensureEmailAvailable(email);
+  }
 
   const role_id = await getRoleId(role_name);
   const password_hash = await hashPassword(password);
   const { data, error } = await accountDao.insertAccount({
     username,
-    email,
-    phone,
+    email: email || null,
+    phone: phone || null,
     password_hash,
     role_id,
     status: "Active",
