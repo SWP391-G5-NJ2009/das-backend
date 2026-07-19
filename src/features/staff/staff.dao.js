@@ -93,6 +93,10 @@ async function createDentistProfile(payload) {
     .single();
 }
 
+async function deleteDentistProfile(dentistId) {
+  return supabase.from("dentist").delete().eq("dentist_id", dentistId);
+}
+
 async function createReceptionistProfile(payload) {
   return supabase
     .from("receptionist")
@@ -182,6 +186,7 @@ async function findRepceptionistByAccountIds(accountIds) {
 
 module.exports = {
   createDentistProfile,
+  deleteDentistProfile,
   createReceptionistProfile,
   createDentistServices,
   deleteDentistServices,

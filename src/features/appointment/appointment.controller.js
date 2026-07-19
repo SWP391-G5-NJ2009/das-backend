@@ -101,9 +101,31 @@ async function bookAppointment(req, res, next) {
   }
 }
 
+async function checkInAppointment(req, res, next) {
+  try {
+    const apptId = parseInt(req.params.id, 10);
+    const data = await appointmentService.checkInAppointment(apptId);
+    return sendSuccess(res, 200, data, "Check-in bệnh nhân thành công.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function startTreatment(req, res, next) {
+  try {
+    const apptId = parseInt(req.params.id, 10);
+    const data = await appointmentService.startTreatment(apptId, req.user.profileId);
+    return sendSuccess(res, 200, data, "Bắt đầu điều trị thành công.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
   bookAppointment,
   cancelAppointment,
+  checkInAppointment,
   getAllAppointments,
   getMyAppointments,
+  startTreatment,
 };

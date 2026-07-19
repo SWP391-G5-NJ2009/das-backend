@@ -114,6 +114,60 @@ async function cancelById(apptId, actorAccountId, reason) {
   return data;
 }
 
+async function checkInById(apptId, expectedStatus = "Confirmed") {
+  const { data, error } = await supabase
+    .from("appointment")
+    .update({ status: "Checked-in" })
+    .eq("appt_id", apptId)
+    .eq("status", expectedStatus)
+    .select("appt_id, status")
+    .maybeSingle();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return data;
+}
+
+async function reconcileNoShowAfterCheckIn(patientId) {
+  const { data: patient, error: readError } = await supabase
+    .from("patient")
+    .select("patient_id, account_id, no_show_count")
+    .eq("patient_id", patientId)
+    .maybeSingle();
+  if (readError) throw new AppError(readError.message, 500, "DB_ERROR");
+  if (!patient) return;
+
+  const currentCount = Number(patient.no_show_count || 0);
+  const nextCount = Math.max(0, currentCount - 1);
+  const { error: updateError } = await supabase
+    .from("patient")
+    .update({ no_show_count: nextCount })
+    .eq("patient_id", patientId)
+    .eq("no_show_count", currentCount);
+  if (updateError) throw new AppError(updateError.message, 500, "DB_ERROR");
+
+  if (patient.account_id && nextCount < 3) {
+    const { error: accountError } = await supabase
+      .from("account")
+      .update({ status: "Active" })
+      .eq("account_id", patient.account_id)
+      .eq("status", "Restricted");
+    if (accountError) throw new AppError(accountError.message, 500, "DB_ERROR");
+  }
+}
+
+async function startTreatmentById(apptId) {
+  const { data, error } = await supabase
+    .from("appointment")
+    .update({ status: "In-Treatment" })
+    .eq("appt_id", apptId)
+    .eq("status", "Checked-in")
+    .select("appt_id, status")
+    .maybeSingle();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return data;
+}
+
 async function markSlotBooked(slotId) {
   const { data, error } = await supabase
     .from("work_slot")
@@ -473,6 +527,7 @@ async function incrementNoShowCount(patientIds) {
 
 module.exports = {
   cancelById,
+  checkInById,
   createAppointment,
   findAll,
   findById,
@@ -491,6 +546,8 @@ module.exports = {
   markNoShowSlotAvailable: releaseSlot,
   markOverdueAsNoShow,
   markSlotBooked,
+  reconcileNoShowAfterCheckIn,
   releaseSlot,
   releaseSlotsByIds,
+  startTreatmentById,
 };

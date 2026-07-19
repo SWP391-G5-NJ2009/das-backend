@@ -47,13 +47,20 @@ function normalizeProfile(row) {
 }
 
 function normalizeTreatment(row) {
-  const schedule = row.work_slot?.schedules;
+  const primarySlotEntry = (row.appointment_slot || []).find(
+    (entry) => entry.is_primary,
+  );
+  const workSlot = primarySlotEntry?.work_slot;
+  const schedule = workSlot?.schedules;
   const dentist = schedule?.dentist;
   const services = row.appointment_service || [];
   const invoice = Array.isArray(row.invoice) ? row.invoice[0] : row.invoice;
   const treatment = Array.isArray(row.treatment_record)
     ? row.treatment_record[0]
     : row.treatment_record;
+  const prescription = Array.isArray(treatment?.prescription)
+    ? treatment.prescription[0]
+    : treatment?.prescription;
   const servicesTotal = services.reduce(
     (sum, service) => sum + Number(service.actual_price || 0),
     0,
@@ -68,8 +75,8 @@ function normalizeTreatment(row) {
     id: String(treatment?.record_id || row.appt_id),
     appointmentId: row.appt_id,
     date: schedule?.work_date || row.book_time?.slice(0, 10) || "",
-    startTime: row.work_slot?.slot_config?.start_time?.substring(0, 5) || "",
-    endTime: row.work_slot?.slot_config?.end_time?.substring(0, 5) || "",
+    startTime: workSlot?.slot_config?.start_time?.substring(0, 5) || "",
+    endTime: workSlot?.slot_config?.end_time?.substring(0, 5) || "",
     treatment:
       services
         .map((service) => service.dental_service?.service_name)
@@ -77,10 +84,16 @@ function normalizeTreatment(row) {
         .join(", ") || "Điều trị nha khoa",
     diagnosis: treatment?.diagnosis || "",
     treatmentNote: treatment?.treatment_note || "",
+    prescriptionNote: prescription?.note || "",
+    medicines: (prescription?.prescription_detail || []).map((detail) => ({
+      id: detail.medicine?.medicine_id || null,
+      name: detail.medicine?.name || "Thuốc chưa cập nhật",
+      dosage: detail.dosage || "",
+    })),
     notes: treatment?.treatment_note || "",
     appointmentNote: row.note || "",
     dentist: dentist
-      ? `BS. ${dentist.account?.username || dentist.account?.email || "Nha sĩ"}`
+      ? `BS. ${dentist.full_name || "Nha sĩ"}`
       : "",
     cost: totalAmount,
     status: row.status,
@@ -90,7 +103,10 @@ function normalizeTreatment(row) {
 }
 
 function getTreatmentDentistId(row) {
-  return row.work_slot?.schedules?.dentist?.dentist_id || null;
+  const primarySlotEntry = (row.appointment_slot || []).find(
+    (entry) => entry.is_primary,
+  );
+  return primarySlotEntry?.work_slot?.schedules?.dentist?.dentist_id || null;
 }
 
 function filterTreatmentHistoryByActor(

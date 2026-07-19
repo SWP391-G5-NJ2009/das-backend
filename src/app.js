@@ -20,6 +20,7 @@ const clinicScheduleManagementRoutes = require("./features/clinicScheduleManagem
 const scheduleRoutes = require("./features/schedule/schedule.routes");
 const appointmentDashboardRoutes = require("./features/appointmentDashboard/appointmentDashboard.routes");
 const staffRoutes = require("./features/staff/staff.routes");
+const treatmentRoutes = require("./features/treatment/treatment.routes");
 const {
   errorMiddleware,
   notFoundMiddleware,
@@ -73,6 +74,7 @@ app.use("/api/schedule/management", clinicScheduleManagementRoutes);
 app.use("/api/schedules", scheduleRoutes);
 app.use("/api/owner/appointment-dashboard", appointmentDashboardRoutes);
 app.use("/api/staff", staffRoutes);
+app.use("/api/treatments", treatmentRoutes);
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 

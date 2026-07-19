@@ -20,6 +20,11 @@ const createStaffProfileSchema = Joi.object({
   address: Joi.string().trim().min(1).max(255).required(),
   speciality: Joi.when("role", { is: "dentist", then: Joi.string().trim().min(1).max(150).required(), otherwise: Joi.forbidden() }),
   experience: Joi.when("role", { is: "dentist", then: Joi.string().trim().min(1).max(255).required(), otherwise: Joi.forbidden() }),
+  serviceIds: Joi.when("role", {
+    is: "dentist",
+    then: Joi.array().items(Joi.string().trim().required()).min(1).unique().required(),
+    otherwise: Joi.forbidden(),
+  }),
 });
 
 const updateDentistProfileSchema = Joi.object({

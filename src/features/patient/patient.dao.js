@@ -57,16 +57,19 @@ const TREATMENT_HISTORY_SELECT = `
   status,
   note,
   total_estimated_amount,
-  work_slot:slot_id (
-    slot_config:slot_config_id (
-      start_time,
-      end_time
-    ),
-    schedules:schedule_id (
-      work_date,
-      dentist:dentist_id (
-        dentist_id,
-        full_name
+  appointment_slot (
+    is_primary,
+    work_slot:slot_id (
+      slot_config:slot_config_id (
+        start_time,
+        end_time
+      ),
+      schedules:schedule_id (
+        work_date,
+        dentist:dentist_id (
+          dentist_id,
+          full_name
+        )
       )
     )
   ),
@@ -79,7 +82,18 @@ const TREATMENT_HISTORY_SELECT = `
   treatment_record!inner (
     record_id,
     treatment_note,
-    diagnosis
+    diagnosis,
+    prescription (
+      prescription_id,
+      note,
+      prescription_detail (
+        dosage,
+        medicine:medicine_id (
+          medicine_id,
+          name
+        )
+      )
+    )
   ),
   invoice (
     total_amount,
