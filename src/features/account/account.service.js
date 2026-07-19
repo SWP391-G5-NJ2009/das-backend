@@ -33,7 +33,7 @@ async function ensureUsernameAvailable(username, accountId = null) {
   }
 
   if (data) {
-    throw new AppError("Tên đăng nhập đã tồn tại.", 409, "DUPLICATE_USERNAME");
+    throw new AppError("Tên đăng nhập đã được sử dụng.", 409, "DUPLICATE_USERNAME");
   }
 }
 
@@ -49,7 +49,7 @@ async function ensureEmailAvailable(email, accountId = null) {
   }
 
   if (data) {
-    throw new AppError("Email đã tồn tại.", 409, "DUPLICATE_EMAIL");
+    throw new AppError("Email đã được sử dụng.", 409, "DUPLICATE_EMAIL");
   }
 }
 
