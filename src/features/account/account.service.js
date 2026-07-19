@@ -1,4 +1,5 @@
 const accountDao = require("./account.dao");
+const logger = require("../../utils/logger");
 const AppError = require("../../utils/AppError");
 const { hashPassword } = require("../../utils/password");
 
@@ -13,7 +14,8 @@ async function getAllAccounts(filters = {}) {
   const { data, error, count } = await accountDao.findAllAccounts(queryFilters);
 
   if (error) {
-    throw new AppError(error.message, 500, "DB_ERROR");
+    logger.error("Failed to retrieve accounts", error);
+    throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
   return { items: data || [], total: count || 0 };
@@ -23,9 +25,14 @@ async function ensureUsernameAvailable(username, accountId = null) {
   const lookup = accountId
     ? accountDao.findAccountByUsernameExcept(username, accountId)
     : accountDao.findAccountByUsername(username);
-  const { data: existing } = await lookup;
+  const { data, error } = await lookup;
 
-  if (existing) {
+  if (error) {
+    logger.error("Failed to check username availability", error);
+    throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
+  }
+
+  if (data) {
     throw new AppError("Tên đăng nhập đã tồn tại.", 409, "DUPLICATE_USERNAME");
   }
 }
@@ -33,8 +40,14 @@ async function ensureUsernameAvailable(username, accountId = null) {
 async function getRoleId(roleName) {
   const { data: role, error } = await accountDao.findRoleByName(roleName);
 
-  if (error || !role) {
-    throw new AppError(`Role '${roleName}' not found.`, 400, "INVALID_ROLE");
+  if (error) {
+    logger.error("Failed to retrieve role name", error);
+    throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
+  }
+
+  if (!role) {
+    logger.error(`Role '${roleName}' not found`);
+    throw new AppError("Đã xảy ra lỗi khi tìm vai trò", 400, "INVALID_ROLE");
   }
 
   return role.role_id;
@@ -46,7 +59,6 @@ async function createAccount({
   phone,
   password,
   role_name,
-  status,
 }) {
   await ensureUsernameAvailable(username);
 
@@ -58,11 +70,12 @@ async function createAccount({
     phone,
     password_hash,
     role_id,
-    status: status || "Active",
+    status: "Active",
   });
 
   if (error) {
-    throw new AppError(error.message, 500, "DB_ERROR");
+    logger.error("Failed to insert account", error);
+    throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
   return data;
@@ -101,7 +114,8 @@ async function updateAccount(
   );
 
   if (error) {
-    throw new AppError(error.message, 500, "DB_ERROR");
+    logger.error("Failed to update account", error);
+    throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
   return data;
@@ -117,7 +131,8 @@ async function deleteAccount(accountId) {
   const { error } = await accountDao.deleteAccount(accountId);
 
   if (error) {
-    throw new AppError(error.message, 500, "DB_ERROR");
+    logger.error("Failed to delete accounts", error);
+    throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
   return { account_id: accountId };

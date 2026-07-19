@@ -63,7 +63,7 @@ async function findRoleByName(roleName) {
 async function insertAccount(account) {
   return supabase
     .from("account")
-    .insert(account, status = "active")
+    .insert(account)
     .select("account_id, email, username, status, created_date, role(role_name)")
     .single();
 }

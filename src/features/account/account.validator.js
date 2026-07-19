@@ -1,24 +1,25 @@
 const Joi = require("joi");
-const { validate } = require("../../utils/validation");
+const { validateDetails } = require("../../utils/validation");
 
 const createAccountSchema = Joi.object({
-  username: Joi.string().trim().min(2).max(254).required().messages({
+  username: Joi.string().trim().min(2).max(100).required().messages({
     "string.empty": "Tên người dùng không được để trống.",
     "string.min": "Tên người dùng cần ít nhất 2 kí tự.",
-    "string.max": "Tên người dùng không được vượt quá 254 kí tự.",
+    "string.max": "Tên người dùng không được vượt quá 100 kí tự.",
     "any.required": "Tên người dùng là bắt buộc.",
   }),
   email: Joi.string().trim().email().max(254).allow("", null).messages({
     "string.max": "Email không được vượt quá 254 kí tự.",
+    "string.email": "Email không hợp lệ.",
   }),
-  phone: Joi.string().trim().min(7).max(15).allow("", null).messages({
-    "string.min": "Số điện thoại cần ít nhất 7 chữ số.",
-    "string.max": "Số điện thoại không được vượt quá 15 chữ số.",
+  phone: Joi.string().trim().pattern(/^[0-9]{10,11}$/).allow("", null).messages({
+    "string.pattern.base": "Số điện thoại chỉ được chứa 10-11 chữ số.",
   }),
-  password: Joi.string().trim().min(8)
+  password: Joi.string().trim().min(8).max(72)
     .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).+$/)
     .required().messages({
       "string.min": "Mật khẩu cần ít nhất 8 kí tự.",
+      "string.max": "Mật khẩu không được vượt quá 72 chữ số.",
       "string.pattern.base":
         "Mật khẩu cần có ít nhất 1 kí tự in hoa, 1 kí tự in thường, 1 chữ số và 1 kí tự đặc biệt.",
       "any.required": "Mật khẩu là bắt buộc.",
@@ -47,11 +48,11 @@ const updateAccountSchema = Joi.object({
 });
 
 function validateCreateAccount(payload) {
-  return validate(createAccountSchema, payload);
+  return validateDetails(createAccountSchema, payload);
 }
 
 function validateUpdateAccount(payload) {
-  return validate(updateAccountSchema, payload);
+  return validateDetails(updateAccountSchema, payload);
 }
 
 module.exports = {
