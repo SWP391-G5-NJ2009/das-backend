@@ -2,6 +2,7 @@ const accountDao = require("./account.dao");
 const logger = require("../../utils/logger");
 const AppError = require("../../utils/AppError");
 const { hashPassword } = require("../../utils/password");
+const profileDao = require("../profile/profile.dao");
 
 async function getAllAccounts(filters = {}) {
   let queryFilters = { ...filters };
@@ -153,16 +154,49 @@ async function updateAccount(
 }
 
 async function deleteAccount(accountId) {
-  const { data: existing } = await accountDao.findAccountById(accountId);
+  const { data, error: findAccountError } = await accountDao.findAccountById(accountId);
 
-  if (!existing) {
+  if (findAccountError) {
+    logger.error("Failed to find account to delete", findAccountError);
+    throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
+  }
+
+  if (!data) {
     throw new AppError("Không tìm thấy tài khoản.", 404, "NOT_FOUND");
   }
 
-  const { error } = await accountDao.deleteAccount(accountId);
+  const ROLE_TABLE_MAP = {
+    Receptionist: "receptionist",
+    Dentist: "dentist",
+    Patient: "patient",
+    Owner: "owner",
+  };
 
-  if (error) {
-    logger.error("Failed to delete accounts", error);
+  const ROLE_DISPLAY_NAME = {
+    Receptionist: "lễ tân",
+    Dentist: "nha sĩ",
+    Patient: "bệnh nhân",
+    Owner: "chủ phòng khám"
+  };
+
+  const table = ROLE_TABLE_MAP[data.role.role_name];
+  if (table) {
+    const hasProfile = await profileDao.checkProfileExists(table, accountId);
+    if (hasProfile) {
+      throw new AppError(
+        `Đang có hồ sơ ${ROLE_DISPLAY_NAME[data.role.role_name]} liên kết tới tài khoản này.`,
+        409,
+        "ACCOUNT_HAS_LINKED_PROFILE",
+      );
+    }
+  }
+
+  await accountDao.deleteOtpTokensByAccountId(accountId);
+
+  const { error: deleteError } = await accountDao.deleteAccount(accountId);
+
+  if (deleteError) {
+    logger.error("Failed to delete account", deleteError);
     throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 

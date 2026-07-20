@@ -64,7 +64,7 @@ async function findAccountByEmailExcept(email, accountId) {
 async function findAccountById(accountId) {
   return supabase
     .from("account")
-    .select("account_id")
+    .select("account_id, role(role_name)")
     .eq("account_id", accountId)
     .single();
 }
@@ -98,8 +98,13 @@ async function deleteAccount(accountId) {
   return supabase.from("account").delete().eq("account_id", accountId);
 }
 
+async function deleteOtpTokensByAccountId(accountId) {
+  return supabase.from("otp_tokens").delete().eq("account_id", accountId);
+}
+
 module.exports = {
   deleteAccount,
+  deleteOtpTokensByAccountId,
   findAccountById,
   findAccountByUsername,
   findAccountByUsernameExcept,
