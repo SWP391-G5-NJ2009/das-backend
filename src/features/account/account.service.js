@@ -104,15 +104,27 @@ async function updateAccount(
   accountId,
   { username, email, phone, password, role_name, status },
 ) {
+
   const updateFields = {
-    ...(email !== undefined ? { email } : {}),
-    ...(phone !== undefined ? { phone } : {}),
     ...(status !== undefined ? { status } : {}),
   };
 
   if (username !== undefined) {
     await ensureUsernameAvailable(username, accountId);
     updateFields.username = username;
+  }
+
+  if (email !== undefined && email !== "") {
+    await ensureEmailAvailable(email, accountId);
+    updateFields.email = email;
+  } else {
+    updateFields.email = null;
+  }
+
+  if (phone !== undefined && phone !== "") {
+    updateFields.phone = phone;
+  } else {
+    updateFields.phone = null;
   }
 
   if (password !== undefined) {
