@@ -56,7 +56,7 @@ const updateAccountSchema = Joi.object({
     .required().messages({
       "any.required": "Vai trò là bắt buộc.",
     }),
-  status: Joi.string().trim().valid("Active", "Banned").required().messages({
+  status: Joi.string().trim().valid("Active", "Deactivated").required().messages({
     "any.required": "Vai trò là bắt buộc.",
   }),
 });
