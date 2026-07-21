@@ -521,11 +521,38 @@ async function cancelAppointment(
   return cancelled;
 }
 
+/**
+ * Returns the list of (date, startTime) pairs for all active appointments of a patient.
+ * Used by the booking UI to disable already-booked time slots.
+ */
+async function getMyBookedTimes(patientId) {
+  const { data, error } = await appointmentDao.findByPatientId(patientId);
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+
+  const ACTIVE_STATUSES = ["Confirmed", "Checked-in", "Conflict"];
+  const bookedTimes = [];
+
+  for (const appt of data || []) {
+    if (!ACTIVE_STATUSES.includes(appt.status)) continue;
+    for (const slotEntry of appt.appointment_slot || []) {
+      const slot = slotEntry.work_slot;
+      const workDate = slot?.schedules?.work_date;
+      const startTime = slot?.time_slot_config?.start_time;
+      if (workDate && startTime) {
+        bookedTimes.push({ date: workDate, startTime: startTime.slice(0, 5) });
+      }
+    }
+  }
+
+  return bookedTimes;
+}
+
 module.exports = {
   bookAppointment,
   cancelAppointment,
   checkInAppointment,
   getAll,
   getMyAppointments,
+  getMyBookedTimes,
   startTreatment,
 };
