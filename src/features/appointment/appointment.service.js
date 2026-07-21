@@ -221,6 +221,13 @@ async function checkInAppointment(apptId) {
       "CHECK_IN_DATE_EXPIRED",
     );
   }
+  if (appointmentDate > today) {
+    throw new AppError(
+      "Chỉ có thể check-in trong đúng ngày hẹn.",
+      409,
+      "CHECK_IN_DATE_NOT_REACHED",
+    );
+  }
 
   const appointment = await appointmentDao.checkInById(apptId, existing.status);
   if (!appointment) {
