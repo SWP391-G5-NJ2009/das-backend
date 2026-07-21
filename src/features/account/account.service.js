@@ -169,14 +169,12 @@ async function deleteAccount(accountId) {
     Receptionist: "receptionist",
     Dentist: "dentist",
     Patient: "patient",
-    Owner: "owner",
   };
 
   const ROLE_DISPLAY_NAME = {
     Receptionist: "lễ tân",
     Dentist: "nha sĩ",
     Patient: "bệnh nhân",
-    Owner: "chủ phòng khám"
   };
 
   const table = ROLE_TABLE_MAP[data.role.role_name];
