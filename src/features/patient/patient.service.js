@@ -58,9 +58,6 @@ function normalizeTreatment(row) {
   const treatment = Array.isArray(row.treatment_record)
     ? row.treatment_record[0]
     : row.treatment_record;
-  const prescription = Array.isArray(treatment?.prescription)
-    ? treatment.prescription[0]
-    : treatment?.prescription;
   const servicesTotal = services.reduce(
     (sum, service) => sum + Number(service.actual_price || 0),
     0,
@@ -84,12 +81,6 @@ function normalizeTreatment(row) {
         .join(", ") || "Điều trị nha khoa",
     diagnosis: treatment?.diagnosis || "",
     treatmentNote: treatment?.treatment_note || "",
-    prescriptionNote: prescription?.note || "",
-    medicines: (prescription?.prescription_detail || []).map((detail) => ({
-      id: detail.medicine?.medicine_id || null,
-      name: detail.medicine?.name || "Thuốc chưa cập nhật",
-      dosage: detail.dosage || "",
-    })),
     notes: treatment?.treatment_note || "",
     appointmentNote: row.note || "",
     dentist: dentist
