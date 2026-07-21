@@ -41,6 +41,8 @@ const bookAppointmentSchema = Joi.object({
   }),
   // Number of consecutive slots the selected service occupies (from dental_services.slot_occupied)
   slotOccupied: Joi.number().integer().min(1).allow(null).optional(),
+  // Link this appointment back to a consultation request (optional)
+  consultationRequestId: Joi.number().integer().positive().allow(null).optional(),
 });
 
 /* ──────────────────────────────────────────────────────────────────────────────

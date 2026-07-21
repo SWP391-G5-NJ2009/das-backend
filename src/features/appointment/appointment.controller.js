@@ -96,6 +96,7 @@ async function bookAppointment(req, res, next) {
       patientId: bodyPatientId,
       newPatient,
       slotOccupied,
+      consultationRequestId,
     } = validateBookAppointment(req.body);
     const { role, profileId, id: actorAccountId } = req.user;
 
@@ -123,6 +124,7 @@ async function bookAppointment(req, res, next) {
       actorAccountId,
       actorRole: role,
       slotOccupied: slotOccupied ?? 1,
+      consultationRequestId: consultationRequestId || null,
     });
     return sendSuccess(res, 201, data, "Đặt lịch hẹn thành công.");
   } catch (err) {
