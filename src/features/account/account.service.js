@@ -7,8 +7,8 @@ const profileDao = require("../profile/profile.dao");
 async function getAllAccounts(filters = {}) {
   let queryFilters = { ...filters };
 
-  if (queryFilters.status && queryFilters.status !== "All") {
-    const roleId = await getRoleId(queryFilters.status);
+  if (queryFilters.role && queryFilters.role !== "All") {
+    const roleId = await getRoleId(queryFilters.role);
     queryFilters.roleId = roleId;
   }
 

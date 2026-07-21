@@ -5,6 +5,7 @@ const { validateCreateAccount, validateUpdateAccount } = require("./account.vali
 async function getAllAccounts(req, res, next) {
   try {
     const filters = {
+      role: req.query.role || null,
       status: req.query.status || null,
       from_date: req.query.from_date || null,
       to_date: req.query.to_date || null,

@@ -14,6 +14,10 @@ async function findAllAccounts(filters = {}) {
     query = query.eq("role_id", filters.roleId);
   }
 
+  if (filters.status && filters.status !== "All") {
+    query = query.eq("status", filters.status);
+  }
+
   if (filters.search) {
     const s = `%${filters.search}%`;
     query = query.or(`username.ilike.${s},phone.ilike.${s},email.ilike.${s}`);
