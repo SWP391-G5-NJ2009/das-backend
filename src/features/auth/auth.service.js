@@ -21,7 +21,8 @@ const ROLE_PROFILE_TABLE = {
 };
 
 const STAFF_ROLES = ["receptionist", "dentist", "owner", "admin"];
-const INVALID_CREDENTIALS_MESSAGE = "Thông tin đăng nhập không hợp lệ. Vui lòng thử lại.";
+const INVALID_CREDENTIALS_MESSAGE =
+  "Thông tin đăng nhập không hợp lệ. Vui lòng thử lại.";
 const PROCESSING_ERROR_MESSAGE =
   "Không thể xử lý dữ liệu. Vui lòng thử lại sau.";
 const PASSWORD_UPDATE_ERROR_MESSAGE =
@@ -119,7 +120,8 @@ async function loginWithAccount(account, password, allowedRoles) {
   }
 
   if (!isActiveStatus(account.status)) {
-    const isRestricted = String(account.status || "").toLowerCase() === "restricted";
+    const isRestricted =
+      String(account.status || "").toLowerCase() === "restricted";
     throw new AppError(
       isRestricted
         ? "Your account has been temporarily restricted due to repeated no-shows. Please contact the clinic to lift the restriction."
@@ -183,7 +185,7 @@ async function findAccountForIdentifier(identifier) {
 
   if (!account) {
     throw new AppError(
-      "Không tìm thấy tài khoản. Please check and try again.",
+      "Không tìm thấy số điện thoại. Hãy thử lại.",
       404,
       "ACCOUNT_NOT_FOUND",
     );
@@ -281,7 +283,7 @@ async function staffForgotPassword({ username }) {
     String(account.username || "").toLowerCase() !== normalizedUsername
   ) {
     throw new AppError(
-      "Không tìm thấy tài khoản. Please check and try again.",
+      "Không tìm thấy tài khoản. Hãy thử lại.",
       404,
       "ACCOUNT_NOT_FOUND",
     );
@@ -306,7 +308,11 @@ async function getLatestValidOtp({ accountId, identifier, otp }) {
   }
 
   if (!data || !(await compareOtp(otp, data.otp_hash))) {
-    throw new AppError("OTP không hợp lệ. Vui lòng thử lại.", 400, "OTP_INVALID");
+    throw new AppError(
+      "OTP không hợp lệ. Vui lòng thử lại.",
+      400,
+      "OTP_INVALID",
+    );
   }
 
   return { account, otpToken: data };
@@ -362,7 +368,10 @@ async function changePassword({ accountId, oldPassword, newPassword }) {
   }
 
   const passwordHash = await hashPassword(newPassword);
-  const { error } = await authDao.updateAccountPassword(accountId, passwordHash);
+  const { error } = await authDao.updateAccountPassword(
+    accountId,
+    passwordHash,
+  );
 
   if (error) {
     throw passwordUpdateError();
