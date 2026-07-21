@@ -11,6 +11,7 @@ async function bookAppointment({
   actorAccountId,
   actorRole,
   slotOccupied = 1,
+  consultationRequestId = null,
 }) {
   let resolvedPatientId = patientId;
   if (!resolvedPatientId && newPatient) {
@@ -171,6 +172,9 @@ async function bookAppointment({
     status: "Confirmed",
     note: note || null,
     book_time: new Date().toISOString(),
+    ...(consultationRequestId
+      ? { consultation_request_id: consultationRequestId }
+      : {}),
   });
 
   // Step 3: Look up service price then link service to the appointment
