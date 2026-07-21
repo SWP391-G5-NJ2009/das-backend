@@ -104,7 +104,12 @@ async function createAccount({
 async function updateAccount(
   accountId,
   { username, email, phone, password, role_name, status },
+  requestingAccountId
 ) {
+  
+  if (requestingAccountId && accountId === requestingAccountId && status === "Deactivated") {
+    throw new AppError("Không thể ngừng hoạt động tài khoản của chính mình.", 409, "CANNOT_DEACTIVATE_SELF");
+  }
 
   const updateFields = {
     ...(status !== undefined ? { status } : {}),

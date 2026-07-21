@@ -33,7 +33,7 @@ async function updateAccount(req, res, next) {
   try {
     const { id } = req.params;
     const payload = validateUpdateAccount(req.body);
-    const data = await accountService.updateAccount(id, payload);
+    const data = await accountService.updateAccount(id, payload, req.user.id);
     return sendSuccess(res, 200, data, "Cập nhật tài khoản thành công.");
   } catch (err) {
     return next(err);
