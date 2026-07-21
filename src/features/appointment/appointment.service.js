@@ -429,7 +429,7 @@ async function cancelAppointment(
     throw new AppError("Không tìm thấy lịch hẹn.", 404, "NOT_FOUND");
   }
 
-  if (role === "patient" && existing.patient_id !== patientId) {
+  if (role === "patient" && existing.patient?.patient_id !== Number(patientId)) {
     throw new AppError("Bạn không có quyền truy cập.", 403, "FORBIDDEN");
   }
 

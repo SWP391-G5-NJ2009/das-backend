@@ -170,6 +170,7 @@ async function getDentistsByServiceId(serviceId) {
   return (data || [])
     .map((row) => row.dentist)
     .filter(Boolean)
+    .filter((d) => d.account?.status !== "Deactivated")
     .map((d) => ({
       dentist_id: d.dentist_id,
       full_name: d.full_name || d.account?.email || `Dentist #${d.dentist_id}`,
