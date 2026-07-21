@@ -12,4 +12,32 @@ router.get(
   paymentController.getAllPayments,
 );
 
+router.get(
+  "/unpaid-invoices",
+  authMiddleware,
+  requireRole("receptionist", "owner", "admin"),
+  paymentController.getUnpaidInvoices,
+);
+
+router.get(
+  "/invoices/:invoiceId",
+  authMiddleware,
+  requireRole("receptionist", "owner", "admin"),
+  paymentController.getInvoiceDetail,
+);
+
+router.post(
+  "/invoices/:invoiceId/pay",
+  authMiddleware,
+  requireRole("receptionist"),
+  paymentController.payInvoice,
+);
+
+router.get(
+  "/:id",
+  authMiddleware,
+  requireRole("receptionist", "owner", "admin"),
+  paymentController.getPaymentDetail,
+);
+
 module.exports = router;
