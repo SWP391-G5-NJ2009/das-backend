@@ -82,18 +82,7 @@ const TREATMENT_HISTORY_SELECT = `
   treatment_record!inner (
     record_id,
     treatment_note,
-    diagnosis,
-    prescription (
-      prescription_id,
-      note,
-      prescription_detail (
-        dosage,
-        medicine:medicine_id (
-          medicine_id,
-          name
-        )
-      )
-    )
+    diagnosis
   ),
   invoice (
     total_amount,

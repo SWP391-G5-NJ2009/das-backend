@@ -60,41 +60,6 @@ async function getUnpaidInvoices() {
   }));
 }
 
-function normalizeMedicines(treatmentRecords) {
-  const records = Array.isArray(treatmentRecords)
-    ? treatmentRecords
-    : treatmentRecords
-      ? [treatmentRecords]
-      : [];
-
-  return records.flatMap((record) => {
-    const prescriptions = Array.isArray(record.prescription)
-      ? record.prescription
-      : record.prescription
-        ? [record.prescription]
-        : [];
-
-    return prescriptions.flatMap((prescription) =>
-      (prescription.prescription_detail || []).map((detail, index) => {
-        const medicine = detail.medicine || {};
-        const unitPrice = Number(
-          detail.actual_price ?? medicine.unit_price ?? 0,
-        );
-        const quantity = Number(detail.quantity ?? 1);
-        return {
-          id: medicine.medicine_id || `medicine-${record.record_id}-${index}`,
-          name: medicine.name || "Thuốc theo đơn",
-          type: "Thuốc",
-          unitPrice,
-          quantity: `${quantity}${medicine.unit ? ` ${medicine.unit}` : ""}`,
-          total: unitPrice * quantity,
-          dosage: detail.dosage || "",
-        };
-      }),
-    );
-  });
-}
-
 async function getPaymentDetail(paymentId) {
   const { data, error } = await paymentDao.findPaymentById(paymentId);
 
@@ -118,16 +83,14 @@ async function getPaymentDetail(paymentId) {
     paymentDate: data.payment_date,
     transactionCode: data.transaction_code,
     status: data.status || invoice?.payment_status,
-    items: (appointment?.appointment_service || [])
-      .map((item) => ({
+    items: (appointment?.appointment_service || []).map((item) => ({
         id: item.dental_service?.service_id,
         name: item.dental_service?.service_name || "Dịch vụ nha khoa",
         type: "Dịch vụ",
         unitPrice: item.actual_price,
         quantity: 1,
         total: item.actual_price,
-      }))
-      .concat(normalizeMedicines(appointment?.treatment_record)),
+      })),
   };
 }
 
@@ -150,16 +113,14 @@ async function getInvoiceDetail(invoiceId) {
     ...getAppointmentInfo(appointment),
     amount: data.total_amount,
     status: data.payment_status || "Unpaid",
-    items: (appointment?.appointment_service || [])
-      .map((item) => ({
+    items: (appointment?.appointment_service || []).map((item) => ({
         id: item.dental_service?.service_id,
         name: item.dental_service?.service_name || "Dịch vụ nha khoa",
         type: "Dịch vụ",
         unitPrice: item.actual_price,
         quantity: 1,
         total: item.actual_price,
-      }))
-      .concat(normalizeMedicines(appointment?.treatment_record)),
+      })),
   };
 }
 

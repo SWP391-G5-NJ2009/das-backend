@@ -126,24 +126,6 @@ async function findPaymentById(paymentId) {
             actual_price,
             dental_service:service_id (service_id, service_name)
           ),
-          treatment_record (
-            record_id,
-            prescription (
-              prescription_id,
-              note,
-              prescription_detail (
-                dosage,
-                quantity,
-                actual_price,
-                medicine:medicine_id (
-                  medicine_id,
-                  name,
-                  unit,
-                  unit_price
-                )
-              )
-            )
-          ),
           appointment_slot (
             is_primary,
             work_slot:slot_id (
@@ -175,18 +157,6 @@ async function findInvoiceById(invoiceId) {
         appointment_service (
           actual_price,
           dental_service:service_id (service_id, service_name)
-        ),
-        treatment_record (
-          record_id,
-          prescription (
-            prescription_id,
-            prescription_detail (
-              dosage,
-              quantity,
-              actual_price,
-              medicine:medicine_id (medicine_id, name, unit, unit_price)
-            )
-          )
         ),
         appointment_slot (
           is_primary,

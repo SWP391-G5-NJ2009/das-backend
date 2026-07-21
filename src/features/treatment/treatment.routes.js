@@ -5,13 +5,6 @@ const requireRole = require("../../middlewares/role.middleware");
 
 const router = express.Router();
 
-router.get(
-  "/medicines",
-  authMiddleware,
-  requireRole("dentist"),
-  treatmentController.listMedicines,
-);
-
 router.post(
   "/",
   authMiddleware,
