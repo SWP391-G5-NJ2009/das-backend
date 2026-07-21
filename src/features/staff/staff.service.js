@@ -1,4 +1,5 @@
 const staffDao = require("./staff.dao");
+const accountService = require("../account/account.service");
 const AppError = require("../../utils/AppError");
 
 function normalizeRoleName(account) {
@@ -278,18 +279,23 @@ async function createStaffProfile(payload) {
       404,
       "STAFF_ACCOUNT_NOT_FOUND",
     );
-  if (!account.email || !account.phone)
+  if (!payload.email || !payload.phone)
     throw new AppError(
       "Tài khoản phải có email và số điện thoại.",
       400,
       "ACCOUNT_CONTACT_REQUIRED",
     );
 
+  await accountService.updateAccount(payload.accountId, {
+    email: payload.email,
+    phone: payload.phone,
+  });
+
   const common = {
     account_id: payload.accountId,
     full_name: payload.fullName,
-    email: account.email,
-    phone: account.phone,
+    email: payload.email,
+    phone: payload.phone,
     birth_date: payload.birthDate,
     gender: payload.gender,
     address: payload.address,
@@ -359,6 +365,11 @@ async function updateDentistProfile(dentistId, payload) {
       "DENTIST_NOT_FOUND",
     );
 
+  await accountService.updateAccount(existing.account_id, {
+    email: payload.email,
+    phone: payload.phone,
+  });
+
   const { data: services, error: serviceError } =
     await staffDao.findActiveServicesByIds(payload.serviceIds);
   if (serviceError) throw new AppError(serviceError.message, 500, "DB_ERROR");
@@ -373,6 +384,8 @@ async function updateDentistProfile(dentistId, payload) {
   const { data: profile, error: updateError } =
     await staffDao.updateDentistProfile(dentistId, {
       full_name: payload.fullName,
+      email: payload.email || null,
+      phone: payload.phone || null,
       birth_date: payload.birthDate,
       gender: payload.gender,
       address: payload.address,
@@ -422,9 +435,16 @@ async function updateReceptionistProfile(receptionistId, payload) {
     );
   }
 
+  await accountService.updateAccount(existing.account_id, {
+    email: payload.email,
+    phone: payload.phone,
+  });
+
   const { data: profile, error: updateError } =
     await staffDao.updateReceptionistProfile(receptionistId, {
       full_name: payload.fullName,
+      email: payload.email || null,
+      phone: payload.phone || null,
       birth_date: payload.birthDate,
       gender: payload.gender,
       address: payload.address,

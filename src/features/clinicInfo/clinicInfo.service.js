@@ -106,6 +106,8 @@ async function updateClinicInfo(payload) {
       name: payload.clinicName,
       address: payload.address,
       hotline: payload.hotline,
+      open_time: payload.openTime,
+      close_time: payload.closeTime,
     },
   );
 

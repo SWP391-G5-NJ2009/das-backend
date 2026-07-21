@@ -15,6 +15,8 @@ const createStaffProfileSchema = Joi.object({
   role: Joi.string().valid("dentist", "receptionist").required(),
   accountId: Joi.string().guid({ version: ["uuidv4", "uuidv5"] }).required(),
   fullName: Joi.string().trim().min(2).max(100).required(),
+  email: Joi.string().trim().email().max(254).required(),
+  phone: Joi.string().trim().pattern(/^[0-9]{10,11}$/).required(),
   birthDate: Joi.date().iso().max("now").required(),
   gender: Joi.string().trim().valid("Male", "Female").required(),
   address: Joi.string().trim().min(1).max(255).required(),
@@ -29,6 +31,8 @@ const createStaffProfileSchema = Joi.object({
 
 const updateDentistProfileSchema = Joi.object({
   fullName: Joi.string().trim().min(2).max(100).required(),
+  email: Joi.string().trim().email().max(254).allow("", null).required(),
+  phone: Joi.string().trim().pattern(/^[0-9]{10,11}$/).allow("", null).required(),
   birthDate: Joi.date().iso().max("now").required(),
   gender: Joi.string().trim().valid("Male", "Female").required(),
   address: Joi.string().trim().min(1).max(255).required(),
@@ -39,6 +43,8 @@ const updateDentistProfileSchema = Joi.object({
 
 const updateReceptionistProfileSchema = Joi.object({
   fullName: Joi.string().trim().min(2).max(100).required(),
+  email: Joi.string().trim().email().max(254).allow("", null).required(),
+  phone: Joi.string().trim().pattern(/^[0-9]{10,11}$/).allow("", null).required(),
   birthDate: Joi.date().iso().max("now").required(),
   gender: Joi.string().trim().valid("Male", "Female").required(),
   address: Joi.string().trim().min(1).max(255).required(),
