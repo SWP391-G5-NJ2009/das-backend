@@ -8,6 +8,7 @@ const APPOINTMENT_SELECT = `
   total_estimated_amount,
   note,
   book_time,
+  consultation_request_id,
   appointment_slot (
     is_primary,
     work_slot:slot_id (

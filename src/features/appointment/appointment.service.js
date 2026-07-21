@@ -11,6 +11,7 @@ async function bookAppointment({
   actorAccountId,
   actorRole,
   slotOccupied = 1,
+  consultationRequestId = null,
 }) {
   let resolvedPatientId = patientId;
   if (!resolvedPatientId && newPatient) {
@@ -153,6 +154,7 @@ async function bookAppointment({
     status: "Confirmed",
     note: note || null,
     book_time: new Date().toISOString(),
+    consultation_request_id: consultationRequestId || null,
   });
 
   // Step 3: Look up service price then link service to the appointment
@@ -351,6 +353,7 @@ function normalize(row) {
     roomName: dentist?.room_info?.[0]?.room_name || null,
     treatmentRecord: row.treatment_record?.[0] || null,
     invoice: row.invoice?.[0] || null,
+    consultationRequestId: row.consultation_request_id || null,
   };
 }
 
