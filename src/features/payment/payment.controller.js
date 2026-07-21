@@ -10,6 +10,39 @@ async function getAllPayments(req, res, next) {
   }
 }
 
+async function getMyPaymentHistory(req, res, next) {
+  try {
+    const payments = await paymentService.getMyPaymentHistory(
+      req.user.profileId,
+    );
+    return sendSuccess(
+      res,
+      200,
+      payments,
+      "Lấy lịch sử thanh toán thành công.",
+    );
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function getMyPaymentDetail(req, res, next) {
+  try {
+    const payment = await paymentService.getMyPaymentDetail(
+      req.params.id,
+      req.user.profileId,
+    );
+    return sendSuccess(
+      res,
+      200,
+      payment,
+      "Lấy chi tiết thanh toán thành công.",
+    );
+  } catch (err) {
+    return next(err);
+  }
+}
+
 async function getPaymentDetail(req, res, next) {
   try {
     const payment = await paymentService.getPaymentDetail(req.params.id);
@@ -48,6 +81,8 @@ async function payInvoice(req, res, next) {
 
 module.exports = {
   getAllPayments,
+  getMyPaymentHistory,
+  getMyPaymentDetail,
   getInvoiceDetail,
   getPaymentDetail,
   getUnpaidInvoices,

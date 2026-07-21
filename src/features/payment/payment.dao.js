@@ -36,6 +36,43 @@ async function findAllPayments() {
     .order("payment_date", { ascending: false });
 }
 
+async function findPaymentsByPatientId(patientId) {
+  return supabase
+    .from("payment")
+    .select(
+      `
+      payment_id,
+      invoice_id,
+      amount,
+      payment_method,
+      payment_date,
+      transaction_code,
+      status,
+      invoice:invoice_id!inner (
+        invoice_id,
+        total_amount,
+        payment_status,
+        appointment:appt_id!inner (
+          appt_id,
+          patient:patient_id!inner (patient_id, full_name, phone),
+          appointment_slot (
+            is_primary,
+            work_slot:slot_id (
+              time_slot_config:slot_config_id (start_time),
+              schedules:schedule_id (
+                work_date,
+                dentist:dentist_id (dentist_id, full_name)
+              )
+            )
+          )
+        )
+      )
+    `,
+    )
+    .eq("invoice.appointment.patient.patient_id", patientId)
+    .order("payment_date", { ascending: false });
+}
+
 async function findUnpaidInvoices() {
   return supabase
     .from("invoice")
@@ -184,6 +221,7 @@ async function markInvoicePaid(invoiceId, paymentTime) {
 module.exports = {
   createPayment,
   findAllPayments,
+  findPaymentsByPatientId,
   findInvoiceById,
   findPaymentById,
   findUnpaidInvoices,

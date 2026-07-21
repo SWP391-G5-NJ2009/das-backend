@@ -11,6 +11,14 @@ async function getAllPayments() {
   return (data || []).map(normalizePaymentRow);
 }
 
+async function getMyPaymentHistory(patientId) {
+  const { data, error } = await paymentDao.findPaymentsByPatientId(patientId);
+  if (error) {
+    throw new AppError(error.message, 500, "DB_ERROR");
+  }
+  return (data || []).map(normalizePaymentRow);
+}
+
 function getAppointmentInfo(appointment) {
   const primarySlot = (appointment?.appointment_slot || []).find(
     (slot) => slot.is_primary,
@@ -123,6 +131,14 @@ async function getPaymentDetail(paymentId) {
   };
 }
 
+async function getMyPaymentDetail(paymentId, patientId) {
+  const detail = await getPaymentDetail(paymentId);
+  if (String(detail.patient?.patient_id) !== String(patientId)) {
+    throw new AppError("Không tìm thấy hóa đơn.", 404, "NOT_FOUND");
+  }
+  return detail;
+}
+
 async function getInvoiceDetail(invoiceId) {
   const { data, error } = await paymentDao.findInvoiceById(invoiceId);
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
@@ -148,7 +164,7 @@ async function getInvoiceDetail(invoiceId) {
 }
 
 async function payInvoice(invoiceId, paymentMethod) {
-  const allowedMethods = ["cash", "bank_transfer", "card"];
+  const allowedMethods = ["Tiền mặt", "Chuyển khoản"];
   if (!allowedMethods.includes(paymentMethod)) {
     throw new AppError(
       "Phương thức thanh toán không hợp lệ.",
@@ -198,6 +214,8 @@ async function payInvoice(invoiceId, paymentMethod) {
 
 module.exports = {
   getAllPayments,
+  getMyPaymentHistory,
+  getMyPaymentDetail,
   getInvoiceDetail,
   getPaymentDetail,
   getUnpaidInvoices,

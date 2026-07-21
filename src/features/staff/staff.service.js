@@ -294,6 +294,25 @@ async function createStaffProfile(payload) {
     gender: payload.gender,
     address: payload.address,
   };
+
+  let services = [];
+  if (payload.role === "dentist") {
+    const serviceResult = await staffDao.findActiveServicesByIds(
+      payload.serviceIds,
+    );
+    if (serviceResult.error) {
+      throw new AppError(serviceResult.error.message, 500, "DB_ERROR");
+    }
+    services = serviceResult.data || [];
+    if (services.length !== payload.serviceIds.length) {
+      throw new AppError(
+        "Dịch vụ không tồn tại hoặc đã ngừng hoạt động.",
+        400,
+        "INVALID_SERVICES",
+      );
+    }
+  }
+
   const result =
     payload.role === "dentist"
       ? await staffDao.createDentistProfile({
@@ -307,7 +326,26 @@ async function createStaffProfile(payload) {
       throw new AppError("Tài khoản đã có hồ sơ.", 409, "STAFF_PROFILE_EXISTS");
     throw new AppError(result.error.message, 500, "DB_ERROR");
   }
-  return { ...result.data, role: payload.role };
+  if (payload.role === "dentist") {
+    const assignments = payload.serviceIds.map((serviceId) => ({
+      dentist_id: result.data.dentist_id,
+      service_id: serviceId,
+    }));
+    const assignmentResult = await staffDao.createDentistServices(assignments);
+    if (assignmentResult.error) {
+      await staffDao.deleteDentistProfile(result.data.dentist_id);
+      throw new AppError(assignmentResult.error.message, 500, "DB_ERROR");
+    }
+  }
+
+  return {
+    ...result.data,
+    role: payload.role,
+    services: services.map((service) => ({
+      id: service.service_id,
+      name: service.service_name,
+    })),
+  };
 }
 
 async function updateDentistProfile(dentistId, payload) {

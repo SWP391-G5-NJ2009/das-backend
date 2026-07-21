@@ -178,6 +178,118 @@ async function bookAppointment({
 
 const CANCELLABLE_STATUSES = ["Confirmed", "Checked-in", "Conflict"];
 
+async function checkInAppointment(apptId) {
+  const { data: existing, error } = await appointmentDao.findById(apptId);
+
+  if (error || !existing) {
+    throw new AppError("Không tìm thấy lịch hẹn.", 404, "NOT_FOUND");
+  }
+  const checkInStatuses = ["Confirmed", "No-Show"];
+  if (!checkInStatuses.includes(existing.status)) {
+    throw new AppError(
+      "Chỉ có thể check-in lịch hẹn đã xác nhận.",
+      409,
+      "INVALID_STATUS_TRANSITION",
+    );
+  }
+
+  const primarySlot = (existing.appointment_slot || []).find(
+    (slot) => slot.is_primary,
+  );
+  const appointmentDate = primarySlot?.work_slot?.schedules?.work_date;
+  if (!appointmentDate) {
+    throw new AppError(
+      "Lịch hẹn không có ngày khám hợp lệ nên không thể check-in.",
+      409,
+      "CHECK_IN_DATE_MISSING",
+    );
+  }
+  const clinicDateParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const clinicDate = Object.fromEntries(
+    clinicDateParts.map(({ type, value }) => [type, value]),
+  );
+  const today = `${clinicDate.year}-${clinicDate.month}-${clinicDate.day}`;
+  if (appointmentDate < today) {
+    throw new AppError(
+      "Lịch hẹn đã qua ngày khám nên không thể check-in.",
+      409,
+      "CHECK_IN_DATE_EXPIRED",
+    );
+  }
+
+  const appointment = await appointmentDao.checkInById(apptId, existing.status);
+  if (!appointment) {
+    throw new AppError(
+      "Trạng thái lịch hẹn vừa thay đổi. Vui lòng tải lại danh sách.",
+      409,
+      "APPOINTMENT_STATUS_CHANGED",
+    );
+  }
+  if (existing.status === "No-Show") {
+    await appointmentDao.reconcileNoShowAfterCheckIn(existing.patient?.patient_id);
+  }
+  return appointment;
+}
+
+async function startTreatment(apptId, dentistId) {
+  const { data: existing, error } = await appointmentDao.findById(apptId);
+  if (error || !existing) {
+    throw new AppError("Không tìm thấy lịch hẹn.", 404, "NOT_FOUND");
+  }
+
+  const primarySlot = (existing.appointment_slot || []).find((slot) => slot.is_primary);
+  const assignedDentistId = primarySlot?.work_slot?.schedules?.dentist?.dentist_id;
+  if (String(assignedDentistId) !== String(dentistId)) {
+    throw new AppError("Bạn không phải bác sĩ phụ trách lịch hẹn này.", 403, "FORBIDDEN");
+  }
+  if (existing.status !== "Checked-in") {
+    throw new AppError(
+      "Chỉ có thể bắt đầu điều trị cho bệnh nhân đã check-in.",
+      409,
+      "INVALID_STATUS_TRANSITION",
+    );
+  }
+
+  const { data: activeAppointments, error: activeError } =
+    await appointmentDao.findAll({ status: "In-Treatment" });
+  if (activeError) {
+    throw new AppError(activeError.message, 500, "DB_ERROR");
+  }
+  const activeAppointment = (activeAppointments || []).find((appointment) => {
+    const activePrimarySlot = (appointment.appointment_slot || []).find(
+      (slot) => slot.is_primary,
+    );
+    const activeDentistId =
+      activePrimarySlot?.work_slot?.schedules?.dentist?.dentist_id;
+    return (
+      String(activeDentistId) === String(dentistId) &&
+      String(appointment.appt_id) !== String(apptId)
+    );
+  });
+  if (activeAppointment) {
+    throw new AppError(
+      `Bạn đang điều trị cho ${activeAppointment.patient?.full_name || "một bệnh nhân khác"}. Vui lòng hoàn tất ca hiện tại trước.`,
+      409,
+      "DENTIST_ALREADY_TREATING",
+    );
+  }
+
+  const appointment = await appointmentDao.startTreatmentById(apptId);
+  if (!appointment) {
+    throw new AppError(
+      "Trạng thái lịch hẹn vừa thay đổi. Vui lòng tải lại danh sách.",
+      409,
+      "APPOINTMENT_STATUS_CHANGED",
+    );
+  }
+  return appointment;
+}
+
 function normalize(row) {
   const primarySlotEntry = (row.appointment_slot || []).find(
     (as) => as.is_primary,
@@ -376,6 +488,8 @@ async function cancelAppointment(
 module.exports = {
   bookAppointment,
   cancelAppointment,
+  checkInAppointment,
   getAll,
   getMyAppointments,
+  startTreatment,
 };

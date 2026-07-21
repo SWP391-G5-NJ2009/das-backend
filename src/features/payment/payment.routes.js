@@ -6,6 +6,20 @@ const requireRole = require("../../middlewares/role.middleware");
 const router = express.Router();
 
 router.get(
+  "/me",
+  authMiddleware,
+  requireRole("patient"),
+  paymentController.getMyPaymentHistory,
+);
+
+router.get(
+  "/me/:id",
+  authMiddleware,
+  requireRole("patient"),
+  paymentController.getMyPaymentDetail,
+);
+
+router.get(
   "/",
   authMiddleware,
   requireRole("receptionist", "owner", "admin"),

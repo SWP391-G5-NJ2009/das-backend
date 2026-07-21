@@ -29,6 +29,18 @@ router.post(
   appointmentController.bookAppointment,
 );
 
+router.patch(
+  "/:id/checkin",
+  requireRole("receptionist"),
+  appointmentController.checkInAppointment,
+);
+
+router.patch(
+  "/:id/start-treatment",
+  requireRole("dentist"),
+  appointmentController.startTreatment,
+);
+
 // Cancel: patient (own) or receptionist
 router.patch(
   "/:id/cancel",
