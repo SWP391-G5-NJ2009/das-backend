@@ -11,6 +11,7 @@ async function bookAppointment({
   actorAccountId,
   actorRole,
   slotOccupied = 1,
+  consultationRequestId = null,
 }) {
   let resolvedPatientId = patientId;
   if (!resolvedPatientId && newPatient) {
@@ -93,6 +94,24 @@ async function bookAppointment({
   }
   // End BR-15
 
+  // BR-19: A patient cannot have two active appointments at the same date+time, even with different dentists.
+  if (workDate && startTime) {
+    const slotConflict =
+      await appointmentDao.findActiveAppointmentByPatientAtTime(
+        resolvedPatientId,
+        workDate,
+        startTime,
+      );
+    if (slotConflict) {
+      throw new AppError(
+        "Bệnh nhân đã có một lịch hẹn vào khung giờ này. Vui lòng chọn khung giờ khác.",
+        409,
+        "DUPLICATE_SLOT_BOOKING",
+      );
+    }
+  }
+  // End BR-19
+
   // Multi-slot: find all consecutive slots this service requires
   const normalizedSlotCount = Math.max(1, Number(slotOccupied) || 1);
 
@@ -153,6 +172,9 @@ async function bookAppointment({
     status: "Confirmed",
     note: note || null,
     book_time: new Date().toISOString(),
+    ...(consultationRequestId
+      ? { consultation_request_id: consultationRequestId }
+      : {}),
   });
 
   // Step 3: Look up service price then link service to the appointment
@@ -238,7 +260,9 @@ async function checkInAppointment(apptId) {
     );
   }
   if (existing.status === "No-Show") {
-    await appointmentDao.reconcileNoShowAfterCheckIn(existing.patient?.patient_id);
+    await appointmentDao.reconcileNoShowAfterCheckIn(
+      existing.patient?.patient_id,
+    );
   }
   return appointment;
 }
@@ -249,10 +273,17 @@ async function startTreatment(apptId, dentistId) {
     throw new AppError("Không tìm thấy lịch hẹn.", 404, "NOT_FOUND");
   }
 
-  const primarySlot = (existing.appointment_slot || []).find((slot) => slot.is_primary);
-  const assignedDentistId = primarySlot?.work_slot?.schedules?.dentist?.dentist_id;
+  const primarySlot = (existing.appointment_slot || []).find(
+    (slot) => slot.is_primary,
+  );
+  const assignedDentistId =
+    primarySlot?.work_slot?.schedules?.dentist?.dentist_id;
   if (String(assignedDentistId) !== String(dentistId)) {
-    throw new AppError("Bạn không phải bác sĩ phụ trách lịch hẹn này.", 403, "FORBIDDEN");
+    throw new AppError(
+      "Bạn không phải bác sĩ phụ trách lịch hẹn này.",
+      403,
+      "FORBIDDEN",
+    );
   }
   if (existing.status !== "Checked-in") {
     throw new AppError(
@@ -392,7 +423,6 @@ function applyClientFilters(list, filters) {
   return result;
 }
 
-
 async function getMyAppointments(patientId, filters = {}) {
   const { data, error } = await appointmentDao.findByPatientId(
     patientId,
@@ -429,7 +459,10 @@ async function cancelAppointment(
     throw new AppError("Không tìm thấy lịch hẹn.", 404, "NOT_FOUND");
   }
 
-  if (role === "patient" && existing.patient_id !== patientId) {
+  if (
+    role === "patient" &&
+    existing.patient?.patient_id !== Number(patientId)
+  ) {
     throw new AppError("Bạn không có quyền truy cập.", 403, "FORBIDDEN");
   }
 
@@ -492,11 +525,38 @@ async function cancelAppointment(
   return cancelled;
 }
 
+/**
+ * Returns the list of (date, startTime) pairs for all active appointments of a patient.
+ * Used by the booking UI to disable already-booked time slots.
+ */
+async function getMyBookedTimes(patientId) {
+  const { data, error } = await appointmentDao.findByPatientId(patientId);
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+
+  const ACTIVE_STATUSES = ["Confirmed", "Checked-in", "Conflict"];
+  const bookedTimes = [];
+
+  for (const appt of data || []) {
+    if (!ACTIVE_STATUSES.includes(appt.status)) continue;
+    for (const slotEntry of appt.appointment_slot || []) {
+      const slot = slotEntry.work_slot;
+      const workDate = slot?.schedules?.work_date;
+      const startTime = slot?.time_slot_config?.start_time;
+      if (workDate && startTime) {
+        bookedTimes.push({ date: workDate, startTime: startTime.slice(0, 5) });
+      }
+    }
+  }
+
+  return bookedTimes;
+}
+
 module.exports = {
   bookAppointment,
   cancelAppointment,
   checkInAppointment,
   getAll,
   getMyAppointments,
+  getMyBookedTimes,
   startTreatment,
 };
