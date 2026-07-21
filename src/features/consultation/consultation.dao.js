@@ -24,12 +24,15 @@ async function findAllConsultationRequests(filters = {}) {
     query = query.or(`full_name.ilike.${s},phone.ilike.${s},email.ilike.${s},description.ilike.${s}`);
   }
 
-  if (filters.date) {
-    const start = new Date(filters.date);
-    //const end = new Date(start);
+  if (filters.from_date) {
+    const start = new Date(filters.from_date);
     query = query.gte("created_at", start.toISOString());
-    // .lt("created_at", end.toISOString());
+  }
 
+  if (filters.to_date) {
+    const end = new Date(filters.to_date);
+    end.setDate(end.getDate() + 1);
+    query = query.lt("created_at", end.toISOString());
   }
 
   return query;
