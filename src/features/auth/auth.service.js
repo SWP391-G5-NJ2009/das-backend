@@ -124,8 +124,8 @@ async function loginWithAccount(account, password, allowedRoles) {
       String(account.status || "").toLowerCase() === "restricted";
     throw new AppError(
       isRestricted
-        ? "Your account has been temporarily restricted due to repeated no-shows. Please contact the clinic to lift the restriction."
-        : "Account is not active.",
+        ? "Tài khoản của bạn đã bị hạn chế tạm thời do nhiều lần không đến khám theo lịch hẹn. Vui lòng liên hệ với phòng khám để gỡ bỏ hạn chế này."
+        : "Tài khoản chưa được kích hoạt",
       403,
       isRestricted ? "ACCOUNT_RESTRICTED" : "ACCOUNT_INACTIVE",
     );
