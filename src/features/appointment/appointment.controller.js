@@ -5,6 +5,35 @@ const {
   validateCancelAppointment,
 } = require("./appointment.validator");
 
+async function getMyBookedTimes(req, res, next) {
+  try {
+    const patientId = req.user.profileId;
+    const data = await appointmentService.getMyBookedTimes(patientId);
+    return sendSuccess(res, 200, data, "Lấy khung giờ đã đặt thành công.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function getPatientBookedTimesForReceptionist(req, res, next) {
+  try {
+    const patientId = parseInt(req.query.patientId, 10);
+    if (!patientId) {
+      return next(
+        new (require("../../utils/AppError"))(
+          "patientId là bắt buộc.",
+          400,
+          "VALIDATION_ERROR",
+        ),
+      );
+    }
+    const data = await appointmentService.getMyBookedTimes(patientId);
+    return sendSuccess(res, 200, data, "Lấy khung giờ đã đặt thành công.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
 async function getMyAppointments(req, res, next) {
   try {
     const patientId = req.user.profileId;
@@ -127,5 +156,7 @@ module.exports = {
   checkInAppointment,
   getAllAppointments,
   getMyAppointments,
+  getMyBookedTimes,
+  getPatientBookedTimesForReceptionist,
   startTreatment,
 };

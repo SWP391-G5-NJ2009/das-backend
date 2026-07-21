@@ -395,6 +395,41 @@ async function findConfirmedAppointmentByService(patientId, serviceId) {
   return data && data.length > 0 ? data[0] : null;
 }
 
+/**
+ * Check if a patient already has an active appointment at the same date + time.
+ * Prevents a patient from having two appointments at overlapping times,
+ * even with different dentists (different slot_ids but same time window).
+ */
+async function findActiveAppointmentByPatientAtTime(patientId, workDate, startTime) {
+  const ACTIVE_STATUSES = ["Confirmed", "Checked-in", "Conflict"];
+
+  const { data, error } = await supabase
+    .from("appointment")
+    .select(
+      `
+      appt_id,
+      status,
+      appointment_slot!inner (
+        slot_id,
+        work_slot:slot_id!inner (
+          slot_config_id,
+          time_slot_config:slot_config_id!inner (start_time),
+          schedule_id,
+          schedules:schedule_id!inner (work_date)
+        )
+      )
+    `,
+    )
+    .eq("patient_id", patientId)
+    .in("status", ACTIVE_STATUSES)
+    .eq("appointment_slot.work_slot.schedules.work_date", workDate)
+    .eq("appointment_slot.work_slot.time_slot_config.start_time", startTime)
+    .limit(1);
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return data && data.length > 0 ? data[0] : null;
+}
+
 async function hasActiveAppointmentsByServiceId(serviceId) {
   const { data, error } = await supabase
     .from("appointment")
@@ -532,6 +567,7 @@ module.exports = {
   findAll,
   findById,
   findByPatientId,
+  findActiveAppointmentByPatientAtTime,
   findConfirmedAppointmentByService,
   findConsecutiveSlotsFromId,
   findSlotInfo,
