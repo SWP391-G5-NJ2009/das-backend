@@ -6,7 +6,7 @@ function requireRole(...roles) {
 
   return (req, res, next) => {
     if (!allowedRoles.includes(normalizeRole(req.user?.role))) {
-      return next(new AppError("Access denied.", 403, "FORBIDDEN"));
+      return next(new AppError("Bạn không có quyền truy cập.", 403, "FORBIDDEN"));
     }
 
     return next();

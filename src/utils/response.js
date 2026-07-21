@@ -1,4 +1,4 @@
-const sendSuccess = (res, statusCode = 200, data = null, message = "OK") =>
+const sendSuccess = (res, statusCode = 200, data = null, message = "Thành công") =>
   res.status(statusCode).json({ success: true, data, message });
 
 const sendError = (

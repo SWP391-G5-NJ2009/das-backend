@@ -150,7 +150,7 @@ function generateDates({ startDate, endDate, weekdays }) {
   const end = toDate(endDate, "endDate");
 
   if (start > end) {
-    throw new AppError("startDate must be before or equal to endDate.", 400, "VALIDATION_ERROR");
+    throw new AppError("Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.", 400, "VALIDATION_ERROR");
   }
 
   const diffDays = Math.floor((end - start) / 86400000) + 1;
@@ -167,7 +167,7 @@ function generateDates({ startDate, endDate, weekdays }) {
   );
 
   if (weekdaySet.size === 0) {
-    throw new AppError("Please select at least one working day.", 400, "VALIDATION_ERROR");
+    throw new AppError("Vui lòng chọn ít nhất một ngày làm việc.", 400, "VALIDATION_ERROR");
   }
 
   const dates = [];
@@ -219,7 +219,7 @@ async function getSlotConfigsForWorkDate(workDate, cache = new Map()) {
       await scheduleDao.findTimeSlotConfigsByDay(dayOfWeek);
 
     if (error) {
-      throw new AppError("Failed to load clinic slots.", 500, "DB_ERROR");
+      throw new AppError("Không thể tải khung giờ của phòng khám.", 500, "DB_ERROR");
     }
 
     cache.set(cacheKey, data || []);
@@ -301,7 +301,7 @@ function selectSlotConfigs(slotConfigs, startTime, endTime) {
   const end = normalizeTime(endTime, "endTime");
 
   if (start >= end) {
-    throw new AppError("End time must be later than start time.", 400, "VALIDATION_ERROR");
+    throw new AppError("Giờ kết thúc phải sau giờ bắt đầu.", 400, "VALIDATION_ERROR");
   }
 
   const selected = slotConfigs.filter(
@@ -325,7 +325,7 @@ async function resolveDentistId(user) {
   const { data, error } = await scheduleDao.findDentistByAccountId(user?.id);
 
   if (error || !data) {
-    throw new AppError("Dentist profile not found.", 404, "DENTIST_NOT_FOUND");
+    throw new AppError("Không tìm thấy hồ sơ nha sĩ.", 404, "DENTIST_NOT_FOUND");
   }
 
   return data.dentist_id;
@@ -404,7 +404,7 @@ async function getMySchedule(user, filters = {}) {
   );
 
   if (error) {
-    throw new AppError("Failed to load your schedule.", 500, "DB_ERROR");
+    throw new AppError("Không thể tải lịch của bạn.", 500, "DB_ERROR");
   }
 
   const roomsByDentist = await buildRoomsByDentistMap();
@@ -415,7 +415,7 @@ async function listScheduleRequests(filters = {}) {
   const { data, error } = await scheduleDao.findSchedulesForOwner(filters);
 
   if (error) {
-    throw new AppError("Failed to load schedule requests.", 500, "DB_ERROR");
+    throw new AppError("Không thể tải yêu cầu lịch.", 500, "DB_ERROR");
   }
 
   const roomsByDentist = await buildRoomsByDentistMap();
@@ -685,7 +685,7 @@ async function submitMyScheduleRequest(user, payload = {}) {
       await scheduleDao.findScheduleByDentistAndDate(dentistId, workDate);
 
     if (lookupError) {
-      throw new AppError("Failed to check existing schedule.", 500, "DB_ERROR");
+      throw new AppError("Không thể kiểm tra lịch hiện có.", 500, "DB_ERROR");
     }
 
     let schedule = existing;
@@ -746,7 +746,7 @@ async function submitMyScheduleRequest(user, payload = {}) {
         });
 
       if (updateError || !updated?.[0]) {
-        throw new AppError("Failed to update schedule request.", 500, "DB_ERROR");
+        throw new AppError("Không thể cập nhật yêu cầu lịch.", 500, "DB_ERROR");
       }
 
       schedule = updated[0];
@@ -759,7 +759,7 @@ async function submitMyScheduleRequest(user, payload = {}) {
         });
 
       if (insertError || !inserted?.[0]) {
-        throw new AppError("Failed to create schedule request.", 500, "DB_ERROR");
+        throw new AppError("Không thể tạo yêu cầu lịch.", 500, "DB_ERROR");
       }
 
       schedule = inserted[0];
@@ -790,7 +790,7 @@ async function approveScheduleRequest(scheduleId) {
     await scheduleDao.findScheduleById(scheduleId);
 
   if (lookupError || !existing) {
-    throw new AppError("Schedule request not found.", 404, "NOT_FOUND");
+    throw new AppError("Không tìm thấy yêu cầu lịch.", 404, "NOT_FOUND");
   }
 
   if (!existing.work_slot?.length) {
@@ -818,7 +818,7 @@ async function approveScheduleRequest(scheduleId) {
   });
 
   if (error || !data?.[0]) {
-    throw new AppError("Failed to approve schedule.", 500, "DB_ERROR");
+    throw new AppError("Không thể duyệt lịch.", 500, "DB_ERROR");
   }
 
   const { data: refreshed } = await scheduleDao.findScheduleById(scheduleId);
@@ -830,7 +830,7 @@ async function denyScheduleRequest(scheduleId, payload = {}) {
   const note = String(payload.reason || payload.note || "").trim();
 
   if (!note) {
-    throw new AppError("Owner note is required when denying a schedule.", 400, "VALIDATION_ERROR");
+    throw new AppError("Cần nhập ghi chú khi từ chối lịch.", 400, "VALIDATION_ERROR");
   }
 
   const deniedStatus = `${DENIED_PREFIX}: ${note.slice(0, 180)}`;
@@ -839,7 +839,7 @@ async function denyScheduleRequest(scheduleId, payload = {}) {
   });
 
   if (error || !data?.[0]) {
-    throw new AppError("Failed to deny schedule request.", 500, "DB_ERROR");
+    throw new AppError("Không thể từ chối yêu cầu lịch.", 500, "DB_ERROR");
   }
 
   const { error: slotError } = await scheduleDao.updateWorkSlotsStatus(
@@ -873,18 +873,18 @@ async function updateAvailabilityStatus(user, payload = {}) {
     const scheduleId = Number(payload.scheduleId || payload.schedule_id);
 
     if (!scheduleId) {
-      throw new AppError("scheduleId is required.", 400, "VALIDATION_ERROR");
+      throw new AppError("Thiếu scheduleId.", 400, "VALIDATION_ERROR");
     }
 
     const { data: schedule, error: scheduleError } =
       await scheduleDao.findScheduleById(scheduleId);
 
     if (scheduleError || !schedule) {
-      throw new AppError("Schedule not found.", 404, "NOT_FOUND");
+      throw new AppError("Không tìm thấy lịch.", 404, "NOT_FOUND");
     }
 
     if (Number(schedule.dentist_id) !== Number(dentistId)) {
-      throw new AppError("Access denied.", 403, "FORBIDDEN");
+      throw new AppError("Bạn không có quyền truy cập.", 403, "FORBIDDEN");
     }
 
     if (schedule.status !== APPROVED_STATUS) {
@@ -899,18 +899,18 @@ async function updateAvailabilityStatus(user, payload = {}) {
   }
 
   if (!slotIds.length) {
-    throw new AppError("Please select at least one slot.", 400, "VALIDATION_ERROR");
+    throw new AppError("Vui lòng chọn ít nhất một khung giờ.", 400, "VALIDATION_ERROR");
   }
 
   if (!reason) {
-    throw new AppError("Reason is required.", 400, "VALIDATION_ERROR");
+    throw new AppError("Vui lòng nhập lý do.", 400, "VALIDATION_ERROR");
   }
 
   const { data: slots, error: slotError } =
     await scheduleDao.findWorkSlotsByIdsForDentist(slotIds, dentistId);
 
   if (slotError) {
-    throw new AppError("Failed to load selected slots.", 500, "DB_ERROR");
+    throw new AppError("Không thể tải các khung giờ đã chọn.", 500, "DB_ERROR");
   }
 
   if (!slots || slots.length !== slotIds.length) {
@@ -954,7 +954,7 @@ async function updateAvailabilityStatus(user, payload = {}) {
     throw new AppError(
       "Booked slots cannot be blocked until the linked appointment is resolved.",
       409,
-      "SLOT_ALREADY_BOOKED",
+      "SLOT_ALREADY_BOThành côngED",
       {
         slotIds: bookedWithoutActiveConflict.map((slot) => slot.slot_id),
       },
@@ -1008,7 +1008,7 @@ async function updateAvailabilityStatus(user, payload = {}) {
     message:
       affectedAppointments.length > 0
         ? "MSG26: Slots blocked and affected appointments flagged for rescheduling."
-        : "MSG24: Availability updated successfully.",
+        : "MSG24: Cập nhật trạng thái khả dụng thành công.",
     affectedAppointments,
     updatedSlots: updatedSlots || [],
     conflictAppointments: conflictResult.updated,

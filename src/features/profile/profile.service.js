@@ -41,7 +41,7 @@ async function getAccount(accountId) {
   const { data, error } = await profileDao.findAccountById(accountId);
 
   if (error || !data) {
-    throw new AppError("Account not found.", 404, "ACCOUNT_NOT_FOUND");
+    throw new AppError("Không tìm thấy tài khoản.", 404, "ACCOUNT_NOT_FOUND");
   }
 
   return data;
@@ -82,7 +82,7 @@ async function updateMyProfile(accountId, payload) {
   const profileFields = pickColumns(payload, PROFILE_FIELDS);
 
   if (!Object.keys(accountFields).length && !Object.keys(profileFields).length) {
-    throw new AppError("No fields to update.", 400, "NO_UPDATES");
+    throw new AppError("Không có trường nào để cập nhật.", 400, "NO_UPDATES");
   }
 
   if (Object.keys(accountFields).length) {

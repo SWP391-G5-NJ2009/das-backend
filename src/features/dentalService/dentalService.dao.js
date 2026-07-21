@@ -75,7 +75,8 @@ async function findDentistsByServiceId(serviceId) {
         experience,
         account:account_id (
           username,
-          email
+          email,
+          status
         )
       )
     `,

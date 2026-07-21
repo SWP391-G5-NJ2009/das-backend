@@ -15,7 +15,7 @@ async function patientLogin(req, res, next) {
   try {
     const payload = validate(patientLoginSchema, req.body);
     const data = await authService.patientLogin(payload);
-    return sendSuccess(res, 200, data, "Login successful. Welcome back!");
+    return sendSuccess(res, 200, data, "Đăng nhập thành công. Chào mừng bạn trở lại!");
   } catch (err) {
     return next(err);
   }
@@ -25,21 +25,21 @@ async function staffLogin(req, res, next) {
   try {
     const payload = validate(staffLoginSchema, req.body);
     const data = await authService.staffLogin(payload);
-    return sendSuccess(res, 200, data, "Login successful. Welcome back!");
+    return sendSuccess(res, 200, data, "Đăng nhập thành công. Chào mừng bạn trở lại!");
   } catch (err) {
     return next(err);
   }
 }
 
 async function logout(req, res) {
-  return sendSuccess(res, 200, null, "Logged out successfully.");
+  return sendSuccess(res, 200, null, "Đăng xuất thành công.");
 }
 
 async function forgotPassword(req, res, next) {
   try {
     const payload = validate(forgotPasswordSchema, req.body);
     const data = await authService.forgotPassword(payload);
-    return sendSuccess(res, 200, data, "OTP has been generated.");
+    return sendSuccess(res, 200, data, "Đã tạo mã OTP.");
   } catch (err) {
     return next(err);
   }
@@ -49,7 +49,7 @@ async function staffForgotPassword(req, res, next) {
   try {
     const payload = validate(staffForgotPasswordSchema, req.body);
     const data = await authService.staffForgotPassword(payload);
-    return sendSuccess(res, 200, data, "OTP has been generated.");
+    return sendSuccess(res, 200, data, "Đã tạo mã OTP.");
   } catch (err) {
     return next(err);
   }
@@ -59,7 +59,7 @@ async function verifyOtp(req, res, next) {
   try {
     const payload = validate(verifyOtpSchema, req.body);
     const data = await authService.verifyOtp(payload);
-    return sendSuccess(res, 200, data, "OTP verified successfully.");
+    return sendSuccess(res, 200, data, "Xác minh OTP thành công.");
   } catch (err) {
     return next(err);
   }
@@ -73,7 +73,7 @@ async function resetPassword(req, res, next) {
       res,
       200,
       data,
-      "Your password has been reset successfully.",
+      "Đặt lại mật khẩu thành công.",
     );
   } catch (err) {
     return next(err);
@@ -91,7 +91,7 @@ async function changePassword(req, res, next) {
       res,
       200,
       data,
-      "Your password has been changed successfully.",
+      "Đổi mật khẩu thành công.",
     );
   } catch (err) {
     return next(err);

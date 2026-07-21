@@ -24,6 +24,17 @@ async function findProfileByAccountId(table, accountId) {
     .maybeSingle();
 }
 
+async function checkProfileExists(table, accountId) {
+  const { data, error } = await supabase
+    .from(table)
+    .select("account_id")
+    .eq("account_id", accountId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data !== null;
+}
+
 async function updateAccount(accountId, payload) {
   return supabase
     .from("account")
@@ -43,6 +54,7 @@ async function updateProfile(table, accountId, payload) {
 }
 
 module.exports = {
+  checkProfileExists,
   findAccountById,
   findProfileByAccountId,
   updateAccount,

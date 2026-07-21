@@ -3,7 +3,21 @@ const supabase = require("../../config/supabase");
 async function findAllRooms() {
   return supabase
     .from("room_info")
-    .select("room_id, room_name, specialization, status")
+    .select(
+      `
+      room_id,
+      room_name,
+      dentist_id,
+      status,
+      dentist:dentist_id (
+        dentist_id,
+        full_name,
+        speciality,
+        email,
+        phone
+      )
+      `,
+    )
     .order("room_id", { ascending: true });
 }
 
@@ -19,11 +33,8 @@ async function deleteRoom(id) {
   return supabase.from("room_info").delete().eq("room_id", id).select();
 }
 
-async function countSchedulesByRoomId(id) {
-  return supabase
-    .from("schedules")
-    .select("schedule_id", { count: "exact", head: true })
-    .eq("room_id", id);
+async function countSchedulesByRoomId() {
+  return { count: 0, error: null };
 }
 
 module.exports = {

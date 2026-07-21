@@ -57,16 +57,19 @@ const TREATMENT_HISTORY_SELECT = `
   status,
   note,
   total_estimated_amount,
-  work_slot:slot_id (
-    slot_config:slot_config_id (
-      start_time,
-      end_time
-    ),
-    schedules:schedule_id (
-      work_date,
-      dentist:dentist_id (
-        dentist_id,
-        full_name
+  appointment_slot (
+    is_primary,
+    work_slot:slot_id (
+      slot_config:slot_config_id (
+        start_time,
+        end_time
+      ),
+      schedules:schedule_id (
+        work_date,
+        dentist:dentist_id (
+          dentist_id,
+          full_name
+        )
       )
     )
   ),
@@ -107,7 +110,7 @@ async function findPatientById(patientId) {
     .single();
 
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
-  if (!data) throw new AppError("Patient not found.", 404, "NOT_FOUND");
+  if (!data) throw new AppError("Không tìm thấy bệnh nhân.", 404, "NOT_FOUND");
   return data;
 }
 

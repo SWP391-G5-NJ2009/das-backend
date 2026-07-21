@@ -2,9 +2,6 @@ const appointmentDao = require("./appointment.dao");
 const patientDao = require("../patient/patient.dao");
 const AppError = require("../../utils/AppError");
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   bookAppointment — Patient or Receptionist creates a new appointment
-───────────────────────────────────────────────────────────────────────────── */
 async function bookAppointment({
   patientId,
   newPatient,
@@ -14,8 +11,8 @@ async function bookAppointment({
   actorAccountId,
   actorRole,
   slotOccupied = 1,
+  consultationRequestId = null,
 }) {
-  // ── Walk-in patient: create patient record on the fly ────────────────────
   let resolvedPatientId = patientId;
   if (!resolvedPatientId && newPatient) {
     const created = await patientDao.createPatient(newPatient);
@@ -23,31 +20,31 @@ async function bookAppointment({
   }
   if (!resolvedPatientId) {
     throw new AppError(
-      "Patient ID could not be resolved.",
+      "Không thể xác định bệnh nhân.",
       400,
       "VALIDATION_ERROR",
     );
   }
 
-  // ── BR-11: Block patient with ≥ 3 No-Shows from booking online ──────────
+  // BR-11: Block patient with >= 3 No-Shows from booking online
   if (actorRole === "patient") {
     const patientInfo = await patientDao.findPatientById(resolvedPatientId);
     if (patientInfo.no_show_count >= 3) {
       throw new AppError(
-        "Your account has been restricted from booking appointments online due to 3 or more no-shows. " +
-          "Please contact the clinic directly for assistance.",
+        "Tài khoản của bạn đã bị hạn chế đặt lịch trực tuyến do vắng mặt từ 3 lần trở lên. " +
+          "Vui lòng liên hệ trực tiếp với phòng khám để được hỗ trợ.",
         403,
         "BOOKING_BANNED_NO_SHOW",
       );
     }
   }
-  // ── End BR-11 ────────────────────────────────────────────────────────────
+  // End BR-11
 
-  // ── BR-14: Validate slot timing before attempting to claim it ────────────
+  // BR-14: Validate slot timing before attempting to claim it
 
   const slotInfo = await appointmentDao.findSlotInfo(slotId);
   if (!slotInfo) {
-    throw new AppError("Slot not found.", 404, "NOT_FOUND");
+    throw new AppError("Không tìm thấy khung giờ.", 404, "NOT_FOUND");
   }
 
   const workDate = slotInfo.schedules?.work_date; // "YYYY-MM-DD"
@@ -62,7 +59,7 @@ async function bookAppointment({
     // Block everyone: slot start time has already passed
     if (diffMs <= 0) {
       throw new AppError(
-        "This time slot has already passed and can no longer be booked.",
+        "Khung giờ này đã qua và không thể đặt lịch nữa.",
         400,
         "SLOT_PAST",
       );
@@ -71,15 +68,15 @@ async function bookAppointment({
     // Block patients only: slot starts within 30 minutes
     if (actorRole === "patient" && diffMs < 30 * 60 * 1000) {
       throw new AppError(
-        "Appointments must be booked at least 30 minutes in advance.",
+        "Lịch hẹn phải được đặt trước ít nhất 30 phút.",
         400,
         "SLOT_TOO_SOON",
       );
     }
   }
-  // ── End BR-14 ────────────────────────────────────────────────────────────
+  // End BR-14
 
-  // ── BR-15: One active appointment per service per patient (patient only) ──
+  // BR-15: One active appointment per service per patient (patient only)
   if (actorRole === "patient") {
     const conflict = await appointmentDao.findConfirmedAppointmentByService(
       resolvedPatientId,
@@ -87,26 +84,43 @@ async function bookAppointment({
     );
     if (conflict) {
       throw new AppError(
-        "You already have an active appointment for this service " +
-          `(current status: ${conflict.status}). ` +
-          "Please wait until it is completed, cancelled, or resolved before booking again.",
+        "Bạn đã có một lịch hẹn đang hoạt động cho dịch vụ này " +
+          `(trạng thái hiện tại: ${conflict.status}). ` +
+          "Vui lòng chờ đến khi lịch hẹn đủ điều kiện trước khi đặt lịch mới.",
         409,
         "DUPLICATE_SERVICE_BOOKING",
       );
     }
   }
-  // ── End BR-15 ────────────────────────────────────────────────────────────
+  // End BR-15
 
-  // ── Multi-slot: find all consecutive slots this service requires ──────────
+  // BR-19: A patient cannot have two active appointments at the same date+time, even with different dentists.
+  if (workDate && startTime) {
+    const slotConflict =
+      await appointmentDao.findActiveAppointmentByPatientAtTime(
+        resolvedPatientId,
+        workDate,
+        startTime,
+      );
+    if (slotConflict) {
+      throw new AppError(
+        "Bệnh nhân đã có một lịch hẹn vào khung giờ này. Vui lòng chọn khung giờ khác.",
+        409,
+        "DUPLICATE_SLOT_BOOKING",
+      );
+    }
+  }
+  // End BR-19
+
+  // Multi-slot: find all consecutive slots this service requires
   const normalizedSlotCount = Math.max(1, Number(slotOccupied) || 1);
 
   let allSlotIds;
   if (normalizedSlotCount === 1) {
-    // Fast path: single-slot service
     const claimedSlot = await appointmentDao.markSlotBooked(slotId);
     if (!claimedSlot) {
       throw new AppError(
-        "This time slot has just been booked by another user. Please select a different slot.",
+        "Khung giờ này vừa được đặt bởi người khác. Vui lòng chọn khung giờ khác.",
         409,
         "SLOT_TAKEN",
       );
@@ -121,7 +135,7 @@ async function bookAppointment({
 
     if (consecutiveSlots.length < normalizedSlotCount) {
       throw new AppError(
-        `This service requires ${normalizedSlotCount} consecutive time slots, but only ${consecutiveSlots.length} slots are available at the end of this schedule. Please choose an earlier time.`,
+        `Dịch vụ này yêu cầu ${normalizedSlotCount} khung giờ liên tiếp, nhưng chỉ cón ${consecutiveSlots.length} khung giờ trống ở cuối lịch này. Vui lòng chọn giờ sớm hơn.`,
         409,
         "INSUFFICIENT_CONSECUTIVE_SLOTS",
       );
@@ -133,7 +147,7 @@ async function bookAppointment({
     );
     if (unavailable.length > 0) {
       throw new AppError(
-        "One or more required consecutive time slots are not available. Please choose a different start time.",
+        "Một hoặc nhiều khung giờ liên tiếp cần thiết không còn trống. Vui lòng chọn giờ bắt đầu khác.",
         409,
         "SLOT_TAKEN",
       );
@@ -145,21 +159,22 @@ async function bookAppointment({
       await appointmentDao.markMultipleSlotsBooked(slotIdsToClaim);
     if (!claimedIds) {
       throw new AppError(
-        "One or more required time slots were just booked by another user. Please select a different start time.",
+        "Một hoặc nhiều khung giờ liên tiếp vừa bị đặt bởi người khác. Vui lòng chọn giờ bắt đầu khác.",
         409,
         "SLOT_TAKEN",
       );
     }
     allSlotIds = claimedIds;
   }
-  // ── End multi-slot ───────────────────────────────────────────────────────
 
-  // Step 2: Create appointment record (primary slot only — the anchor)
   const appointment = await appointmentDao.createAppointment({
     patient_id: resolvedPatientId,
     status: "Confirmed",
     note: note || null,
     book_time: new Date().toISOString(),
+    ...(consultationRequestId
+      ? { consultation_request_id: consultationRequestId }
+      : {}),
   });
 
   // Step 3: Look up service price then link service to the appointment
@@ -172,9 +187,6 @@ async function bookAppointment({
     },
   ]);
 
-  // Step 4: Record all claimed slot IDs in appointment_slot junction table
-  // is_primary = true for the anchor slot (stored in appointment.slot_id),
-  // is_primary = false for each follow-on slot.
   await appointmentDao.insertAppointmentSlots(
     allSlotIds.map((sid) => ({
       appt_id: appointment.appt_id,
@@ -186,14 +198,137 @@ async function bookAppointment({
   return appointment;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Shape normalizer — maps raw Supabase joined row → clean frontend-ready object.
-   Field names mirror the mock data shape used in the frontend hook.
-───────────────────────────────────────────────────────────────────────────── */
 const CANCELLABLE_STATUSES = ["Confirmed", "Checked-in", "Conflict"];
 
+async function checkInAppointment(apptId) {
+  const { data: existing, error } = await appointmentDao.findById(apptId);
+
+  if (error || !existing) {
+    throw new AppError("Không tìm thấy lịch hẹn.", 404, "NOT_FOUND");
+  }
+  const checkInStatuses = ["Confirmed", "No-Show"];
+  if (!checkInStatuses.includes(existing.status)) {
+    throw new AppError(
+      "Chỉ có thể check-in lịch hẹn đã xác nhận.",
+      409,
+      "INVALID_STATUS_TRANSITION",
+    );
+  }
+
+  const primarySlot = (existing.appointment_slot || []).find(
+    (slot) => slot.is_primary,
+  );
+  const appointmentDate = primarySlot?.work_slot?.schedules?.work_date;
+  if (!appointmentDate) {
+    throw new AppError(
+      "Lịch hẹn không có ngày khám hợp lệ nên không thể check-in.",
+      409,
+      "CHECK_IN_DATE_MISSING",
+    );
+  }
+  const clinicDateParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const clinicDate = Object.fromEntries(
+    clinicDateParts.map(({ type, value }) => [type, value]),
+  );
+  const today = `${clinicDate.year}-${clinicDate.month}-${clinicDate.day}`;
+  if (appointmentDate < today) {
+    throw new AppError(
+      "Lịch hẹn đã qua ngày khám nên không thể check-in.",
+      409,
+      "CHECK_IN_DATE_EXPIRED",
+    );
+  }
+  if (appointmentDate > today) {
+    throw new AppError(
+      "Chỉ có thể check-in trong đúng ngày hẹn.",
+      409,
+      "CHECK_IN_DATE_NOT_REACHED",
+    );
+  }
+
+  const appointment = await appointmentDao.checkInById(apptId, existing.status);
+  if (!appointment) {
+    throw new AppError(
+      "Trạng thái lịch hẹn vừa thay đổi. Vui lòng tải lại danh sách.",
+      409,
+      "APPOINTMENT_STATUS_CHANGED",
+    );
+  }
+  if (existing.status === "No-Show") {
+    await appointmentDao.reconcileNoShowAfterCheckIn(
+      existing.patient?.patient_id,
+    );
+  }
+  return appointment;
+}
+
+async function startTreatment(apptId, dentistId) {
+  const { data: existing, error } = await appointmentDao.findById(apptId);
+  if (error || !existing) {
+    throw new AppError("Không tìm thấy lịch hẹn.", 404, "NOT_FOUND");
+  }
+
+  const primarySlot = (existing.appointment_slot || []).find(
+    (slot) => slot.is_primary,
+  );
+  const assignedDentistId =
+    primarySlot?.work_slot?.schedules?.dentist?.dentist_id;
+  if (String(assignedDentistId) !== String(dentistId)) {
+    throw new AppError(
+      "Bạn không phải bác sĩ phụ trách lịch hẹn này.",
+      403,
+      "FORBIDDEN",
+    );
+  }
+  if (existing.status !== "Checked-in") {
+    throw new AppError(
+      "Chỉ có thể bắt đầu điều trị cho bệnh nhân đã check-in.",
+      409,
+      "INVALID_STATUS_TRANSITION",
+    );
+  }
+
+  const { data: activeAppointments, error: activeError } =
+    await appointmentDao.findAll({ status: "In-Treatment" });
+  if (activeError) {
+    throw new AppError(activeError.message, 500, "DB_ERROR");
+  }
+  const activeAppointment = (activeAppointments || []).find((appointment) => {
+    const activePrimarySlot = (appointment.appointment_slot || []).find(
+      (slot) => slot.is_primary,
+    );
+    const activeDentistId =
+      activePrimarySlot?.work_slot?.schedules?.dentist?.dentist_id;
+    return (
+      String(activeDentistId) === String(dentistId) &&
+      String(appointment.appt_id) !== String(apptId)
+    );
+  });
+  if (activeAppointment) {
+    throw new AppError(
+      `Bạn đang điều trị cho ${activeAppointment.patient?.full_name || "một bệnh nhân khác"}. Vui lòng hoàn tất ca hiện tại trước.`,
+      409,
+      "DENTIST_ALREADY_TREATING",
+    );
+  }
+
+  const appointment = await appointmentDao.startTreatmentById(apptId);
+  if (!appointment) {
+    throw new AppError(
+      "Trạng thái lịch hẹn vừa thay đổi. Vui lòng tải lại danh sách.",
+      409,
+      "APPOINTMENT_STATUS_CHANGED",
+    );
+  }
+  return appointment;
+}
+
 function normalize(row) {
-  // Primary slot data lives in appointment_slot (is_primary = true)
   const primarySlotEntry = (row.appointment_slot || []).find(
     (as) => as.is_primary,
   );
@@ -238,8 +373,6 @@ function normalize(row) {
       ? slotConfig.start_time.substring(0, 5)
       : null,
     scheduledTimeEnd: (() => {
-      // For multi-slot appointments, use the end_time of the LAST slot
-      // (largest start_time in appointment_slot). Falls back to primary slot end_time.
       const allSlots = (row.appointment_slot || [])
         .map((as) => as.work_slot?.time_slot_config)
         .filter(Boolean)
@@ -252,6 +385,8 @@ function normalize(row) {
     notes: row.note || "",
     bookTime: row.book_time,
     totalEstimatedAmount: row.total_estimated_amount || null,
+    roomId: dentist?.room_info?.[0]?.room_id || null,
+    roomName: dentist?.room_info?.[0]?.room_name || null,
     treatmentRecord: row.treatment_record?.[0] || null,
     invoice: row.invoice?.[0] || null,
   };
@@ -260,14 +395,11 @@ function normalize(row) {
 function applyClientFilters(list, filters) {
   let result = list;
 
-  // Exact day takes priority; otherwise fall through to month, then year
   if (filters.date) {
     result = result.filter((a) => a.scheduledDate === filters.date);
   } else if (filters.month) {
-    // filters.month is "YYYY-MM"
     result = result.filter((a) => a.scheduledDate?.startsWith(filters.month));
   } else if (filters.year) {
-    // filters.year is "YYYY"
     result = result.filter((a) => a.scheduledDate?.startsWith(filters.year));
   }
 
@@ -324,24 +456,26 @@ async function cancelAppointment(
   const { data: existing, error } = await appointmentDao.findById(apptId);
 
   if (error || !existing) {
-    throw new AppError("Appointment not found.", 404, "NOT_FOUND");
+    throw new AppError("Không tìm thấy lịch hẹn.", 404, "NOT_FOUND");
   }
 
-  if (role === "patient" && existing.patient_id !== patientId) {
-    throw new AppError("Access denied.", 403, "FORBIDDEN");
+  if (
+    role === "patient" &&
+    existing.patient?.patient_id !== Number(patientId)
+  ) {
+    throw new AppError("Bạn không có quyền truy cập.", 403, "FORBIDDEN");
   }
 
   if (!CANCELLABLE_STATUSES.includes(existing.status)) {
     throw new AppError(
-      `Cannot cancel an appointment with status "${existing.status}".`,
+      `Không thể hủy lịch hẹn có trạng thái "${existing.status}".`,
       400,
       "INVALID_STATUS_TRANSITION",
     );
   }
 
-  // ── BR-13: Patients can only cancel at least 24 hours before scheduled time ──
+  // BR-13: Patients can only cancel at least 24 hours before scheduled time
   if (role === "patient") {
-    // Get primary slot from appointment_slot junction (appointment table has no slot_id column)
     const primarySlotEntry = (existing.appointment_slot || []).find(
       (as) => as.is_primary,
     );
@@ -356,7 +490,7 @@ async function cancelAppointment(
           const diffMs = slotDateTime.getTime() - Date.now();
           if (diffMs < 24 * 60 * 60 * 1000) {
             throw new AppError(
-              "Appointments can only be cancelled at least 24 hours before the scheduled time. Please contact the receptionist directly for assistance.",
+              "Chỉ có thể hủy lịch hẹn trước ít nhất 24 giờ so với giờ đã đặt. Vui lòng liên hệ trực tiếp với lễ tân để được hỗ trợ.",
               400,
               "CANCEL_TOO_LATE",
             );
@@ -365,7 +499,7 @@ async function cancelAppointment(
       }
     }
   }
-  // ── End BR-13 ────────────────────────────────────────────────────────────────
+  // End BR-13
 
   const cancelled = await appointmentDao.cancelById(
     apptId,
@@ -373,19 +507,12 @@ async function cancelAppointment(
     reason,
   );
 
-  // Release all slots linked to this appointment (non-blocking).
-  // appointment_slot rows are cascade-deleted when appointment is cancelled,
-  // but we read them BEFORE cancel so we know which work_slots to free.
-  // (We already fetched `existing` above — primary slot is on existing.work_slot.slot_id;
-  //  we re-query appointment_slot for the full list to handle multi-slot services.)
   appointmentDao
     .findSlotsByApptId(apptId)
     .then((slotIds) => {
       if (slotIds.length > 0) {
         return appointmentDao.releaseSlotsByIds(slotIds);
       }
-      // Fallback: if junction table has no rows yet (legacy appointment),
-      // release the primary slot the old way.
       const primarySlotId = existing.work_slot?.slot_id;
       if (primarySlotId) {
         return appointmentDao.releaseSlotsByIds([primarySlotId]);
@@ -398,9 +525,38 @@ async function cancelAppointment(
   return cancelled;
 }
 
+/**
+ * Returns the list of (date, startTime) pairs for all active appointments of a patient.
+ * Used by the booking UI to disable already-booked time slots.
+ */
+async function getMyBookedTimes(patientId) {
+  const { data, error } = await appointmentDao.findByPatientId(patientId);
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+
+  const ACTIVE_STATUSES = ["Confirmed", "Checked-in", "Conflict"];
+  const bookedTimes = [];
+
+  for (const appt of data || []) {
+    if (!ACTIVE_STATUSES.includes(appt.status)) continue;
+    for (const slotEntry of appt.appointment_slot || []) {
+      const slot = slotEntry.work_slot;
+      const workDate = slot?.schedules?.work_date;
+      const startTime = slot?.time_slot_config?.start_time;
+      if (workDate && startTime) {
+        bookedTimes.push({ date: workDate, startTime: startTime.slice(0, 5) });
+      }
+    }
+  }
+
+  return bookedTimes;
+}
+
 module.exports = {
   bookAppointment,
   cancelAppointment,
+  checkInAppointment,
   getAll,
   getMyAppointments,
+  getMyBookedTimes,
+  startTreatment,
 };

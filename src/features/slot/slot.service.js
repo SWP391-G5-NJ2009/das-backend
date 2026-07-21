@@ -10,7 +10,7 @@ const AppError = require("../../utils/AppError");
  */
 async function getAvailableSlots(dentistId, date) {
   if (!dentistId || !date) {
-    throw new AppError("dentistId and date are required.", 400, "VALIDATION_ERROR");
+    throw new AppError("Thiếu dentistId và ngày.", 400, "VALIDATION_ERROR");
   }
 
   const raw = await slotDao.findSlotsByDentistAndDate(Number(dentistId), date);

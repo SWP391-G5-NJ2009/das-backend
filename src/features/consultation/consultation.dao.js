@@ -7,11 +7,16 @@ async function findAllConsultationRequests(filters = {}) {
   let query = supabase
     .from("consultation_request")
     .select("*", { count: "exact" })
-    .order("created_at", { ascending: false })
     .range((page-1)*PAGE_SIZE, page*PAGE_SIZE-1);
 
   if (filters.status && filters.status !== "All") {
-    query = query.eq("status", filters.status)
+    query = query.eq("status", filters.status);
+  }
+
+  if (filters.status && filters.status === "Pending") {
+    query = query.order("created_at", { ascending: true });
+  } else {
+    query = query.order("created_at", { ascending: false });
   }
 
   if (filters.search) {

@@ -4,7 +4,7 @@ const { sendSuccess } = require("../../utils/response");
 async function getNewPatient(req, res, next) {
     try {
         const data = await patientAnalytics.getNewPatient();
-        return sendSuccess(res, 200, data, "New patient count retrieved successfully.");
+        return sendSuccess(res, 200, data, "Lấy số lượng bệnh nhân mới thành công.");
     } catch (err) {
         return next(err);
     }
@@ -13,7 +13,7 @@ async function getNewPatient(req, res, next) {
 async function getNoShowRate(req, res, next) {
     try {
         const data = await patientAnalytics.getNoShowRate();
-        return sendSuccess(res, 200, data, "No-show rate retrieved successfully.");
+        return sendSuccess(res, 200, data, "Lấy tỷ lệ vắng mặt thành công.");
     } catch (err) {
         return next(err);
     }
@@ -22,7 +22,7 @@ async function getNoShowRate(req, res, next) {
 async function getReturningPatient(req, res, next) {
     try {
         const data = await patientAnalytics.getReturningPatient();
-        return sendSuccess(res, 200, data, "Returning patient count retrieved successfully.");
+        return sendSuccess(res, 200, data, "Lấy số lượng bệnh nhân quay lại thành công.");
     } catch (err) {
         return next(err);
     }
@@ -31,7 +31,7 @@ async function getReturningPatient(req, res, next) {
 async function getMonthlyNewPatient(req, res, next) {
     try {
         const data = await patientAnalytics.getMonthlyNewPatient();
-        return sendSuccess(res, 200, data, "Monthly new patient count retrieved successfully.");
+        return sendSuccess(res, 200, data, "Lấy số lượng bệnh nhân mới theo tháng thành công.");
     } catch (err) {
         return next(err);
     }
@@ -40,7 +40,7 @@ async function getMonthlyNewPatient(req, res, next) {
 async function getMonthlyReturningPatient(req, res, next) {
     try {
         const data = await patientAnalytics.getMonthlyReturningPatient();
-        return sendSuccess(res, 200, data, "Monthly returning patient count retrieved successfully.");
+        return sendSuccess(res, 200, data, "Lấy số lượng bệnh nhân quay lại theo tháng thành công.");
     } catch (err) {
         return next(err);
     }
@@ -49,7 +49,7 @@ async function getMonthlyReturningPatient(req, res, next) {
 async function getMonthlyNoShowRate(req, res, next) {
     try {
         const data = await patientAnalytics.getMonthlyNoShowRate();
-        return sendSuccess(res, 200, data, "Monthly no show rate retrieved successfully.");
+        return sendSuccess(res, 200, data, "Lấy tỷ lệ vắng mặt theo tháng thành công.");
     } catch (err) {
         return next(err);
     }

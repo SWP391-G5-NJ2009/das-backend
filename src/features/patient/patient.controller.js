@@ -9,10 +9,10 @@ async function searchPatients(req, res, next) {
   try {
     const q = (req.query.q || "").trim();
     if (q.length < 2) {
-      return sendSuccess(res, 200, [], "Query too short.");
+      return sendSuccess(res, 200, [], "Từ khóa tìm kiếm quá ngắn.");
     }
     const data = await patientService.searchPatients(q);
-    return sendSuccess(res, 200, data, "Patients fetched successfully.");
+    return sendSuccess(res, 200, data, "Lấy danh sách bệnh nhân thành công.");
   } catch (err) {
     return next(err);
   }
@@ -22,7 +22,7 @@ async function createPatientAccount(req, res, next) {
   try {
     const payload = validateCreatePatientAccount(req.body);
     const data = await patientService.createPatientAccount(payload);
-    return sendSuccess(res, 201, data, "Patient account created successfully.");
+    return sendSuccess(res, 201, data, "Tạo tài khoản bệnh nhân thành công.");
   } catch (err) {
     return next(err);
   }
@@ -35,7 +35,7 @@ async function getMyTreatmentHistory(req, res, next) {
       res,
       200,
       data,
-      "Treatment history fetched successfully.",
+      "Lấy lịch sử điều trị thành công.",
     );
   } catch (err) {
     return next(err);
@@ -52,7 +52,7 @@ async function getTreatmentHistoryByPatient(req, res, next) {
       res,
       200,
       data,
-      "Treatment history fetched successfully.",
+      "Lấy lịch sử điều trị thành công.",
     );
   } catch (err) {
     return next(err);
@@ -67,7 +67,7 @@ async function liftBookingBan(req, res, next) {
   try {
     const patientId = Number(req.params.patientId);
     const data = await patientService.liftBookingBan(patientId);
-    return sendSuccess(res, 200, data, "Booking ban lifted successfully.");
+    return sendSuccess(res, 200, data, "Gỡ chặn đặt lịch thành công.");
   } catch (err) {
     return next(err);
   }

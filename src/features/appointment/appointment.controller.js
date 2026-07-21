@@ -5,10 +5,35 @@ const {
   validateCancelAppointment,
 } = require("./appointment.validator");
 
-/**
- * GET /api/appointments/my
- * Patient: fetch own appointments (filtered by JWT patientId).
- */
+async function getMyBookedTimes(req, res, next) {
+  try {
+    const patientId = req.user.profileId;
+    const data = await appointmentService.getMyBookedTimes(patientId);
+    return sendSuccess(res, 200, data, "Lấy khung giờ đã đặt thành công.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function getPatientBookedTimesForReceptionist(req, res, next) {
+  try {
+    const patientId = parseInt(req.query.patientId, 10);
+    if (!patientId) {
+      return next(
+        new (require("../../utils/AppError"))(
+          "patientId là bắt buộc.",
+          400,
+          "VALIDATION_ERROR",
+        ),
+      );
+    }
+    const data = await appointmentService.getMyBookedTimes(patientId);
+    return sendSuccess(res, 200, data, "Lấy khung giờ đã đặt thành công.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
 async function getMyAppointments(req, res, next) {
   try {
     const patientId = req.user.profileId;
@@ -20,17 +45,12 @@ async function getMyAppointments(req, res, next) {
       search: req.query.search || null,
     };
     const data = await appointmentService.getMyAppointments(patientId, filters);
-    return sendSuccess(res, 200, data, "Appointments fetched successfully.");
+    return sendSuccess(res, 200, data, "Lấy danh sách lịch hẹn thành công.");
   } catch (err) {
     return next(err);
   }
 }
 
-/**
- * GET /api/appointments
- * Receptionist: fetch all clinic appointments.
- * Dentist: fetch own assigned appointments.
- */
 async function getAllAppointments(req, res, next) {
   try {
     const filters = {
@@ -42,16 +62,12 @@ async function getAllAppointments(req, res, next) {
       dentistId: req.user.role === "dentist" ? req.user.profileId : null,
     };
     const data = await appointmentService.getAll(filters);
-    return sendSuccess(res, 200, data, "Appointments fetched successfully.");
+    return sendSuccess(res, 200, data, "Lấy danh sách lịch hẹn thành công.");
   } catch (err) {
     return next(err);
   }
 }
 
-/**
- * PATCH /api/appointments/:id/cancel
- * Patient or Staff: cancel an appointment.
- */
 async function cancelAppointment(req, res, next) {
   try {
     const apptId = parseInt(req.params.id, 10);
@@ -65,20 +81,23 @@ async function cancelAppointment(req, res, next) {
       role,
       profileId,
     );
-    return sendSuccess(res, 200, data, "Appointment cancelled successfully.");
+    return sendSuccess(res, 200, data, "Hủy lịch hẹn thành công.");
   } catch (err) {
     return next(err);
   }
 }
 
-/**
- * POST /api/appointments
- * Patient or Receptionist: create a new appointment.
- */
 async function bookAppointment(req, res, next) {
   try {
-    const { slotId, serviceId, note, patientId: bodyPatientId, newPatient, slotOccupied } =
-      validateBookAppointment(req.body);
+    const {
+      slotId,
+      serviceId,
+      note,
+      patientId: bodyPatientId,
+      newPatient,
+      slotOccupied,
+      consultationRequestId,
+    } = validateBookAppointment(req.body);
     const { role, profileId, id: actorAccountId } = req.user;
 
     if (role === "receptionist" && !bodyPatientId && !newPatient) {
@@ -92,17 +111,42 @@ async function bookAppointment(req, res, next) {
     }
 
     const data = await appointmentService.bookAppointment({
-      // Patient books for themselves; receptionist supplies patientId or newPatient
-      patientId: role === "patient" ? Number(profileId) : bodyPatientId ? Number(bodyPatientId) : null,
-      newPatient: role === "receptionist" ? (newPatient || null) : null,
+      patientId:
+        role === "patient"
+          ? Number(profileId)
+          : bodyPatientId
+            ? Number(bodyPatientId)
+            : null,
+      newPatient: role === "receptionist" ? newPatient || null : null,
       slotId: Number(slotId),
       serviceId: Number(serviceId),
       note,
       actorAccountId,
       actorRole: role,
       slotOccupied: slotOccupied ?? 1,
+      consultationRequestId: consultationRequestId || null,
     });
-    return sendSuccess(res, 201, data, "Appointment booked successfully.");
+    return sendSuccess(res, 201, data, "Đặt lịch hẹn thành công.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function checkInAppointment(req, res, next) {
+  try {
+    const apptId = parseInt(req.params.id, 10);
+    const data = await appointmentService.checkInAppointment(apptId);
+    return sendSuccess(res, 200, data, "Check-in bệnh nhân thành công.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function startTreatment(req, res, next) {
+  try {
+    const apptId = parseInt(req.params.id, 10);
+    const data = await appointmentService.startTreatment(apptId, req.user.profileId);
+    return sendSuccess(res, 200, data, "Bắt đầu điều trị thành công.");
   } catch (err) {
     return next(err);
   }
@@ -111,6 +155,10 @@ async function bookAppointment(req, res, next) {
 module.exports = {
   bookAppointment,
   cancelAppointment,
+  checkInAppointment,
   getAllAppointments,
   getMyAppointments,
+  getMyBookedTimes,
+  getPatientBookedTimesForReceptionist,
+  startTreatment,
 };

@@ -16,9 +16,10 @@ const profileRoutes = require("./features/profile/profile.routes");
 const roomRoutes = require("./features/room/room.routes");
 const revenueRoutes = require("./features/revenue/revenue.routes");
 const patientAnalyticsRoutes = require("./features/patientAnalytics/patientAnalytics.routes");
-const clinicScheduleManagementRoutes = require("./features/clinicScheduleManagement/clinicScheduleManagement.routes");
 const scheduleRoutes = require("./features/schedule/schedule.routes");
+const appointmentDashboardRoutes = require("./features/appointmentDashboard/appointmentDashboard.routes");
 const staffRoutes = require("./features/staff/staff.routes");
+const treatmentRoutes = require("./features/treatment/treatment.routes");
 const {
   errorMiddleware,
   notFoundMiddleware,
@@ -52,7 +53,7 @@ app.use(
 app.use(express.json());
 
 app.get("/api/health", (req, res) =>
-  sendSuccess(res, 200, { status: "ok" }, "OK"),
+  sendSuccess(res, 200, { status: "ok" }, "Thành công"),
 );
 
 app.use("/api/consultations", consultationRoutes);
@@ -68,9 +69,10 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/rooms", roomRoutes);
 app.use("/api/reports/revenue", revenueRoutes);
 app.use("/api/reports/patient", patientAnalyticsRoutes);
-app.use("/api/schedule/management", clinicScheduleManagementRoutes);
 app.use("/api/schedules", scheduleRoutes);
+app.use("/api/owner/appointment-dashboard", appointmentDashboardRoutes);
 app.use("/api/staff", staffRoutes);
+app.use("/api/treatments", treatmentRoutes);
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 

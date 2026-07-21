@@ -9,7 +9,7 @@ async function getAvailableSlots(req, res, next) {
   try {
     const { dentistId, date } = req.query;
     const data = await slotService.getAvailableSlots(dentistId, date);
-    return sendSuccess(res, 200, data, "Slots fetched successfully.");
+    return sendSuccess(res, 200, data, "Lấy khung giờ thành công.");
   } catch (err) {
     return next(err);
   }

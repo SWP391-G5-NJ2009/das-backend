@@ -25,7 +25,7 @@ async function getAllServices() {
 
   if (error) {
     throw new AppError(
-      "Failed to load service list. Please try again later.",
+      "Không thể tải danh sách dịch vụ. Vui lòng thử lại sau.",
       500,
       "DB_ERROR",
     );
@@ -58,7 +58,7 @@ async function getPublicServices() {
 
   if (error) {
     throw new AppError(
-      "Failed to load public service list. Please try again later.",
+      "Không thể tải danh sách dịch vụ công khai. Vui lòng thử lại sau.",
       500,
       "DB_ERROR",
     );
@@ -73,7 +73,7 @@ async function deleteService(id) {
   const everBooked = await appointmentDao.hasAnyAppointmentByServiceId(id);
   if (everBooked) {
     throw new AppError(
-      "Deletion Denied. This service cannot be deleted because it contains linked appointment record. Please use the Inactivate status instead to hide it.",
+      "Không thể xóa dịch vụ này vì đã có lịch hẹn liên kết. Vui lòng chuyển trạng thái sang 'Ngừng hoạt động' để ẩn dịch vụ thay vì xóa.",
       409,
       "SERVICE_HAS_HISTORY",
     );
@@ -83,7 +83,7 @@ async function deleteService(id) {
 
   if (error) {
     throw new AppError(
-      "Failed to delete service. Please try again later.",
+      "Không thể xóa dịch vụ. Vui lòng thử lại sau.",
       500,
       "DB_ERROR",
     );
@@ -121,7 +121,7 @@ async function getAllCategories() {
 
   if (error) {
     throw new AppError(
-      "Failed to load service categories. Please try again later.",
+      "Không thể tải danh mục dịch vụ. Vui lòng thử lại sau.",
       500,
       "DB_ERROR",
     );
@@ -170,6 +170,7 @@ async function getDentistsByServiceId(serviceId) {
   return (data || [])
     .map((row) => row.dentist)
     .filter(Boolean)
+    .filter((d) => d.account?.status !== "Deactivated")
     .map((d) => ({
       dentist_id: d.dentist_id,
       full_name: d.full_name || d.account?.email || `Dentist #${d.dentist_id}`,
