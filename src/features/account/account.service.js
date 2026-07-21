@@ -1,6 +1,8 @@
 const accountDao = require("./account.dao");
+const logger = require("../../utils/logger");
 const AppError = require("../../utils/AppError");
 const { hashPassword } = require("../../utils/password");
+const profileDao = require("../profile/profile.dao");
 
 async function getAllAccounts(filters = {}) {
   let queryFilters = { ...filters };
@@ -13,7 +15,8 @@ async function getAllAccounts(filters = {}) {
   const { data, error, count } = await accountDao.findAllAccounts(queryFilters);
 
   if (error) {
-    throw new AppError(error.message, 500, "DB_ERROR");
+    logger.error("Failed to retrieve accounts", error);
+    throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
   return { items: data || [], total: count || 0 };
@@ -23,18 +26,45 @@ async function ensureUsernameAvailable(username, accountId = null) {
   const lookup = accountId
     ? accountDao.findAccountByUsernameExcept(username, accountId)
     : accountDao.findAccountByUsername(username);
-  const { data: existing } = await lookup;
+  const { data, error } = await lookup;
 
-  if (existing) {
-    throw new AppError("Tên đăng nhập đã tồn tại.", 409, "DUPLICATE_USERNAME");
+  if (error) {
+    logger.error("Failed to check username availability", error);
+    throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
+  }
+
+  if (data) {
+    throw new AppError("Tên đăng nhập đã được sử dụng.", 409, "DUPLICATE_USERNAME");
+  }
+}
+
+async function ensureEmailAvailable(email, accountId = null) {
+  const lookup = accountId
+    ? accountDao.findAccountByEmailExcept(email, accountId)
+    : accountDao.findAccountByEmail(email);
+  const { data, error } = await lookup;
+
+  if (error) {
+    logger.error("Failed to check email availability", error);
+    throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
+  }
+
+  if (data) {
+    throw new AppError("Email đã được sử dụng.", 409, "DUPLICATE_EMAIL");
   }
 }
 
 async function getRoleId(roleName) {
   const { data: role, error } = await accountDao.findRoleByName(roleName);
 
-  if (error || !role) {
-    throw new AppError(`Role '${roleName}' not found.`, 400, "INVALID_ROLE");
+  if (error) {
+    logger.error("Failed to retrieve role name", error);
+    throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
+  }
+
+  if (!role) {
+    logger.error(`Role '${roleName}' not found`);
+    throw new AppError("Đã xảy ra lỗi khi tìm vai trò", 400, "INVALID_ROLE");
   }
 
   return role.role_id;
@@ -46,23 +76,26 @@ async function createAccount({
   phone,
   password,
   role_name,
-  status,
 }) {
   await ensureUsernameAvailable(username);
+  if (email) {
+    await ensureEmailAvailable(email);
+  }
 
   const role_id = await getRoleId(role_name);
   const password_hash = await hashPassword(password);
   const { data, error } = await accountDao.insertAccount({
     username,
-    email,
-    phone,
+    email: email || null,
+    phone: phone || null,
     password_hash,
     role_id,
-    status: status || "Active",
+    status: "Active",
   });
 
   if (error) {
-    throw new AppError(error.message, 500, "DB_ERROR");
+    logger.error("Failed to insert account", error);
+    throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
   return data;
@@ -72,15 +105,27 @@ async function updateAccount(
   accountId,
   { username, email, phone, password, role_name, status },
 ) {
+
   const updateFields = {
-    ...(email !== undefined ? { email } : {}),
-    ...(phone !== undefined ? { phone } : {}),
     ...(status !== undefined ? { status } : {}),
   };
 
   if (username !== undefined) {
     await ensureUsernameAvailable(username, accountId);
     updateFields.username = username;
+  }
+
+  if (email !== undefined && email !== "") {
+    await ensureEmailAvailable(email, accountId);
+    updateFields.email = email;
+  } else {
+    updateFields.email = null;
+  }
+
+  if (phone !== undefined && phone !== "") {
+    updateFields.phone = phone;
+  } else {
+    updateFields.phone = null;
   }
 
   if (password !== undefined) {
@@ -101,23 +146,56 @@ async function updateAccount(
   );
 
   if (error) {
-    throw new AppError(error.message, 500, "DB_ERROR");
+    logger.error("Failed to update account", error);
+    throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
   return data;
 }
 
 async function deleteAccount(accountId) {
-  const { data: existing } = await accountDao.findAccountById(accountId);
+  const { data, error: findAccountError } = await accountDao.findAccountById(accountId);
 
-  if (!existing) {
+  if (findAccountError) {
+    logger.error("Failed to find account to delete", findAccountError);
+    throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
+  }
+
+  if (!data) {
     throw new AppError("Không tìm thấy tài khoản.", 404, "NOT_FOUND");
   }
 
-  const { error } = await accountDao.deleteAccount(accountId);
+  const ROLE_TABLE_MAP = {
+    Receptionist: "receptionist",
+    Dentist: "dentist",
+    Patient: "patient",
+  };
 
-  if (error) {
-    throw new AppError(error.message, 500, "DB_ERROR");
+  const ROLE_DISPLAY_NAME = {
+    Receptionist: "lễ tân",
+    Dentist: "nha sĩ",
+    Patient: "bệnh nhân",
+  };
+
+  const table = ROLE_TABLE_MAP[data.role.role_name];
+  if (table) {
+    const hasProfile = await profileDao.checkProfileExists(table, accountId);
+    if (hasProfile) {
+      throw new AppError(
+        `Đang có hồ sơ ${ROLE_DISPLAY_NAME[data.role.role_name]} liên kết tới tài khoản này.`,
+        409,
+        "ACCOUNT_HAS_LINKED_PROFILE",
+      );
+    }
+  }
+
+  await accountDao.deleteOtpTokensByAccountId(accountId);
+
+  const { error: deleteError } = await accountDao.deleteAccount(accountId);
+
+  if (deleteError) {
+    logger.error("Failed to delete account", deleteError);
+    throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
   return { account_id: accountId };

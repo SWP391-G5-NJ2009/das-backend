@@ -21,10 +21,7 @@ async function findAllAccounts(filters = {}) {
 
   if (filters.date) {
     const start = new Date(filters.date);
-    //const end = new Date(start);
     query = query.gte("created_date", start.toISOString());
-    // .lt("created_at", end.toISOString());
-
   }
 
   return query;
@@ -47,10 +44,27 @@ async function findAccountByUsernameExcept(username, accountId) {
     .maybeSingle();
 }
 
-async function findAccountById(accountId) {
+async function findAccountByEmail(email) {
   return supabase
     .from("account")
     .select("account_id")
+    .eq("email", email)
+    .maybeSingle();
+}
+
+async function findAccountByEmailExcept(email, accountId) {
+  return supabase
+    .from("account")
+    .select("account_id")
+    .eq("email", email)
+    .neq("account_id", accountId)
+    .maybeSingle();
+}
+
+async function findAccountById(accountId) {
+  return supabase
+    .from("account")
+    .select("account_id, role(role_name)")
     .eq("account_id", accountId)
     .single();
 }
@@ -84,11 +98,18 @@ async function deleteAccount(accountId) {
   return supabase.from("account").delete().eq("account_id", accountId);
 }
 
+async function deleteOtpTokensByAccountId(accountId) {
+  return supabase.from("otp_tokens").delete().eq("account_id", accountId);
+}
+
 module.exports = {
   deleteAccount,
+  deleteOtpTokensByAccountId,
   findAccountById,
   findAccountByUsername,
   findAccountByUsernameExcept,
+  findAccountByEmail,
+  findAccountByEmailExcept,
   findAllAccounts,
   findRoleByName,
   insertAccount,

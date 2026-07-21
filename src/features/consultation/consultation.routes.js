@@ -7,7 +7,7 @@ const router = express.Router();
 
 const spamLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 3,
+  max: 5,
   message: { success: false, message: "Quá nhiều yêu cầu. Vui lòng thử lại sau." },
 });
 
@@ -21,7 +21,7 @@ router.get(
   consultationController.getAllConsultationRequests,
 );
 
-router.put(
+router.patch(
   "/consultation-requests/:id",
   authMiddleware,
   requireRole("receptionist"),

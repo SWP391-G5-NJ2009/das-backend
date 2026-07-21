@@ -4,6 +4,7 @@ const {
   validateCreateConsultation,
   validateUpdateConsultation,
 } = require("./consultation.validator");
+const AppError = require("../../utils/AppError");
 
 async function getAllConsultationRequests(req, res, next) {
   try {
