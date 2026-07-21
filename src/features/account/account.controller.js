@@ -43,7 +43,7 @@ async function updateAccount(req, res, next) {
 async function deleteAccount(req, res, next) {
   try {
     const { id } = req.params;
-    const data = await accountService.deleteAccount(id);
+    const data = await accountService.deleteAccount(id, req.user.id);
     return sendSuccess(res, 200, data, "Xóa tài khoản thành công.");
   } catch (err) {
     return next(err);

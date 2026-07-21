@@ -153,7 +153,11 @@ async function updateAccount(
   return data;
 }
 
-async function deleteAccount(accountId) {
+async function deleteAccount(accountId, requestingAccountId) {
+  if (accountId === requestingAccountId) {
+    throw new AppError("Không thể xóa tài khoản của chính mình.", 409, "CANNOT_DELETE_SELF");
+  }
+
   const { data, error: findAccountError } = await accountDao.findAccountById(accountId);
 
   if (findAccountError) {
