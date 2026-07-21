@@ -27,9 +27,13 @@ const createConsultationSchema = Joi.object({
 
 const updateConsultationSchema = Joi.object({
   status: Joi.string()
-    .valid("Pending", "Resolved", "Spam", "Fail-to-contact", "Other")
-    .required(),
-  note: Joi.string().trim().max(2000).allow("", null),
+    .valid("Pending", "Resolved", "Follow-up", "Spam", "Fail-to-contact", "Booked", "Other")
+    .required().messages({
+    "any.required": "Trạng thái là bắt buộc.",
+  }),
+  note: Joi.string().trim().max(2000).allow("", null).messages({
+    "string.max": "Nội dung không được vượt quá 2000 kí tự.",
+  }),
 });
 
 function validateCreateConsultation(payload) {
