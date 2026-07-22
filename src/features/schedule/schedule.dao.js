@@ -18,9 +18,9 @@ const SCHEDULE_SELECT = `
     status,
     time_slot_config:slot_config_id (
       slot_config_id,
+      slot_name,
       start_time,
       end_time,
-      version_id,
       day_of_week
     )
   )
@@ -29,47 +29,17 @@ const SCHEDULE_SELECT = `
 function findTimeSlotConfigs() {
   return supabase
     .from("time_slot_config")
-    .select("slot_config_id, slot_name, start_time, end_time, version_id, day_of_week")
-    .order("day_of_week", { ascending: true })
-    .order("slot_config_id", { ascending: true });
-}
-
-function findTimeSlotConfigsByVersion(versionId) {
-  return supabase
-    .from("time_slot_config")
-    .select("slot_config_id, slot_name, start_time, end_time, version_id, day_of_week")
-    .eq("version_id", versionId)
-    .order("day_of_week", { ascending: true })
-    .order("slot_config_id", { ascending: true });
-}
-
-function findWorkingHoursByVersion(versionId) {
-  return supabase
-    .from("clinic_working_hour")
-    .select("working_hour_id, version_id, day_of_week, start_time, end_time")
-    .eq("version_id", versionId)
+    .select("slot_config_id, slot_name, start_time, end_time, day_of_week")
     .order("day_of_week", { ascending: true })
     .order("start_time", { ascending: true });
 }
 
-function findTimeSlotConfigsByVersionAndDay(versionId, dayOfWeek) {
+function findTimeSlotConfigsByDay(dayOfWeek) {
   return supabase
     .from("time_slot_config")
-    .select("slot_config_id, slot_name, start_time, end_time, version_id, day_of_week")
-    .eq("version_id", versionId)
+    .select("slot_config_id, slot_name, start_time, end_time, day_of_week")
     .eq("day_of_week", dayOfWeek)
-    .order("slot_config_id", { ascending: true });
-}
-
-function findClinicScheduleVersionForDate(workDate) {
-  return supabase
-    .from("clinic_schedule_version")
-    .select("version_id, name, effective_date, status")
-    .in("status", ["Active", "Pending"])
-    .lte("effective_date", workDate)
-    .order("effective_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("start_time", { ascending: true });
 }
 
 function findClinicInfo() {
@@ -86,6 +56,13 @@ function findAvailableRooms() {
     .select("room_id, room_name, dentist_id, status")
     .in("status", ["Available", "Active"])
     .order("room_name", { ascending: true });
+}
+
+function findDentists() {
+  return supabase
+    .from("dentist")
+    .select("dentist_id, full_name, speciality, email, phone")
+    .order("full_name", { ascending: true });
 }
 
 function findDentistByAccountId(accountId) {
@@ -129,6 +106,20 @@ function findSchedulesForOwner({ dateFrom, dateTo, status } = {}) {
   return query;
 }
 
+function findSchedulesForDentistView(dentistId, { dateFrom, dateTo } = {}) {
+  let query = supabase
+    .from("schedules")
+    .select(SCHEDULE_SELECT)
+    .eq("dentist_id", dentistId)
+    .eq("status", "Scheduled")
+    .order("work_date", { ascending: true });
+
+  if (dateFrom) query = query.gte("work_date", dateFrom);
+  if (dateTo) query = query.lte("work_date", dateTo);
+
+  return query;
+}
+
 function findScheduleById(scheduleId) {
   return supabase
     .from("schedules")
@@ -156,8 +147,10 @@ function findWorkSlotsByIdsForDentist(slotIds, dentistId) {
       slot_config_id,
       status,
       time_slot_config:slot_config_id (
+        slot_config_id,
         start_time,
-        end_time
+        end_time,
+        day_of_week
       ),
       schedules:schedule_id!inner (
         schedule_id,
@@ -299,17 +292,16 @@ module.exports = {
   deleteEditableWorkSlots,
   findAvailableRooms,
   findAffectedAppointmentsBySlotIds,
-  findClinicScheduleVersionForDate,
   findClinicInfo,
   findDentistByAccountId,
+  findDentists,
   findScheduleByDentistAndDate,
   findScheduleById,
   findSchedulesByDentist,
+  findSchedulesForDentistView,
   findSchedulesForOwner,
   findTimeSlotConfigs,
-  findTimeSlotConfigsByVersion,
-  findTimeSlotConfigsByVersionAndDay,
-  findWorkingHoursByVersion,
+  findTimeSlotConfigsByDay,
   findWorkSlotsByIdsForDentist,
   findWorkSlotsByScheduleId,
   insertSchedule,

@@ -103,7 +103,7 @@ function parseScheduleStatus(rawStatus) {
   };
 }
 
-function normalizeSchedule(row) {
+function normalizeSchedule(row, roomsByDentist = new Map()) {
   const sortedSlots = [...(row.work_slot || [])]
     .filter((slot) => slot.time_slot_config)
     .sort((firstSlot, secondSlot) =>
@@ -114,6 +114,7 @@ function normalizeSchedule(row) {
   const firstSlot = sortedSlots[0];
   const lastSlot = sortedSlots[sortedSlots.length - 1];
   const status = parseScheduleStatus(row.status);
+  const assignedRoom = roomsByDentist.get(Number(row.dentist_id)) || null;
 
   return {
     id: String(row.schedule_id),
@@ -122,6 +123,11 @@ function normalizeSchedule(row) {
     dentistName: row.dentist?.full_name || `Dentist #${row.dentist_id}`,
     date: row.work_date,
     work_date: row.work_date,
+    room_id: assignedRoom?.room_id || null,
+    roomName: assignedRoom?.room_name
+      ? `Room ${assignedRoom.room_name}`
+      : "No assigned room",
+    roomStatus: assignedRoom?.status || null,
     status: status.label,
     rawStatus: row.status,
     ownerNote: status.ownerNote,
@@ -132,7 +138,6 @@ function normalizeSchedule(row) {
       slot_id: slot.slot_id,
       status: slot.status,
       slot_config_id: slot.time_slot_config.slot_config_id,
-      versionId: slot.time_slot_config.version_id,
       dayOfWeek: slot.time_slot_config.day_of_week,
       startTime: slot.time_slot_config.start_time.substring(0, 5),
       endTime: slot.time_slot_config.end_time.substring(0, 5),
@@ -206,26 +211,12 @@ function buildClinicWindow(slots = [], fallback = {}) {
 }
 
 async function getSlotConfigsForWorkDate(workDate, cache = new Map()) {
-  const { data: version, error: versionError } =
-    await scheduleDao.findClinicScheduleVersionForDate(workDate);
-
-  if (versionError || !version) {
-    throw new AppError(
-      "No clinic working-hour version is available for the selected date.",
-      400,
-      "CLINIC_SCHEDULE_VERSION_NOT_FOUND",
-    );
-  }
-
   const dayOfWeek = toClinicDayOfWeek(workDate);
-  const cacheKey = `${version.version_id}:${dayOfWeek}`;
+  const cacheKey = String(dayOfWeek);
 
   if (!cache.has(cacheKey)) {
     const { data, error } =
-      await scheduleDao.findTimeSlotConfigsByVersionAndDay(
-        version.version_id,
-        dayOfWeek,
-      );
+      await scheduleDao.findTimeSlotConfigsByDay(dayOfWeek);
 
     if (error) {
       throw new AppError("Không thể tải khung giờ của phòng khám.", 500, "DB_ERROR");
@@ -235,6 +226,74 @@ async function getSlotConfigsForWorkDate(workDate, cache = new Map()) {
   }
 
   return cache.get(cacheKey);
+}
+
+function deriveWorkingHoursFromSlots(slots = []) {
+  const byDay = new Map();
+
+  slots.forEach((slot) => {
+    const day = Number(slot.day_of_week);
+    if (!day) return;
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day).push(slot);
+  });
+
+  const ranges = [];
+
+  [...byDay.entries()]
+    .sort(([firstDay], [secondDay]) => firstDay - secondDay)
+    .forEach(([dayOfWeek, daySlots]) => {
+      const sorted = daySlots
+        .filter((slot) => slot.start_time && slot.end_time)
+        .sort((first, second) =>
+          String(first.start_time).localeCompare(String(second.start_time)),
+        );
+
+      let current = null;
+
+      sorted.forEach((slot) => {
+        if (!current) {
+          current = {
+            working_hour_id: `${dayOfWeek}-${slot.start_time}`,
+            day_of_week: dayOfWeek,
+            start_time: slot.start_time,
+            end_time: slot.end_time,
+          };
+          return;
+        }
+
+        if (current.end_time === slot.start_time) {
+          current.end_time = slot.end_time;
+          return;
+        }
+
+        ranges.push(current);
+        current = {
+          working_hour_id: `${dayOfWeek}-${slot.start_time}`,
+          day_of_week: dayOfWeek,
+          start_time: slot.start_time,
+          end_time: slot.end_time,
+        };
+      });
+
+      if (current) ranges.push(current);
+    });
+
+  return ranges;
+}
+
+async function buildRoomsByDentistMap() {
+  const { data: rooms, error } = await scheduleDao.findAvailableRooms();
+
+  if (error) {
+    throw new AppError("Failed to load room assignments.", 500, "DB_ERROR");
+  }
+
+  return new Map(
+    (rooms || [])
+      .filter((room) => room.dentist_id)
+      .map((room) => [Number(room.dentist_id), room]),
+  );
 }
 
 function selectSlotConfigs(slotConfigs, startTime, endTime) {
@@ -274,32 +333,20 @@ async function resolveDentistId(user) {
 
 async function getScheduleMeta() {
   const nextMonth = getNextMonthBounds();
-  const { data: clinicVersion, error: clinicVersionError } =
-    await scheduleDao.findClinicScheduleVersionForDate(nextMonth.startDate);
-  const slotConfigRequest = clinicVersion
-    ? scheduleDao.findTimeSlotConfigsByVersion(clinicVersion.version_id)
-    : Promise.resolve({ data: [], error: null });
-  const workingHourRequest = clinicVersion
-    ? scheduleDao.findWorkingHoursByVersion(clinicVersion.version_id)
-    : Promise.resolve({ data: [], error: null });
   const [
     { data: rooms, error: roomError },
     { data: slots, error: slotError },
-    { data: workingHours, error: workingHourError },
     { data: clinicInfo, error: clinicError },
   ] = await Promise.all([
     scheduleDao.findAvailableRooms(),
-    slotConfigRequest,
-    workingHourRequest,
+    scheduleDao.findTimeSlotConfigs(),
     scheduleDao.findClinicInfo(),
   ]);
 
   if (
     roomError ||
     slotError ||
-    workingHourError ||
-    clinicError ||
-    clinicVersionError
+    clinicError
   ) {
     throw new AppError(
       "Failed to load schedule setup data.",
@@ -309,6 +356,7 @@ async function getScheduleMeta() {
   }
 
   const clinicWindow = buildClinicWindow(slots || [], clinicInfo || {});
+  const workingHours = deriveWorkingHoursFromSlots(slots || []);
   const workingDays = [
     ...new Set(
       (workingHours || [])
@@ -318,14 +366,7 @@ async function getScheduleMeta() {
   ].sort((first, second) => first - second);
 
   return {
-    scheduleVersion: clinicVersion
-      ? {
-          versionId: clinicVersion.version_id,
-          name: clinicVersion.name,
-          effectiveDate: clinicVersion.effective_date,
-          status: clinicVersion.status,
-        }
-      : null,
+    scheduleVersion: null,
     clinic: {
       openTime: clinicWindow.openTime,
       closeTime: clinicWindow.closeTime,
@@ -341,7 +382,6 @@ async function getScheduleMeta() {
     workingDays,
     workingHours: (workingHours || []).map((hour) => ({
       workingHourId: hour.working_hour_id,
-      versionId: hour.version_id,
       dayOfWeek: hour.day_of_week,
       startTime: hour.start_time.substring(0, 5),
       endTime: hour.end_time.substring(0, 5),
@@ -349,7 +389,6 @@ async function getScheduleMeta() {
     timeSlots: (slots || []).map((slot) => ({
       slot_config_id: slot.slot_config_id,
       slotName: slot.slot_name,
-      versionId: slot.version_id,
       dayOfWeek: slot.day_of_week,
       startTime: slot.start_time.substring(0, 5),
       endTime: slot.end_time.substring(0, 5),
@@ -368,7 +407,8 @@ async function getMySchedule(user, filters = {}) {
     throw new AppError("Không thể tải lịch của bạn.", 500, "DB_ERROR");
   }
 
-  return (data || []).map(normalizeSchedule);
+  const roomsByDentist = await buildRoomsByDentistMap();
+  return (data || []).map((row) => normalizeSchedule(row, roomsByDentist));
 }
 
 async function listScheduleRequests(filters = {}) {
@@ -378,7 +418,66 @@ async function listScheduleRequests(filters = {}) {
     throw new AppError("Không thể tải yêu cầu lịch.", 500, "DB_ERROR");
   }
 
-  return (data || []).map(normalizeSchedule);
+  const roomsByDentist = await buildRoomsByDentistMap();
+  return (data || []).map((row) => normalizeSchedule(row, roomsByDentist));
+}
+
+async function listDentistsForSchedule() {
+  const [
+    { data: dentists, error: dentistError },
+    { data: rooms, error: roomError },
+  ] = await Promise.all([
+    scheduleDao.findDentists(),
+    scheduleDao.findAvailableRooms(),
+  ]);
+
+  if (dentistError || roomError) {
+    throw new AppError("Failed to load dentists.", 500, "DB_ERROR");
+  }
+
+  const roomsByDentist = new Map(
+    (rooms || [])
+      .filter((room) => room.dentist_id)
+      .map((room) => [Number(room.dentist_id), room]),
+  );
+
+  return (dentists || []).map((dentist) => {
+    const assignedRoom = roomsByDentist.get(Number(dentist.dentist_id));
+
+    return {
+      dentist_id: dentist.dentist_id,
+      id: String(dentist.dentist_id),
+      full_name: dentist.full_name,
+      name: dentist.full_name || `Dentist #${dentist.dentist_id}`,
+      speciality: dentist.speciality || "",
+      email: dentist.email || "",
+      phone: dentist.phone || "",
+      room_id: assignedRoom?.room_id || null,
+      roomName: assignedRoom?.room_name
+        ? `Room ${assignedRoom.room_name}`
+        : "No assigned room",
+    };
+  });
+}
+
+async function viewDentistSchedule(filters = {}) {
+  const dentistId = Number(filters.dentistId || filters.dentist_id);
+
+  if (!dentistId) {
+    throw new AppError("dentistId is required.", 400, "VALIDATION_ERROR");
+  }
+
+  const { data, error } = await scheduleDao.findSchedulesForDentistView(
+    dentistId,
+    filters,
+  );
+
+  if (error) {
+    throw new AppError("Failed to load dentist schedule.", 500, "DB_ERROR");
+  }
+
+  const roomsByDentist = await buildRoomsByDentistMap();
+  return (data || []).map((row) => normalizeSchedule(row, roomsByDentist));
 }
 
 function normalizeAffectedAppointment(row) {
@@ -527,7 +626,7 @@ async function markAffectedAppointmentsConflict(affectedAppointments, reason) {
   return { updated: data || [], notifications };
 }
 
-async function replaceScheduleSlots(scheduleId, selectedSlotConfigs, status) {
+async function replaceScheduleSlots(scheduleId, slotRows) {
   const { error: deleteError } =
     await scheduleDao.deleteEditableWorkSlots(scheduleId);
 
@@ -539,10 +638,10 @@ async function replaceScheduleSlots(scheduleId, selectedSlotConfigs, status) {
     );
   }
 
-  const rows = selectedSlotConfigs.map((slot) => ({
+  const rows = slotRows.map((slot) => ({
     schedule_id: scheduleId,
     slot_config_id: slot.slot_config_id,
-    status,
+    status: slot.status,
   }));
   const { error: insertError } = await scheduleDao.insertWorkSlots(rows);
 
@@ -557,6 +656,12 @@ async function replaceScheduleSlots(scheduleId, selectedSlotConfigs, status) {
 
 async function submitMyScheduleRequest(user, payload = {}) {
   const dentistId = await resolveDentistId(user);
+  const busySlotConfigIds = new Set(
+    (payload.busySlotConfigIds || payload.busy_slot_config_ids || [])
+      .map((slotConfigId) => Number(slotConfigId))
+      .filter(Boolean),
+  );
+
   const dates = generateDates(payload);
   assertScheduleSubmissionWindow(dates);
   const savedSchedules = [];
@@ -567,11 +672,15 @@ async function submitMyScheduleRequest(user, payload = {}) {
       workDate,
       slotConfigCache,
     );
-    const selectedSlots = selectSlotConfigs(
-      slotConfigs || [],
-      payload.startTime || payload.start_time,
-      payload.endTime || payload.end_time,
-    );
+
+    if (!slotConfigs?.length) {
+      throw new AppError(
+        "No configured clinic slots match the selected working day.",
+        400,
+        "VALIDATION_ERROR",
+      );
+    }
+
     const { data: existing, error: lookupError } =
       await scheduleDao.findScheduleByDentistAndDate(dentistId, workDate);
 
@@ -583,27 +692,53 @@ async function submitMyScheduleRequest(user, payload = {}) {
     let preservedSlotConfigIds = new Set();
 
     if (schedule) {
-      const existingSlotIds = (schedule.work_slot || []).map(
-        (slot) => slot.slot_id,
+      const bookedSlots = (schedule.work_slot || []).filter(
+        (slot) => slot.status === "Booked",
       );
+      const conflictBookedSlotIds = bookedSlots
+        .filter((slot) =>
+          busySlotConfigIds.has(
+            Number(slot.slot_config_id || slot.time_slot_config?.slot_config_id),
+          ),
+        )
+        .map((slot) => slot.slot_id);
+
+      if (conflictBookedSlotIds.length > 0) {
+        const affectedAppointments =
+          await getAffectedAppointments(conflictBookedSlotIds);
+
+        if (affectedAppointments.length > 0) {
+          await markAffectedAppointmentsConflict(
+            affectedAppointments,
+            payload.reason ||
+            "Dentist marked this schedule slot as unavailable.",
+          );
+        }
+
+        const { error: slotUpdateError } =
+          await scheduleDao.updateWorkSlotsByIds(
+            conflictBookedSlotIds,
+            "Unavailable",
+          );
+
+        if (slotUpdateError) {
+          throw new AppError(
+            "Failed to release conflicting booked slots.",
+            500,
+            "DB_ERROR",
+          );
+        }
+      }
+
       preservedSlotConfigIds = new Set(
-        (schedule.work_slot || [])
-          .filter((slot) => slot.status === "Booked")
+        bookedSlots
+          .filter((slot) => !conflictBookedSlotIds.includes(slot.slot_id))
           .map(
             (slot) =>
-              slot.slot_config_id || slot.time_slot_config?.slot_config_id,
+              Number(slot.slot_config_id || slot.time_slot_config?.slot_config_id),
           )
           .filter(Boolean),
       );
-      const affectedAppointments = await getAffectedAppointments(existingSlotIds);
-
-      if (affectedAppointments.length > 0) {
-        await markAffectedAppointmentsConflict(
-          affectedAppointments,
-          payload.reason ||
-            "Dentist changed their work schedule for this period.",
-        );
-      }
 
       const { data: updated, error: updateError } =
         await scheduleDao.updateSchedule(schedule.schedule_id, {
@@ -630,15 +765,16 @@ async function submitMyScheduleRequest(user, payload = {}) {
       schedule = inserted[0];
     }
 
-    const slotsToCreate = selectedSlots.filter(
-      (slot) => !preservedSlotConfigIds.has(slot.slot_config_id),
-    );
+    const slotsToCreate = (slotConfigs || [])
+      .filter((slot) => !preservedSlotConfigIds.has(Number(slot.slot_config_id)))
+      .map((slot) => ({
+        slot_config_id: slot.slot_config_id,
+        status: busySlotConfigIds.has(Number(slot.slot_config_id))
+          ? "Unavailable"
+          : "Available",
+      }));
 
-    await replaceScheduleSlots(
-      schedule.schedule_id,
-      slotsToCreate,
-      "Unavailable",
-    );
+    await replaceScheduleSlots(schedule.schedule_id, slotsToCreate);
 
     const { data: refreshed } = await scheduleDao.findScheduleById(
       schedule.schedule_id,
@@ -658,10 +794,22 @@ async function approveScheduleRequest(scheduleId) {
   }
 
   if (!existing.work_slot?.length) {
-    throw new AppError(
-      "This schedule request does not contain any working slots.",
-      400,
-      "SCHEDULE_EMPTY",
+    const slotConfigs = await getSlotConfigsForWorkDate(existing.work_date);
+
+    if (!slotConfigs?.length) {
+      throw new AppError(
+        "This schedule request does not contain any working slots.",
+        400,
+        "SCHEDULE_EMPTY",
+      );
+    }
+
+    await replaceScheduleSlots(
+      scheduleId,
+      slotConfigs.map((slot) => ({
+        slot_config_id: slot.slot_config_id,
+        status: "Available",
+      })),
     );
   }
 
@@ -673,21 +821,9 @@ async function approveScheduleRequest(scheduleId) {
     throw new AppError("Không thể duyệt lịch.", 500, "DB_ERROR");
   }
 
-  const { error: slotError } = await scheduleDao.updateWorkSlotsStatus(
-    scheduleId,
-    "Available",
-  );
-
-  if (slotError) {
-    throw new AppError(
-      "Schedule approved, but slots could not be published.",
-      500,
-      "DB_ERROR",
-    );
-  }
-
   const { data: refreshed } = await scheduleDao.findScheduleById(scheduleId);
-  return normalizeSchedule(refreshed || data[0]);
+  const roomsByDentist = await buildRoomsByDentistMap();
+  return normalizeSchedule(refreshed || data[0], roomsByDentist);
 }
 
 async function denyScheduleRequest(scheduleId, payload = {}) {
@@ -720,7 +856,8 @@ async function denyScheduleRequest(scheduleId, payload = {}) {
   }
 
   const { data: refreshed } = await scheduleDao.findScheduleById(scheduleId);
-  return normalizeSchedule(refreshed || data[0]);
+  const roomsByDentist = await buildRoomsByDentistMap();
+  return normalizeSchedule(refreshed || data[0], roomsByDentist);
 }
 
 async function updateAvailabilityStatus(user, payload = {}) {
@@ -882,9 +1019,11 @@ async function updateAvailabilityStatus(user, payload = {}) {
 module.exports = {
   approveScheduleRequest,
   denyScheduleRequest,
+  listDentistsForSchedule,
   getMySchedule,
   getScheduleMeta,
   listScheduleRequests,
   submitMyScheduleRequest,
   updateAvailabilityStatus,
+  viewDentistSchedule,
 };

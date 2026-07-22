@@ -50,6 +50,34 @@ async function listScheduleRequests(req, res, next) {
   }
 }
 
+async function listDentistsForSchedule(req, res, next) {
+  try {
+    const dentists = await scheduleService.listDentistsForSchedule();
+    return sendSuccess(
+      res,
+      200,
+      dentists,
+      "Dentists retrieved successfully.",
+    );
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function viewDentistSchedule(req, res, next) {
+  try {
+    const schedules = await scheduleService.viewDentistSchedule(req.query);
+    return sendSuccess(
+      res,
+      200,
+      schedules,
+      "Dentist schedule retrieved successfully.",
+    );
+  } catch (error) {
+    return next(error);
+  }
+}
+
 async function approveScheduleRequest(req, res, next) {
   try {
     const schedule = await scheduleService.approveScheduleRequest(
@@ -100,7 +128,9 @@ module.exports = {
   denyScheduleRequest,
   getMySchedule,
   getScheduleMeta,
+  listDentistsForSchedule,
   listScheduleRequests,
   submitMyScheduleRequest,
   updateAvailabilityStatus,
+  viewDentistSchedule,
 };

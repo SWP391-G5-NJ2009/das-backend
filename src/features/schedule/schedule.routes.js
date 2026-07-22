@@ -34,6 +34,20 @@ router.patch(
 );
 
 router.get(
+  "/dentists",
+  authMiddleware,
+  requireRole("receptionist", "owner", "admin"),
+  scheduleController.listDentistsForSchedule,
+);
+
+router.get(
+  "/view",
+  authMiddleware,
+  requireRole("receptionist", "owner", "admin"),
+  scheduleController.viewDentistSchedule,
+);
+
+router.get(
   "/requests",
   authMiddleware,
   requireRole("owner", "admin"),
