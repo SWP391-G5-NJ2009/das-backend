@@ -51,15 +51,24 @@ async function getMyAppointments(req, res, next) {
   }
 }
 
+const DENTIST_ALLOWED_STATUSES = ["Confirmed", "Checked-in", "In-Treatment", "Completed"];
+
 async function getAllAppointments(req, res, next) {
   try {
+    const { role, profileId } = req.user;
+    const requestedStatus = req.query.status || null;
+
+    // Khi dentist không chọn filter cụ thể ("all" hoặc không có), chỉ trả về 4 trạng thái liên quan
+    const isDentistViewingAll = role === "dentist" && (!requestedStatus || requestedStatus === "all");
+
     const filters = {
-      status: req.query.status || null,
+      status: isDentistViewingAll ? null : requestedStatus,
+      statuses: isDentistViewingAll ? DENTIST_ALLOWED_STATUSES : null,
       date: req.query.date || null,
       month: req.query.month || null,
       year: req.query.year || null,
       search: req.query.search || null,
-      dentistId: req.user.role === "dentist" ? req.user.profileId : null,
+      dentistId: role === "dentist" ? profileId : null,
     };
     const data = await appointmentService.getAll(filters);
     return sendSuccess(res, 200, data, "Lấy danh sách lịch hẹn thành công.");

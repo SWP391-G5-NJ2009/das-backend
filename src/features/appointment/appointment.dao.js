@@ -84,7 +84,10 @@ async function findAll(filters = {}) {
     .from("appointment")
     .select(APPOINTMENT_SELECT);
 
-  if (filters.status && filters.status !== "all") {
+  // Lọc theo mảng statuses (ưu tiên hơn status đơn)
+  if (Array.isArray(filters.statuses) && filters.statuses.length > 0) {
+    query = query.in("status", filters.statuses);
+  } else if (filters.status && filters.status !== "all") {
     query = query.eq("status", filters.status);
   }
 
