@@ -14,14 +14,24 @@ async function findAllAccounts(filters = {}) {
     query = query.eq("role_id", filters.roleId);
   }
 
+  if (filters.status && filters.status !== "All") {
+    query = query.eq("status", filters.status);
+  }
+
   if (filters.search) {
     const s = `%${filters.search}%`;
     query = query.or(`username.ilike.${s},phone.ilike.${s},email.ilike.${s}`);
   }
 
-  if (filters.date) {
-    const start = new Date(filters.date);
+  if (filters.from_date) {
+    const start = new Date(filters.from_date);
     query = query.gte("created_date", start.toISOString());
+  }
+
+  if (filters.to_date) {
+    const end = new Date(filters.to_date);
+    end.setDate(end.getDate() + 1);
+    query = query.lt("created_date", end.toISOString());
   }
 
   return query;

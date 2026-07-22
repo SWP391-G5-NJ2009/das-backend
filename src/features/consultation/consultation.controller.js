@@ -10,7 +10,8 @@ async function getAllConsultationRequests(req, res, next) {
   try {
     const filters = {
       status: req.query.status || null,
-      date: req.query.date || null,
+      from_date: req.query.from_date || null,
+      to_date: req.query.to_date || null,
       search: req.query.search || null,
       pagination: req.query.pagination || null,
     };

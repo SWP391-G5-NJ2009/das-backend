@@ -5,8 +5,10 @@ const { validateCreateAccount, validateUpdateAccount } = require("./account.vali
 async function getAllAccounts(req, res, next) {
   try {
     const filters = {
+      role: req.query.role || null,
       status: req.query.status || null,
-      date: req.query.date || null,
+      from_date: req.query.from_date || null,
+      to_date: req.query.to_date || null,
       search: req.query.search || null,
       pagination: req.query.pagination || null,
     };
@@ -31,7 +33,7 @@ async function updateAccount(req, res, next) {
   try {
     const { id } = req.params;
     const payload = validateUpdateAccount(req.body);
-    const data = await accountService.updateAccount(id, payload);
+    const data = await accountService.updateAccount(id, payload, req.user.id);
     return sendSuccess(res, 200, data, "Cập nhật tài khoản thành công.");
   } catch (err) {
     return next(err);
@@ -41,7 +43,7 @@ async function updateAccount(req, res, next) {
 async function deleteAccount(req, res, next) {
   try {
     const { id } = req.params;
-    const data = await accountService.deleteAccount(id);
+    const data = await accountService.deleteAccount(id, req.user.id);
     return sendSuccess(res, 200, data, "Xóa tài khoản thành công.");
   } catch (err) {
     return next(err);

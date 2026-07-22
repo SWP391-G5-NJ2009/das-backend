@@ -7,8 +7,8 @@ const profileDao = require("../profile/profile.dao");
 async function getAllAccounts(filters = {}) {
   let queryFilters = { ...filters };
 
-  if (queryFilters.status && queryFilters.status !== "All") {
-    const roleId = await getRoleId(queryFilters.status);
+  if (queryFilters.role && queryFilters.role !== "All") {
+    const roleId = await getRoleId(queryFilters.role);
     queryFilters.roleId = roleId;
   }
 
@@ -104,7 +104,12 @@ async function createAccount({
 async function updateAccount(
   accountId,
   { username, email, phone, password, role_name, status },
+  requestingAccountId
 ) {
+  
+  if (requestingAccountId && accountId === requestingAccountId && status === "Deactivated") {
+    throw new AppError("Không thể ngừng hoạt động tài khoản của chính mình.", 409, "CANNOT_DEACTIVATE_SELF");
+  }
 
   const updateFields = {
     ...(status !== undefined ? { status } : {}),
@@ -153,7 +158,11 @@ async function updateAccount(
   return data;
 }
 
-async function deleteAccount(accountId) {
+async function deleteAccount(accountId, requestingAccountId) {
+  if (accountId === requestingAccountId) {
+    throw new AppError("Không thể xóa tài khoản của chính mình.", 409, "CANNOT_DELETE_SELF");
+  }
+
   const { data, error: findAccountError } = await accountDao.findAccountById(accountId);
 
   if (findAccountError) {
@@ -166,12 +175,16 @@ async function deleteAccount(accountId) {
   }
 
   const ROLE_TABLE_MAP = {
+    Admin: "admin",
+    Owner: "owner",
     Receptionist: "receptionist",
     Dentist: "dentist",
     Patient: "patient",
   };
 
   const ROLE_DISPLAY_NAME = {
+    Admin: "admin",
+    Owner: "chủ phòng khám",
     Receptionist: "lễ tân",
     Dentist: "nha sĩ",
     Patient: "bệnh nhân",
