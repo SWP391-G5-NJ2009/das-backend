@@ -83,9 +83,7 @@ function normalizeTreatment(row) {
     treatmentNote: treatment?.treatment_note || "",
     notes: treatment?.treatment_note || "",
     appointmentNote: row.note || "",
-    dentist: dentist
-      ? `BS. ${dentist.full_name || "Nha sĩ"}`
-      : "",
+    dentist: dentist ? `BS. ${dentist.full_name || "Nha sĩ"}` : "",
     cost: totalAmount,
     status: row.status,
     paymentStatus: invoice?.payment_status || "",
@@ -225,9 +223,43 @@ async function liftBookingBan(patientId) {
   };
 }
 
+async function createWalkInPatient({ fullName, phone }) {
+  const { data: existing, error: existingError } =
+    await patientDao.findProfileByPhone(phone);
+
+  if (existingError) {
+    throw new AppError(existingError.message, 500, "DB_ERROR");
+  }
+
+  if (existing?.account_id) {
+    throw new AppError(
+      "Số điện thoại này đã được đăng ký tài khoản. Vui lòng tìm kiếm bệnh nhân.",
+      409,
+      "DUPLICATE_PHONE",
+    );
+  }
+
+  // Walk-in record cũ chưa có account → trả về luôn
+  if (existing) {
+    return {
+      id: String(existing.patient_id),
+      fullName: existing.full_name || fullName,
+      phone: existing.phone || phone,
+    };
+  }
+
+  const data = await patientDao.createPatient({ fullName, phone });
+  return {
+    id: String(data.patient_id),
+    fullName: data.full_name,
+    phone: data.phone || phone,
+  };
+}
+
 module.exports = {
   searchPatients,
   createPatientAccount,
+  createWalkInPatient,
   getTreatmentHistory,
   liftBookingBan,
 };
