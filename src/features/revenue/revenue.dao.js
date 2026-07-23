@@ -12,10 +12,10 @@ async function currentMonthRevenue() {
         ? `${year + 1}-01-01` : `${year}-${String(now.getMonth() + 2).padStart(2, "0")}-01`;
 
     const { data, error } = await supabase
-        .rpc("get_current_month_revenue", {
-            p_start: startOfMonth,
-            p_end: startOfNextMonth,
-        });
+        .from("payment")
+        .select("amount")
+        .gte("payment_date", startOfMonth)
+        .lt("payment_date", startOfNextMonth)
     if (error) throw new AppError(error.message, 500, "DB_ERROR");
     return data ?? 0;
 }
