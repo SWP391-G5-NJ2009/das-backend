@@ -51,7 +51,7 @@ async function getMyAppointments(req, res, next) {
   }
 }
 
-const DENTIST_ALLOWED_STATUSES = ["Confirmed", "Checked-in", "In-Treatment", "Completed"];
+const DENTIST_ALLOWED_STATUSES = ["Confirmed", "Checked-in"];
 
 async function getAllAppointments(req, res, next) {
   try {
