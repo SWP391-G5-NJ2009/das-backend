@@ -5,41 +5,41 @@ const requireRole = require("../../middlewares/role.middleware");
 
 const router = express.Router();
 
-router.get("/accounts/available", authMiddleware, requireRole("owner"), staffController.getAvailableStaffAccounts);
-router.post("/profiles", authMiddleware, requireRole("owner"), staffController.createStaffProfile);
+router.get("/accounts/available", authMiddleware, requireRole("manager"), staffController.getAvailableStaffAccounts);
+router.post("/profiles", authMiddleware, requireRole("manager"), staffController.createStaffProfile);
 
 router.get(
   "/dentist-accounts/available",
   authMiddleware,
-  requireRole("owner"),
+  requireRole("manager"),
   staffController.getAvailableDentistAccounts,
 );
 
 router.post(
   "/dentists",
   authMiddleware,
-  requireRole("owner"),
+  requireRole("manager"),
   staffController.createDentistProfile,
 );
 
 router.patch(
   "/dentists/:id",
   authMiddleware,
-  requireRole("owner"),
+  requireRole("manager"),
   staffController.updateDentistProfile,
 );
 
 router.patch(
   "/receptionists/:id",
   authMiddleware,
-  requireRole("owner"),
+  requireRole("manager"),
   staffController.updateReceptionistProfile,
 );
 
 router.get(
   "/",
   authMiddleware,
-  requireRole("owner"),
+  requireRole("manager"),
   staffController.getAllStaff,
 );
 

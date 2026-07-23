@@ -8,7 +8,7 @@ const router = express.Router();
 router.get(
   "/meta",
   authMiddleware,
-  requireRole("dentist", "owner", "admin"),
+  requireRole("dentist", "manager", "admin"),
   scheduleController.getScheduleMeta,
 );
 
@@ -36,35 +36,35 @@ router.patch(
 router.get(
   "/dentists",
   authMiddleware,
-  requireRole("receptionist", "owner", "admin"),
+  requireRole("receptionist", "manager", "admin"),
   scheduleController.listDentistsForSchedule,
 );
 
 router.get(
   "/view",
   authMiddleware,
-  requireRole("receptionist", "owner", "admin"),
+  requireRole("receptionist", "manager", "admin"),
   scheduleController.viewDentistSchedule,
 );
 
 router.get(
   "/requests",
   authMiddleware,
-  requireRole("owner", "admin"),
+  requireRole("manager", "admin"),
   scheduleController.listScheduleRequests,
 );
 
 router.patch(
   "/requests/:scheduleId/approve",
   authMiddleware,
-  requireRole("owner", "admin"),
+  requireRole("manager", "admin"),
   scheduleController.approveScheduleRequest,
 );
 
 router.patch(
   "/requests/:scheduleId/deny",
   authMiddleware,
-  requireRole("owner", "admin"),
+  requireRole("manager", "admin"),
   scheduleController.denyScheduleRequest,
 );
 

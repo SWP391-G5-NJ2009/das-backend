@@ -7,42 +7,42 @@ const router = express.Router();
 router.get(
     "/newPatient",
     authMiddleware,
-    requireRole("owner"),
+    requireRole("manager"),
     patientAnalyticsController.getNewPatient,
 );
 
 router.get(
     "/noShowRate",
     authMiddleware,
-    requireRole("owner"),
+    requireRole("manager"),
     patientAnalyticsController.getNoShowRate,
 );
 
 router.get(
     "/returningPatient",
     authMiddleware,
-    requireRole("owner"),
+    requireRole("manager"),
     patientAnalyticsController.getReturningPatient,
 );
 
 router.get(
     "/newPatientMonthly",
     authMiddleware,
-    requireRole("owner"),
+    requireRole("manager"),
     patientAnalyticsController.getMonthlyNewPatient,
 );
 
 router.get(
     "/returningPatientMonthly",
     authMiddleware,
-    requireRole("owner"),
+    requireRole("manager"),
     patientAnalyticsController.getMonthlyReturningPatient,
 );
 
 router.get(
     "/noShowRateMonthly",
     authMiddleware,
-    requireRole("owner"),
+    requireRole("manager"),
     patientAnalyticsController.getMonthlyNoShowRate,
 );
 

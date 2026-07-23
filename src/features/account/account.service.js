@@ -176,7 +176,7 @@ async function deleteAccount(accountId, requestingAccountId) {
 
   const ROLE_TABLE_MAP = {
     Admin: "admin",
-    Owner: "owner",
+    Manager: "manager",
     Receptionist: "receptionist",
     Dentist: "dentist",
     Patient: "patient",
@@ -184,7 +184,7 @@ async function deleteAccount(accountId, requestingAccountId) {
 
   const ROLE_DISPLAY_NAME = {
     Admin: "admin",
-    Owner: "chủ phòng khám",
+    Manager: "quản lý",
     Receptionist: "lễ tân",
     Dentist: "nha sĩ",
     Patient: "bệnh nhân",

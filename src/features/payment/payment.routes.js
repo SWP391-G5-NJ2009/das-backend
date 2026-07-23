@@ -22,21 +22,21 @@ router.get(
 router.get(
   "/",
   authMiddleware,
-  requireRole("receptionist", "owner", "admin"),
+  requireRole("receptionist", "manager", "admin"),
   paymentController.getAllPayments,
 );
 
 router.get(
   "/unpaid-invoices",
   authMiddleware,
-  requireRole("receptionist", "owner", "admin"),
+  requireRole("receptionist", "manager", "admin"),
   paymentController.getUnpaidInvoices,
 );
 
 router.get(
   "/invoices/:invoiceId",
   authMiddleware,
-  requireRole("receptionist", "owner", "admin"),
+  requireRole("receptionist", "manager", "admin"),
   paymentController.getInvoiceDetail,
 );
 
@@ -50,7 +50,7 @@ router.post(
 router.get(
   "/:id",
   authMiddleware,
-  requireRole("receptionist", "owner", "admin"),
+  requireRole("receptionist", "manager", "admin"),
   paymentController.getPaymentDetail,
 );
 

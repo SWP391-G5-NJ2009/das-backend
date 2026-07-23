@@ -7,14 +7,14 @@ const router = express.Router();
 router.get(
     "/",
     authMiddleware,
-    requireRole("owner"),
+    requireRole("manager"),
     revenueController.revenueAnalytics,
 );
 
 router.get(
     "/monthly",
     authMiddleware,
-    requireRole("owner"),
+    requireRole("manager"),
     revenueController.monthlyRevenueAnalytics,
 );
 

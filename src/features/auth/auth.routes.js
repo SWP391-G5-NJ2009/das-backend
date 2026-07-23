@@ -16,7 +16,7 @@ router.post("/logout", authMiddleware, authController.logout);
 router.patch(
   "/change-password",
   authMiddleware,
-  requireRole("patient", "receptionist", "dentist", "owner", "admin"),
+  requireRole("patient", "receptionist", "dentist", "manager", "admin"),
   authController.changePassword,
 );
 

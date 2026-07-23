@@ -5,7 +5,7 @@ const normalizeRole = require("../../utils/normalizeRole");
 const ROLE_PROFILE = {
   admin: { table: "admin", id: "admin_id" },
   dentist: { table: "dentist", id: "dentist_id" },
-  owner: { table: "owner", id: "owner_id" },
+  manager: { table: "manager", id: "manager_id" },
   patient: { table: "patient", id: "patient_id" },
   receptionist: { table: "receptionist", id: "receptionist_id" },
 };

@@ -9,13 +9,13 @@ router.use(authMiddleware);
 
 router.get(
   "/monthly",
-  requireRole("owner"),
+  requireRole("manager"),
   appointmentDashboardController.getMonthlyCounts,
 );
 
 router.get(
   "/daily",
-  requireRole("owner"),
+  requireRole("manager"),
   appointmentDashboardController.getDailyAppointments,
 );
 

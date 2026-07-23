@@ -29,7 +29,7 @@ async function submitMyScheduleRequest(req, res, next) {
       res,
       201,
       schedules,
-      "MSG22: Schedule request sent for owner approval.",
+      "MSG22: Schedule request sent for manager approval.",
     );
   } catch (error) {
     return next(error);

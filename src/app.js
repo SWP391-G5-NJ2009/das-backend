@@ -70,7 +70,7 @@ app.use("/api/rooms", roomRoutes);
 app.use("/api/reports/revenue", revenueRoutes);
 app.use("/api/reports/patient", patientAnalyticsRoutes);
 app.use("/api/schedules", scheduleRoutes);
-app.use("/api/owner/appointment-dashboard", appointmentDashboardRoutes);
+app.use("/api/manager/appointment-dashboard", appointmentDashboardRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/treatments", treatmentRoutes);
 app.use(notFoundMiddleware);

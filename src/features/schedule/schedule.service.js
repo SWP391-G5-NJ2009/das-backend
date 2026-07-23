@@ -93,13 +93,13 @@ function parseScheduleStatus(rawStatus) {
 
     return {
       label: DENIED_PREFIX,
-      ownerNote: noteParts.join(":").trim(),
+      managerNote: noteParts.join(":").trim(),
     };
   }
 
   return {
     label: status || REQUEST_STATUS,
-    ownerNote: "",
+    managerNote: "",
   };
 }
 
@@ -130,7 +130,7 @@ function normalizeSchedule(row, roomsByDentist = new Map()) {
     roomStatus: assignedRoom?.status || null,
     status: status.label,
     rawStatus: row.status,
-    ownerNote: status.ownerNote,
+    managerNote: status.managerNote,
     startTime: firstSlot?.time_slot_config?.start_time?.substring(0, 5) || "",
     endTime: lastSlot?.time_slot_config?.end_time?.substring(0, 5) || "",
     slotCount: sortedSlots.length,
@@ -412,7 +412,7 @@ async function getMySchedule(user, filters = {}) {
 }
 
 async function listScheduleRequests(filters = {}) {
-  const { data, error } = await scheduleDao.findSchedulesForOwner(filters);
+  const { data, error } = await scheduleDao.findSchedulesForManager(filters);
 
   if (error) {
     throw new AppError("Không thể tải yêu cầu lịch.", 500, "DB_ERROR");

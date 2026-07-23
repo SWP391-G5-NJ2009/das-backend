@@ -8,7 +8,7 @@ router.get("/", clinicInfoController.getPublicClinicInfo);
 router.patch(
   "/",
   authMiddleware,
-  requireRole("owner"),
+  requireRole("manager"),
   clinicInfoController.updateClinicInfo,
 );
 

@@ -17,10 +17,10 @@ const ROLE_PROFILE_TABLE = {
   patient: { table: "patient", idColumn: "patient_id" },
   dentist: { table: "dentist", idColumn: "dentist_id" },
   receptionist: { table: "receptionist", idColumn: "receptionist_id" },
-  owner: { table: "owner", idColumn: "owner_id" },
+  manager: { table: "manager", idColumn: "manager_id" },
 };
 
-const STAFF_ROLES = ["receptionist", "dentist", "owner", "admin"];
+const STAFF_ROLES = ["receptionist", "dentist", "manager", "admin"];
 const INVALID_CREDENTIALS_MESSAGE =
   "Thông tin đăng nhập không hợp lệ. Vui lòng thử lại.";
 const PROCESSING_ERROR_MESSAGE =

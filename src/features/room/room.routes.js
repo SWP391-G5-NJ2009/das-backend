@@ -8,28 +8,28 @@ const router = express.Router();
 router.get(
   "/",
   authMiddleware,
-  requireRole("owner"),
+  requireRole("manager"),
   roomController.getAllRooms,
 );
 
 router.post(
   "/",
   authMiddleware,
-  requireRole("owner"),
+  requireRole("manager"),
   roomController.createRoom,
 );
 
 router.put(
   "/:id",
   authMiddleware,
-  requireRole("owner"),
+  requireRole("manager"),
   roomController.updateRoom,
 );
 
 router.delete(
   "/:id",
   authMiddleware,
-  requireRole("owner"),
+  requireRole("manager"),
   roomController.deleteRoom,
 );
 

@@ -86,7 +86,7 @@ function findSchedulesByDentist(dentistId, { dateFrom, dateTo } = {}) {
   return query;
 }
 
-function findSchedulesForOwner({ dateFrom, dateTo, status } = {}) {
+function findSchedulesForManager({ dateFrom, dateTo, status } = {}) {
   let query = supabase
     .from("schedules")
     .select(SCHEDULE_SELECT)
@@ -299,7 +299,7 @@ module.exports = {
   findScheduleById,
   findSchedulesByDentist,
   findSchedulesForDentistView,
-  findSchedulesForOwner,
+  findSchedulesForManager,
   findTimeSlotConfigs,
   findTimeSlotConfigsByDay,
   findWorkSlotsByIdsForDentist,

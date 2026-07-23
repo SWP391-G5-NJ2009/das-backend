@@ -11,19 +11,19 @@ router.get("/:id/dentists", dentalServiceController.getDentistsByService);
 router.delete(
   "/:id",
   authMiddleware,
-  requireRole("owner"),
+  requireRole("manager"),
   dentalServiceController.deleteService,
 );
 router.post(
   "/",
   authMiddleware,
-  requireRole("owner"),
+  requireRole("manager"),
   dentalServiceController.createService,
 );
 router.put(
   "/:id",
   authMiddleware,
-  requireRole("owner"),
+  requireRole("manager"),
   dentalServiceController.updateService,
 );
 

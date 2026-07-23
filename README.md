@@ -53,7 +53,7 @@ The backend expects the current DAS schema in Supabase, including:
 - `patient`
 - `dentist`
 - `receptionist`
-- `owner`
+- `manager`
 - `otp_tokens`
 
 Phase 2 auth also expects these account fields:
@@ -68,7 +68,7 @@ Current role names supported by the API:
 - `patient`
 - `receptionist`
 - `dentist`
-- `owner`
+- `manager`
 - `admin`
 
 Forgot password OTP is stored in `otp_tokens` and sent by TextBee SMS. SpeedSMS is intentionally not integrated yet. In development, the forgot-password endpoint also returns `devOtp` for testing.
