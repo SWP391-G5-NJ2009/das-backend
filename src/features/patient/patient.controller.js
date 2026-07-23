@@ -73,9 +73,34 @@ async function liftBookingBan(req, res, next) {
   }
 }
 
+/**
+ * POST /api/patients/walk-in
+ * Receptionist: tạo walk-in patient record (không cần account).
+ */
+async function createWalkInPatient(req, res, next) {
+  try {
+    const fullName = (req.body.fullName || "").trim();
+    const phone = (req.body.phone || "").trim();
+    if (!fullName || !phone) {
+      return next(
+        new (require("../../utils/AppError"))(
+          "Họ tên và số điện thoại là bắt buộc.",
+          400,
+          "VALIDATION_ERROR",
+        ),
+      );
+    }
+    const data = await patientService.createWalkInPatient({ fullName, phone });
+    return sendSuccess(res, 201, data, "Thêm bệnh nhân thành công.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
   searchPatients,
   createPatientAccount,
+  createWalkInPatient,
   getMyTreatmentHistory,
   getTreatmentHistoryByPatient,
   liftBookingBan,

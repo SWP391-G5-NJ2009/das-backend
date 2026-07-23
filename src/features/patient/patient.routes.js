@@ -15,6 +15,12 @@ router.get(
 );
 
 router.post(
+  "/walk-in",
+  requireRole("receptionist"),
+  patientController.createWalkInPatient,
+);
+
+router.post(
   "/",
   requireRole("receptionist"),
   patientController.createPatientAccount,
