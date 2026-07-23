@@ -4,8 +4,8 @@ async function currentMonthRevenue() {
     return revenueDao.currentMonthRevenue();
 }
 
-async function revenueByMonth() {
-    return revenueDao.revenueByMonth();
+async function revenueByMonth(mCurrent, mOffset) {
+    return revenueDao.revenueByMonth(mCurrent, mOffset);
 }
 
 module.exports = {
