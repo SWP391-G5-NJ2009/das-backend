@@ -203,8 +203,7 @@ async function getTreatmentHistory(patientId, actor = {}) {
 /**
  * BR-12: Lift a booking ban for a patient:
  *  1. Resolve all No-Show appointments → "Resolved No-Show"
- *  2. Reset no_show_count to 0
- *  3. Restore account.status → "Active" so the patient can log in and book again
+ *  2. Reset no_show_count to 0 so the patient can book again
  */
 async function liftBookingBan(patientId) {
   const patient = await patientDao.findPatientById(patientId);
@@ -218,11 +217,6 @@ async function liftBookingBan(patientId) {
   }
 
   const resolved = await patientDao.resolveNoShowAppointments(patientId);
-
-  // Restore account status to Active so the patient can log in and book again
-  if (patient.account_id) {
-    await patientDao.setAccountStatusForPatients([patient.account_id], "Active");
-  }
 
   return {
     patientId: patient.patient_id,

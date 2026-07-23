@@ -80,11 +80,8 @@ async function findByPatientId(patientId, filters = {}) {
 }
 
 async function findAll(filters = {}) {
-  let query = supabase
-    .from("appointment")
-    .select(APPOINTMENT_SELECT);
+  let query = supabase.from("appointment").select(APPOINTMENT_SELECT);
 
-  // Lọc theo mảng statuses (ưu tiên hơn status đơn)
   if (Array.isArray(filters.statuses) && filters.statuses.length > 0) {
     query = query.in("status", filters.statuses);
   } else if (filters.status && filters.status !== "all") {
@@ -133,7 +130,7 @@ async function checkInById(apptId, expectedStatus = "Confirmed") {
 async function reconcileNoShowAfterCheckIn(patientId) {
   const { data: patient, error: readError } = await supabase
     .from("patient")
-    .select("patient_id, account_id, no_show_count")
+    .select("patient_id, no_show_count")
     .eq("patient_id", patientId)
     .maybeSingle();
   if (readError) throw new AppError(readError.message, 500, "DB_ERROR");
@@ -147,15 +144,6 @@ async function reconcileNoShowAfterCheckIn(patientId) {
     .eq("patient_id", patientId)
     .eq("no_show_count", currentCount);
   if (updateError) throw new AppError(updateError.message, 500, "DB_ERROR");
-
-  if (patient.account_id && nextCount < 3) {
-    const { error: accountError } = await supabase
-      .from("account")
-      .update({ status: "Active" })
-      .eq("account_id", patient.account_id)
-      .eq("status", "Restricted");
-    if (accountError) throw new AppError(accountError.message, 500, "DB_ERROR");
-  }
 }
 
 async function startTreatmentById(apptId) {
@@ -202,7 +190,8 @@ async function findConsecutiveSlotsFromId(startSlotId, count) {
     .maybeSingle();
 
   if (anchorError) throw new AppError(anchorError.message, 500, "DB_ERROR");
-  if (!anchor) throw new AppError("Không tìm thấy khung giờ bắt đầu.", 404, "NOT_FOUND");
+  if (!anchor)
+    throw new AppError("Không tìm thấy khung giờ bắt đầu.", 404, "NOT_FOUND");
 
   const scheduleId = anchor.schedule_id;
   const anchorStartTime = anchor.time_slot_config?.start_time;
@@ -403,7 +392,11 @@ async function findConfirmedAppointmentByService(patientId, serviceId) {
  * Prevents a patient from having two appointments at overlapping times,
  * even with different dentists (different slot_ids but same time window).
  */
-async function findActiveAppointmentByPatientAtTime(patientId, workDate, startTime) {
+async function findActiveAppointmentByPatientAtTime(
+  patientId,
+  workDate,
+  startTime,
+) {
   const ACTIVE_STATUSES = ["Confirmed", "Checked-in", "Conflict"];
 
   const { data, error } = await supabase
@@ -530,38 +523,7 @@ async function markOverdueAsNoShow() {
   return updated || [];
 }
 
-async function incrementNoShowCount(patientIds) {
-  if (!patientIds || patientIds.length === 0) return;
 
-  for (const patientId of patientIds) {
-    // Read current count, then write back incremented value
-    const { data: patient, error: readError } = await supabase
-      .from("patient")
-      .select("no_show_count")
-      .eq("patient_id", patientId)
-      .single();
-
-    if (readError || !patient) {
-      logger.error(
-        `[noShow] Could not read no_show_count for patient ${patientId}:`,
-        readError?.message,
-      );
-      continue;
-    }
-
-    const { error: writeError } = await supabase
-      .from("patient")
-      .update({ no_show_count: (patient.no_show_count ?? 0) + 1 })
-      .eq("patient_id", patientId);
-
-    if (writeError) {
-      logger.error(
-        `[noShow] Failed to increment no_show_count for patient ${patientId}:`,
-        writeError.message,
-      );
-    }
-  }
-}
 
 module.exports = {
   cancelById,
@@ -578,7 +540,6 @@ module.exports = {
   getServicePrice,
   hasActiveAppointmentsByServiceId,
   hasAnyAppointmentByServiceId,
-  incrementNoShowCount,
   insertAppointmentServices,
   insertAppointmentSlots,
   markMultipleSlotsBooked,
