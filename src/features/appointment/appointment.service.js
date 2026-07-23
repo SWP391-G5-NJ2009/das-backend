@@ -49,29 +49,43 @@ async function bookAppointment({
 
   const workDate = slotInfo.schedules?.work_date; // "YYYY-MM-DD"
   const startTime = slotInfo.time_slot_config?.start_time; // "HH:MM:SS"
+  const endTime = slotInfo.time_slot_config?.end_time; // "HH:MM:SS"
 
   if (workDate && startTime) {
-    // Build the exact start datetime of the slot in server local time
-    const slotDateTime = new Date(`${workDate}T${startTime}`);
     const now = new Date();
-    const diffMs = slotDateTime.getTime() - now.getTime();
 
-    // Block everyone: slot start time has already passed
-    if (diffMs <= 0) {
-      throw new AppError(
-        "Khung giờ này đã qua và không thể đặt lịch nữa.",
-        400,
-        "SLOT_PAST",
-      );
-    }
+    if (actorRole === "receptionist") {
+      // Receptionist: cho phép đặt miễn là slot chưa kết thúc (dùng end_time)
+      const slotEndTime = endTime || startTime; // fallback về start_time nếu không có end_time
+      const slotEndDateTime = new Date(`${workDate}T${slotEndTime}`);
+      if (slotEndDateTime.getTime() <= now.getTime()) {
+        throw new AppError(
+          "Khung giờ này đã kết thúc và không thể đặt lịch nữa.",
+          400,
+          "SLOT_PAST",
+        );
+      }
+    } else {
+      // Patient (và các role khác): chặn nếu start_time đã qua
+      const slotDateTime = new Date(`${workDate}T${startTime}`);
+      const diffMs = slotDateTime.getTime() - now.getTime();
 
-    // Block patients only: slot starts within 30 minutes
-    if (actorRole === "patient" && diffMs < 30 * 60 * 1000) {
-      throw new AppError(
-        "Lịch hẹn phải được đặt trước ít nhất 30 phút.",
-        400,
-        "SLOT_TOO_SOON",
-      );
+      if (diffMs <= 0) {
+        throw new AppError(
+          "Khung giờ này đã qua và không thể đặt lịch nữa.",
+          400,
+          "SLOT_PAST",
+        );
+      }
+
+      // Block patients only: slot starts within 30 minutes
+      if (actorRole === "patient" && diffMs < 30 * 60 * 1000) {
+        throw new AppError(
+          "Lịch hẹn phải được đặt trước ít nhất 30 phút.",
+          400,
+          "SLOT_TOO_SOON",
+        );
+      }
     }
   }
   // End BR-14
@@ -198,7 +212,7 @@ async function bookAppointment({
   return appointment;
 }
 
-const CANCELLABLE_STATUSES = ["Confirmed", "Checked-in", "Conflict"];
+const CANCELLABLE_STATUSES = ["Confirmed", "Checked-in", "Conflict", "No-Show"];
 
 async function checkInAppointment(apptId) {
   const { data: existing, error } = await appointmentDao.findById(apptId);
@@ -506,6 +520,21 @@ async function cancelAppointment(
     actorAccountId,
     reason,
   );
+
+  // Nếu appointment đang là No-Show, giảm ngay no_show_count trước khi return
+  if (existing.status === "No-Show") {
+    const patientId = existing.patient?.patient_id;
+    if (patientId) {
+      try {
+        await appointmentDao.reconcileNoShowAfterCheckIn(patientId);
+      } catch (err) {
+        console.error(
+          "[appointment.service] no_show_count decrement failed:",
+          err.message,
+        );
+      }
+    }
+  }
 
   appointmentDao
     .findSlotsByApptId(apptId)
