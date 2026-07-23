@@ -71,6 +71,11 @@ function normalizeTreatment(row) {
     recordId: treatment?.record_id || null,
     id: String(treatment?.record_id || row.appt_id),
     appointmentId: row.appt_id,
+    treatmentPlanId: row.treatment_plan_id || null,
+    visitNumber: row.visit_number || null,
+    treatmentPlanStatus: row.treatment_plan?.status || null,
+    treatmentPlanCreatedAt: row.treatment_plan?.created_at || null,
+    treatmentPlanCompletedAt: row.treatment_plan?.completed_at || null,
     date: schedule?.work_date || row.book_time?.slice(0, 10) || "",
     startTime: workSlot?.slot_config?.start_time?.substring(0, 5) || "",
     endTime: workSlot?.slot_config?.end_time?.substring(0, 5) || "",
@@ -80,7 +85,10 @@ function normalizeTreatment(row) {
         .filter(Boolean)
         .join(", ") || "Điều trị nha khoa",
     diagnosis: treatment?.diagnosis || "",
+    clinicalExamination: treatment?.clinical_examination || "",
     treatmentNote: treatment?.treatment_note || "",
+    postTreatmentInstructions:
+      treatment?.post_treatment_instructions || "",
     notes: treatment?.treatment_note || "",
     appointmentNote: row.note || "",
     dentist: dentist ? `BS. ${dentist.full_name || "Nha sĩ"}` : "",

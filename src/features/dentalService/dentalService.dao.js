@@ -11,6 +11,7 @@ async function findAllServices() {
       description,
       unit_price,
       slot_occupied,
+      treatment_mode,
       status,
       service_categories (category_name)
     `,
@@ -29,6 +30,7 @@ async function findActivePublicServices() {
       description,
       unit_price,
       slot_occupied,
+      treatment_mode,
       service_categories (category_name)
     `,
     )
