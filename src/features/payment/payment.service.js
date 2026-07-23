@@ -42,7 +42,7 @@ function normalizePaymentRow(payment) {
     payment_method: payment.payment_method,
     payment_date: payment.payment_date,
     transaction_code: payment.transaction_code,
-    status: payment.status || invoice?.payment_status,
+    status: invoice?.payment_status || payment.status,
     ...getAppointmentInfo(invoice?.appointment),
   };
 }
@@ -87,9 +87,13 @@ async function getPaymentDetail(paymentId) {
         id: item.dental_service?.service_id,
         name: item.dental_service?.service_name || "Dịch vụ nha khoa",
         type: "Dịch vụ",
-        unitPrice: item.actual_price,
+        unitPrice: appointment.appointment_service.length === 1
+          ? data.amount
+          : item.actual_price,
         quantity: 1,
-        total: item.actual_price,
+        total: appointment.appointment_service.length === 1
+          ? data.amount
+          : item.actual_price,
       })),
   };
 }
@@ -117,9 +121,13 @@ async function getInvoiceDetail(invoiceId) {
         id: item.dental_service?.service_id,
         name: item.dental_service?.service_name || "Dịch vụ nha khoa",
         type: "Dịch vụ",
-        unitPrice: item.actual_price,
+        unitPrice: appointment.appointment_service.length === 1
+          ? data.total_amount
+          : item.actual_price,
         quantity: 1,
-        total: item.actual_price,
+        total: appointment.appointment_service.length === 1
+          ? data.total_amount
+          : item.actual_price,
       })),
   };
 }
