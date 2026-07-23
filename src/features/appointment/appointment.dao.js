@@ -303,7 +303,7 @@ async function findSlotInfo(slotId) {
     .select(
       `
       slot_id,
-      time_slot_config:slot_config_id (start_time),
+      time_slot_config:slot_config_id (start_time, end_time),
       schedules:schedule_id (work_date)
     `,
     )
