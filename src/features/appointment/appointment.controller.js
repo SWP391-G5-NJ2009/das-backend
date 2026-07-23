@@ -161,6 +161,16 @@ async function startTreatment(req, res, next) {
   }
 }
 
+async function markNoShow(req, res, next) {
+  try {
+    const apptId = parseInt(req.params.id, 10);
+    const data = await appointmentService.markNoShow(apptId);
+    return sendSuccess(res, 200, data, "Lịch hẹn đã được đánh dấu No-Show thành công.");
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
   bookAppointment,
   cancelAppointment,
@@ -169,5 +179,7 @@ module.exports = {
   getMyAppointments,
   getMyBookedTimes,
   getPatientBookedTimesForReceptionist,
+  markNoShow,
   startTreatment,
 };
+

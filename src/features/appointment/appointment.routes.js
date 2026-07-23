@@ -55,11 +55,19 @@ router.patch(
   appointmentController.startTreatment,
 );
 
+// Receptionist: manually mark a Confirmed appointment as No-Show
+router.patch(
+  "/:id/no-show",
+  requireRole("receptionist"),
+  appointmentController.markNoShow,
+);
+
 // Cancel: patient (own) or receptionist
 router.patch(
   "/:id/cancel",
   requireRole("patient", "receptionist"),
   appointmentController.cancelAppointment,
 );
+
 
 module.exports = router;
