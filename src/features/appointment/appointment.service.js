@@ -212,7 +212,7 @@ async function bookAppointment({
   return appointment;
 }
 
-const CANCELLABLE_STATUSES = ["Confirmed", "Checked-in", "Conflict"];
+const CANCELLABLE_STATUSES = ["Confirmed", "Checked-in", "Conflict", "No-Show"];
 
 async function checkInAppointment(apptId) {
   const { data: existing, error } = await appointmentDao.findById(apptId);
@@ -520,6 +520,21 @@ async function cancelAppointment(
     actorAccountId,
     reason,
   );
+
+  // Nếu appointment đang là No-Show, giảm ngay no_show_count trước khi return
+  if (existing.status === "No-Show") {
+    const patientId = existing.patient?.patient_id;
+    if (patientId) {
+      try {
+        await appointmentDao.reconcileNoShowAfterCheckIn(patientId);
+      } catch (err) {
+        console.error(
+          "[appointment.service] no_show_count decrement failed:",
+          err.message,
+        );
+      }
+    }
+  }
 
   appointmentDao
     .findSlotsByApptId(apptId)
