@@ -18,8 +18,8 @@ const createConsultationSchema = Joi.object({
     "string.max": "Email không được vượt quá 254 kí tự.",
     "string.email": "Email không hợp lệ.",
   }),
-  description: Joi.string().trim().max(2000).allow("", null).messages({
-    "string.max": "Nội dung không được vượt quá 2000 kí tự.",
+  description: Joi.string().trim().max(1000).allow("", null).messages({
+    "string.max": "Nội dung không được vượt quá 1000 kí tự.",
   }),
   website: Joi.string().allow("").valid(""),
   loadedAt: Joi.number().optional(),
@@ -31,8 +31,8 @@ const updateConsultationSchema = Joi.object({
     .required().messages({
     "any.required": "Trạng thái là bắt buộc.",
   }),
-  note: Joi.string().trim().max(2000).allow("", null).messages({
-    "string.max": "Nội dung không được vượt quá 2000 kí tự.",
+  note: Joi.string().trim().max(1000).allow("", null).messages({
+    "string.max": "Nội dung không được vượt quá 1000 kí tự.",
   }),
 });
 
