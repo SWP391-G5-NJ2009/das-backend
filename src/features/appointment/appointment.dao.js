@@ -5,6 +5,8 @@ const logger = require("../../utils/logger");
 const APPOINTMENT_SELECT = `
   appt_id,
   status,
+  treatment_plan_id,
+  visit_number,
   total_estimated_amount,
   note,
   book_time,
@@ -50,13 +52,16 @@ const APPOINTMENT_SELECT = `
     actual_price,
     dental_service:service_id (
       service_id,
-      service_name
+      service_name,
+      treatment_mode
     )
   ),
   treatment_record (
     record_id,
+    clinical_examination,
     diagnosis,
-    treatment_note
+    treatment_note,
+    post_treatment_instructions
   ),
   invoice (
     invoice_id,
@@ -321,7 +326,9 @@ async function createAppointment(payload) {
   const { data, error } = await supabase
     .from("appointment")
     .insert(payload)
-    .select("appt_id, status, book_time, note, total_estimated_amount")
+    .select(
+      "appt_id, status, book_time, note, total_estimated_amount, treatment_plan_id, visit_number",
+    )
     .single();
 
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
@@ -361,6 +368,33 @@ async function getServicePrice(serviceId) {
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
   if (!data) throw new AppError("Không tìm thấy dịch vụ.", 404, "NOT_FOUND");
   return data.unit_price;
+}
+
+async function getServiceBookingConfig(serviceId) {
+  const { data, error } = await supabase
+    .from("dental_services")
+    .select("service_id, unit_price, treatment_mode")
+    .eq("service_id", serviceId)
+    .maybeSingle();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  if (!data) {
+    throw new AppError("Không tìm thấy dịch vụ.", 404, "NOT_FOUND");
+  }
+  return data;
+}
+
+async function findActiveTreatmentPlan(patientId, serviceId) {
+  const { data, error } = await supabase
+    .from("treatment_plan")
+    .select("plan_id, patient_id, service_id, status")
+    .eq("patient_id", patientId)
+    .eq("service_id", serviceId)
+    .eq("status", "Active")
+    .maybeSingle();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return data;
 }
 
 /**
@@ -546,6 +580,7 @@ module.exports = {
   checkInById,
   createAppointment,
   findAll,
+  findActiveTreatmentPlan,
   findById,
   findByPatientId,
   findActiveAppointmentByPatientAtTime,
@@ -554,6 +589,7 @@ module.exports = {
   findSlotInfo,
   findSlotsByApptId,
   getServicePrice,
+  getServiceBookingConfig,
   hasActiveAppointmentsByServiceId,
   hasAnyAppointmentByServiceId,
   insertAppointmentServices,

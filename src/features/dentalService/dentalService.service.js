@@ -8,6 +8,7 @@ function mapServicePayload({
   description,
   unit_price,
   slot_occupied,
+  treatment_mode,
   status,
 }) {
   return {
@@ -16,6 +17,7 @@ function mapServicePayload({
     description: description || null,
     unit_price: Number(unit_price),
     slot_occupied: Number(slot_occupied) || 1,
+    treatment_mode: treatment_mode || "Single-Visit",
     status: status || "Inactive",
   };
 }
@@ -47,6 +49,7 @@ function mapPublicService(row) {
     unit_price: Number(row.unit_price) || 0,
     price: Number(row.unit_price) || 0,
     slot_occupied: slotOccupied,
+    treatment_mode: row.treatment_mode || "Single-Visit",
     duration_minutes: durationMinutes,
     duration: `${durationMinutes} minutes`,
     process: null,

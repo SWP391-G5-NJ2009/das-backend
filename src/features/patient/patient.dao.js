@@ -56,7 +56,19 @@ const TREATMENT_HISTORY_SELECT = `
   book_time,
   status,
   note,
+  treatment_plan_id,
+  visit_number,
   total_estimated_amount,
+  treatment_plan:treatment_plan_id (
+    plan_id,
+    status,
+    created_at,
+    completed_at,
+    dental_service:service_id (
+      service_id,
+      service_name
+    )
+  ),
   appointment_slot (
     is_primary,
     work_slot:slot_id (
@@ -82,7 +94,9 @@ const TREATMENT_HISTORY_SELECT = `
   treatment_record!inner (
     record_id,
     treatment_note,
-    diagnosis
+    diagnosis,
+    clinical_examination,
+    post_treatment_instructions
   ),
   invoice (
     total_amount,

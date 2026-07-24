@@ -26,6 +26,13 @@ const servicePayloadSchema = Joi.object({
     "number.integer": "Số khung giờ phải là số nguyên.",
     "number.min": "Số khung giờ phải ít nhất là {#limit}.",
   }),
+  treatment_mode: Joi.string()
+    .valid("Single-Visit", "Multi-Visit")
+    .default("Single-Visit")
+    .messages({
+      "any.only":
+        "Loại điều trị chỉ được là 'Single-Visit' hoặc 'Multi-Visit'.",
+    }),
   status: Joi.string().valid("Active", "Inactive").default("Inactive").messages({
     "any.only": "Trạng thái chỉ được là 'Active' hoặc 'Inactive'.",
   }),

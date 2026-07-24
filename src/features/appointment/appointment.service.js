@@ -26,6 +26,17 @@ async function bookAppointment({
     );
   }
 
+  const serviceConfig =
+    await appointmentDao.getServiceBookingConfig(serviceId);
+  let activeTreatmentPlan = null;
+
+  if (serviceConfig.treatment_mode === "Multi-Visit") {
+    activeTreatmentPlan = await appointmentDao.findActiveTreatmentPlan(
+      resolvedPatientId,
+      serviceId,
+    );
+  }
+
   // BR-11: Block patient with >= 3 No-Shows from booking online
   if (actorRole === "patient") {
     const patientInfo = await patientDao.findPatientById(resolvedPatientId);
@@ -186,13 +197,18 @@ async function bookAppointment({
     status: "Confirmed",
     note: note || null,
     book_time: new Date().toISOString(),
+    ...(activeTreatmentPlan
+      ? {
+          treatment_plan_id: activeTreatmentPlan.plan_id,
+        }
+      : {}),
     ...(consultationRequestId
       ? { consultation_request_id: consultationRequestId }
       : {}),
   });
 
   // Step 3: Look up service price then link service to the appointment
-  const actualPrice = await appointmentDao.getServicePrice(serviceId);
+  const actualPrice = serviceConfig.unit_price;
   await appointmentDao.insertAppointmentServices([
     {
       appt_id: appointment.appt_id,
@@ -373,6 +389,8 @@ function normalize(row) {
       serviceName: as.dental_service?.service_name,
       actualPrice: as.actual_price,
       slotOccupied: as.dental_service?.slot_occupied ?? 1,
+      treatmentMode:
+        as.dental_service?.treatment_mode || "Single-Visit",
     })),
     slotOccupied: (row.appointment_service || []).reduce(
       (sum, as) => sum + (as.dental_service?.slot_occupied ?? 1),
@@ -403,6 +421,8 @@ function normalize(row) {
     roomName: dentist?.room_info?.[0]?.room_name || null,
     treatmentRecord: row.treatment_record?.[0] || null,
     invoice: row.invoice?.[0] || null,
+    treatmentPlanId: row.treatment_plan_id || null,
+    visitNumber: row.visit_number || null,
   };
 }
 
