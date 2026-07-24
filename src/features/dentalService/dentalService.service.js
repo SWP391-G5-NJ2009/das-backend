@@ -174,6 +174,11 @@ async function getDentistsByServiceId(serviceId) {
     .map((row) => row.dentist)
     .filter(Boolean)
     .filter((d) => d.account?.status !== "Deactivated")
+    .filter((d) => {
+      const rooms = d.room_info;
+      if (!rooms || rooms.length === 0) return true;
+      return rooms[0]?.status !== "Unavailable";
+    })
     .map((d) => ({
       dentist_id: d.dentist_id,
       full_name: d.full_name || d.account?.email || `Dentist #${d.dentist_id}`,
