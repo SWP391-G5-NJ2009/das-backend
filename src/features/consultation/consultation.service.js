@@ -18,12 +18,16 @@ async function createConsultationRequest({
   phone,
   email,
   description,
+  service_id,
+  consultation_date,
 }) {
   const { data, error } = await consultationDao.insertConsultationRequest({
     full_name,
     phone,
-    email,
-    description,
+    email: service || null,
+    description: description || null,
+    service_id: service_id || null,
+    consultation_date: consultation_date || null,
   });
 
   if (error) {
