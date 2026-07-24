@@ -79,6 +79,11 @@ async function findDentistsByServiceId(serviceId) {
           username,
           email,
           status
+        ),
+        room_info (
+          room_id,
+          room_name,
+          status
         )
       )
     `,
