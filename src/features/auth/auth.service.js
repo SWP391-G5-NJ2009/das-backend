@@ -309,7 +309,7 @@ async function getLatestValidOtp({ accountId, identifier, otp }) {
 
   if (!data || !(await compareOtp(otp, data.otp_hash))) {
     throw new AppError(
-      "OTP không hợp lệ. Vui lòng thử lại.",
+      "OTP không hợp lệ. Vui lòng thử lại hoặc gửi lại mã.",
       400,
       "OTP_INVALID",
     );
