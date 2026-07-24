@@ -6,7 +6,7 @@ const roomPayloadSchema = Joi.object({
   dentist_id: Joi.number().integer().positive().allow(null),
   status: Joi.string()
     .trim()
-    .valid("Available", "Maintenance", "Unavailable", "Active", "Inactive")
+    .valid("Available", "Unavailable", "Occupied")
     .default("Available"),
 });
 
