@@ -24,14 +24,19 @@ async function createConsultationRequest({
   const { data, error } = await consultationDao.insertConsultationRequest({
     full_name,
     phone,
-    email: service || null,
-    description: description || null,
+    email: email || null,
+    description,
     service_id: service_id || null,
     consultation_date: consultation_date || null,
   });
 
   if (error) {
-    logger.error("Failed to insert consultation request", error);
+    logger.error("Failed to insert consultation request", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
     throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
