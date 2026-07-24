@@ -119,7 +119,7 @@ async function findProfileByPhone(phone) {
 async function findPatientById(patientId) {
   const { data, error } = await supabase
     .from("patient")
-    .select("patient_id, account_id, full_name, no_show_count")
+    .select("patient_id, account_id, full_name, phone, no_show_count")
     .eq("patient_id", patientId)
     .single();
 

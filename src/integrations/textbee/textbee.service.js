@@ -78,7 +78,12 @@ function patientAccountPassword({ password }) {
   return `DentalCare: Mat khau mac dinh cua ban la: ${password}. Vui long thay doi mat khau sau khi dang nhap.`;
 }
 
+function appointmentConfirmation({ patientName, date, time, serviceName }) {
+  return `DentalCare: Ban co lich hen vao ngay ${date} luc ${time}. Dich vu: ${serviceName}.`;
+}
+
 module.exports = {
+  appointmentConfirmation,
   patientAccountPassword,
   sendSms,
   resetPasswordOtp,

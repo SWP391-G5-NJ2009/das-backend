@@ -373,7 +373,7 @@ async function getServicePrice(serviceId) {
 async function getServiceBookingConfig(serviceId) {
   const { data, error } = await supabase
     .from("dental_services")
-    .select("service_id, unit_price, treatment_mode")
+    .select("service_id, service_name, unit_price, treatment_mode")
     .eq("service_id", serviceId)
     .maybeSingle();
 

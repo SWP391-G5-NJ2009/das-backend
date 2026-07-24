@@ -1,6 +1,48 @@
 const appointmentDao = require("./appointment.dao");
 const patientDao = require("../patient/patient.dao");
 const AppError = require("../../utils/AppError");
+const textbeeService = require("../../integrations/textbee/textbee.service");
+
+function getAppointmentTime(startTime) {
+  return startTime ? startTime.substring(0, 5) : "";
+}
+
+function sendReceptionistBookingSms({
+  appointmentId,
+  patient,
+  serviceName,
+  workDate,
+  startTime,
+}) {
+  const recipient = patient?.phone;
+
+  if (!recipient) {
+    console.warn("[appointment.service] SMS skipped: patient phone missing.", {
+      appointmentId,
+      patientId: patient?.patient_id,
+    });
+    return;
+  }
+
+  Promise.resolve()
+    .then(() =>
+      textbeeService.sendSms({
+        recipient,
+        message: textbeeService.appointmentConfirmation({
+          patientName: patient.full_name || "quy khach",
+          date: workDate || "",
+          time: getAppointmentTime(startTime),
+          serviceName: serviceName || "dich vu nha khoa",
+        }),
+      }),
+    )
+    .catch((err) => {
+      console.error(
+        "[appointment.service] booking confirmation SMS failed:",
+        err.message,
+      );
+    });
+}
 
 async function bookAppointment({
   patientId,
@@ -14,9 +56,11 @@ async function bookAppointment({
   consultationRequestId = null,
 }) {
   let resolvedPatientId = patientId;
+  let resolvedPatient = null;
   if (!resolvedPatientId && newPatient) {
     const created = await patientDao.createPatient(newPatient);
     resolvedPatientId = created.patient_id;
+    resolvedPatient = created;
   }
   if (!resolvedPatientId) {
     throw new AppError(
@@ -26,8 +70,7 @@ async function bookAppointment({
     );
   }
 
-  const serviceConfig =
-    await appointmentDao.getServiceBookingConfig(serviceId);
+  const serviceConfig = await appointmentDao.getServiceBookingConfig(serviceId);
   let activeTreatmentPlan = null;
 
   if (serviceConfig.treatment_mode === "Multi-Visit") {
@@ -40,6 +83,7 @@ async function bookAppointment({
   // BR-11: Block patient with >= 3 No-Shows from booking online
   if (actorRole === "patient") {
     const patientInfo = await patientDao.findPatientById(resolvedPatientId);
+    resolvedPatient = patientInfo;
     if (patientInfo.no_show_count >= 3) {
       throw new AppError(
         "Tài khoản của bạn đã bị hạn chế đặt lịch trực tuyến do vắng mặt từ 3 lần trở lên. " +
@@ -225,6 +269,20 @@ async function bookAppointment({
     })),
   );
 
+  if (actorRole === "receptionist") {
+    if (!resolvedPatient) {
+      resolvedPatient = await patientDao.findPatientById(resolvedPatientId);
+    }
+
+    sendReceptionistBookingSms({
+      appointmentId: appointment.appt_id,
+      patient: resolvedPatient,
+      serviceName: serviceConfig.service_name,
+      workDate,
+      startTime,
+    });
+  }
+
   return appointment;
 }
 
@@ -389,8 +447,7 @@ function normalize(row) {
       serviceName: as.dental_service?.service_name,
       actualPrice: as.actual_price,
       slotOccupied: as.dental_service?.slot_occupied ?? 1,
-      treatmentMode:
-        as.dental_service?.treatment_mode || "Single-Visit",
+      treatmentMode: as.dental_service?.treatment_mode || "Single-Visit",
     })),
     slotOccupied: (row.appointment_service || []).reduce(
       (sum, as) => sum + (as.dental_service?.slot_occupied ?? 1),
@@ -620,7 +677,6 @@ async function markNoShow(apptId) {
   return updated;
 }
 
-
 async function getMyBookedTimes(patientId) {
   const { data, error } = await appointmentDao.findByPatientId(patientId);
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
@@ -643,7 +699,6 @@ async function getMyBookedTimes(patientId) {
   return bookedTimes;
 }
 
-
 module.exports = {
   bookAppointment,
   cancelAppointment,
@@ -654,4 +709,3 @@ module.exports = {
   markNoShow,
   startTreatment,
 };
-
