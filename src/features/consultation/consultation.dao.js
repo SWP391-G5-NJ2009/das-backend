@@ -6,7 +6,7 @@ async function findAllConsultationRequests(filters = {}) {
 
   let query = supabase
     .from("consultation_request")
-    .select("*, dental_services!fk_consultation_request_service(service_id, name)", { count: "exact" })
+    .select("*, dental_services(service_name)", { count: "exact" })
     .range((page-1)*PAGE_SIZE, page*PAGE_SIZE-1);
 
   if (filters.status && filters.status !== "All") {
