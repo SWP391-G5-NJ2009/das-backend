@@ -555,9 +555,52 @@ async function cancelAppointment(
 }
 
 /**
- * Returns the list of (date, startTime) pairs for all active appointments of a patient.
- * Used by the booking UI to disable already-booked time slots.
+ * Receptionist: manually mark a Confirmed appointment as No-Show.
+ * Increments the patient's no_show_count.
  */
+async function markNoShow(apptId) {
+  const { data: existing, error } = await appointmentDao.findById(apptId);
+  if (error || !existing) {
+    throw new AppError("Không tìm thấy lịch hẹn.", 404, "NOT_FOUND");
+  }
+  if (existing.status !== "Confirmed") {
+    throw new AppError(
+      `Chỉ có thể đánh dấu No-Show cho lịch hẹn ở trạng thái Đã xác nhận (hiện tại: ${existing.status}).`,
+      409,
+      "INVALID_STATUS_TRANSITION",
+    );
+  }
+
+  const updated = await appointmentDao.markOneAsNoShow(apptId);
+  if (!updated) {
+    throw new AppError(
+      "Trạng thái lịch hẹn vừa thay đổi. Vui lòng tải lại danh sách.",
+      409,
+      "APPOINTMENT_STATUS_CHANGED",
+    );
+  }
+
+  // Increment no_show_count for this patient
+  const patientId = existing.patient?.patient_id;
+  if (patientId) {
+    const supabase = require("../../config/supabase");
+    const { data: patient } = await supabase
+      .from("patient")
+      .select("patient_id, no_show_count")
+      .eq("patient_id", patientId)
+      .maybeSingle();
+    if (patient) {
+      await supabase
+        .from("patient")
+        .update({ no_show_count: (patient.no_show_count || 0) + 1 })
+        .eq("patient_id", patientId);
+    }
+  }
+
+  return updated;
+}
+
+
 async function getMyBookedTimes(patientId) {
   const { data, error } = await appointmentDao.findByPatientId(patientId);
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
@@ -580,6 +623,7 @@ async function getMyBookedTimes(patientId) {
   return bookedTimes;
 }
 
+
 module.exports = {
   bookAppointment,
   cancelAppointment,
@@ -587,5 +631,7 @@ module.exports = {
   getAll,
   getMyAppointments,
   getMyBookedTimes,
+  markNoShow,
   startTreatment,
 };
+

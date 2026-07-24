@@ -466,7 +466,7 @@ async function markOverdueAsNoShow() {
       appointment_slot (
         is_primary,
         work_slot:slot_id (
-          time_slot_config:slot_config_id (start_time),
+          time_slot_config:slot_config_id (start_time, end_time),
           schedules:schedule_id (work_date)
         )
       )
@@ -481,7 +481,6 @@ async function markOverdueAsNoShow() {
 
   if (!candidates || candidates.length === 0) return [];
 
-  const NO_SHOW_GRACE_MS = 15 * 60 * 1000;
   const overdueIds = [];
   const overduePatientIds = {};
 
@@ -490,13 +489,12 @@ async function markOverdueAsNoShow() {
       (as) => as.is_primary,
     );
     const workDate = primaryEntry?.work_slot?.schedules?.work_date;
-    const startTime = primaryEntry?.work_slot?.time_slot_config?.start_time;
-    if (!workDate || !startTime) continue;
+    const endTime = primaryEntry?.work_slot?.time_slot_config?.end_time;
+    if (!workDate || !endTime) continue;
 
-    const slotStart = new Date(`${workDate}T${startTime}`);
-    const deadline = new Date(slotStart.getTime() + NO_SHOW_GRACE_MS);
+    const slotEnd = new Date(`${workDate}T${endTime}`);
 
-    if (now >= deadline) {
+    if (now >= slotEnd) {
       overdueIds.push(appt.appt_id);
       overduePatientIds[appt.appt_id] = appt.patient_id;
     }
@@ -524,6 +522,24 @@ async function markOverdueAsNoShow() {
 }
 
 
+/**
+ * Receptionist: manually mark a single appointment as No-Show.
+ * Only transitions from 'Confirmed' → 'No-Show' (atomic guard).
+ * Returns the updated row, or null if the status guard failed.
+ */
+async function markOneAsNoShow(apptId) {
+  const { data, error } = await supabase
+    .from("appointment")
+    .update({ status: "No-Show" })
+    .eq("appt_id", apptId)
+    .eq("status", "Confirmed") // atomic guard
+    .select("appt_id, patient_id, status")
+    .maybeSingle();
+
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  return data;
+}
+
 
 module.exports = {
   cancelById,
@@ -544,6 +560,7 @@ module.exports = {
   insertAppointmentSlots,
   markMultipleSlotsBooked,
   markNoShowSlotAvailable: releaseSlot,
+  markOneAsNoShow,
   markOverdueAsNoShow,
   markSlotBooked,
   reconcileNoShowAfterCheckIn,
@@ -551,3 +568,4 @@ module.exports = {
   releaseSlotsByIds,
   startTreatmentById,
 };
+
