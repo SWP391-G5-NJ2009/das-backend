@@ -19,16 +19,40 @@ router.get(
   queueController.getMyQueue,
 );
 
+router.post(
+  "/walk-in",
+  requireRole("receptionist"),
+  queueController.createWalkIn,
+);
+
 router.get(
   "/:id",
   requireRole("receptionist", "dentist"),
   queueController.getQueueDetail,
 );
 
+router.patch(
+  "/:id/assignment",
+  requireRole("receptionist"),
+  queueController.assignQueue,
+);
+
+router.patch(
+  "/:id/status",
+  requireRole("receptionist", "dentist"),
+  queueController.updateStatus,
+);
+
 router.post(
   "/:id/follow-ups",
   requireRole("dentist"),
   queueController.createFollowUp,
+);
+
+router.post(
+  "/:id/treatment-record",
+  requireRole("dentist"),
+  queueController.createTreatmentRecord,
 );
 
 module.exports = router;

@@ -1,6 +1,12 @@
 const queueService = require("./queue.service");
 const { sendSuccess } = require("../../utils/response");
-const { validateCreateFollowUp } = require("./queue.validator");
+const {
+  validateAssignQueue,
+  validateCreateFollowUp,
+  validateCreateTreatmentRecord,
+  validateCreateWalkIn,
+  validateUpdateStatus,
+} = require("./queue.validator");
 
 async function getAllQueues(req, res, next) {
   try {
@@ -46,9 +52,66 @@ async function createFollowUp(req, res, next) {
   }
 }
 
+async function createWalkIn(req, res, next) {
+  try {
+    const payload = validateCreateWalkIn(req.body);
+    const data = await queueService.createWalkIn(payload);
+    return sendSuccess(res, 201, data, "Đã thêm bệnh nhân walk-in vào hàng đợi.");
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function assignQueue(req, res, next) {
+  try {
+    const payload = validateAssignQueue(req.body);
+    const data = await queueService.assignQueue(req.params.id, payload);
+    return sendSuccess(res, 200, data, "Cập nhật phân công thành công.");
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function updateStatus(req, res, next) {
+  try {
+    const { status } = validateUpdateStatus(req.body);
+    const data = await queueService.updateStatus(
+      req.params.id,
+      status,
+      req.user,
+    );
+    return sendSuccess(res, 200, data, "Cập nhật trạng thái hàng đợi thành công.");
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function createTreatmentRecord(req, res, next) {
+  try {
+    const payload = validateCreateTreatmentRecord(req.body);
+    const data = await queueService.createTreatmentRecord(
+      req.params.id,
+      payload,
+      req.user,
+    );
+    return sendSuccess(
+      res,
+      201,
+      data,
+      "Đã lưu kết quả điều trị và hoàn tất lượt walk-in.",
+    );
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
+  assignQueue,
   createFollowUp,
+  createTreatmentRecord,
+  createWalkIn,
   getAllQueues,
   getMyQueue,
   getQueueDetail,
+  updateStatus,
 };

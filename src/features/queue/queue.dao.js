@@ -10,6 +10,8 @@ const QUEUE_SELECT = `
   queue_type,
   status,
   check_in_time,
+  started_at,
+  completed_at,
   note,
   created_at,
   updated_at,
@@ -91,6 +93,94 @@ function findById(queueId) {
     .maybeSingle();
 }
 
+function findPatientById(patientId) {
+  return supabase
+    .from("patient")
+    .select("patient_id, full_name, phone")
+    .eq("patient_id", patientId)
+    .maybeSingle();
+}
+
+function findDentistById(dentistId) {
+  return supabase
+    .from("dentist")
+    .select(`
+      dentist_id,
+      full_name,
+      room_info (
+        room_id,
+        room_name,
+        status
+      )
+    `)
+    .eq("dentist_id", dentistId)
+    .maybeSingle();
+}
+
+function findRoomById(roomId) {
+  return supabase
+    .from("room_info")
+    .select("room_id, room_name, dentist_id, status")
+    .eq("room_id", roomId)
+    .maybeSingle();
+}
+
+async function createWalkIn(payload) {
+  const { data, error } = await supabase
+    .from("queue")
+    .insert(payload)
+    .select(QUEUE_SELECT)
+    .single();
+
+  if (error) {
+    if (error.code === "23505") {
+      throw new AppError(
+        "Bệnh nhân đã có một lượt đang hoạt động trong hàng đợi.",
+        409,
+        "ACTIVE_QUEUE_EXISTS",
+      );
+    }
+    throw new AppError(error.message, 500, "DB_ERROR");
+  }
+  return data;
+}
+
+async function updateById(queueId, payload, expectedStatus) {
+  let query = supabase
+    .from("queue")
+    .update(payload)
+    .eq("id", queueId);
+  if (expectedStatus) query = query.eq("status", expectedStatus);
+  const { data, error } = await query.select(QUEUE_SELECT).maybeSingle();
+
+  if (error) {
+    if (
+      error.code === "23505" &&
+      error.message?.includes("queue_one_in_progress_per_dentist")
+    ) {
+      throw new AppError(
+        "Nha sĩ đang điều trị một bệnh nhân khác.",
+        409,
+        "DENTIST_BUSY",
+      );
+    }
+    throw new AppError(error.message, 500, "DB_ERROR");
+  }
+  return data;
+}
+
+function findDentistInProgress(dentistId, excludedQueueId) {
+  let query = supabase
+    .from("queue")
+    .select("id, patient_id")
+    .eq("dentist_id", dentistId)
+    .eq("status", "IN_PROGRESS")
+    .limit(1);
+
+  if (excludedQueueId) query = query.neq("id", excludedQueueId);
+  return query.maybeSingle();
+}
+
 async function createFollowUp({
   queueId,
   patientId,
@@ -114,8 +204,44 @@ async function createFollowUp({
   return data;
 }
 
+async function createTreatmentRecord(payload) {
+  const { data, error } = await supabase
+    .from("queue_treatment_record")
+    .insert(payload)
+    .select(
+      "record_id, queue_id, patient_id, dentist_id, clinical_examination, diagnosis, treatment_note, post_treatment_instructions, created_at",
+    )
+    .single();
+  if (error) {
+    if (error.code === "23505") {
+      throw new AppError(
+        "Lượt walk-in đã có kết quả điều trị.",
+        409,
+        "TREATMENT_EXISTS",
+      );
+    }
+    throw new AppError(error.message, 500, "DB_ERROR");
+  }
+  return data;
+}
+
+async function removeTreatmentRecord(recordId) {
+  await supabase
+    .from("queue_treatment_record")
+    .delete()
+    .eq("record_id", recordId);
+}
+
 module.exports = {
   createFollowUp,
+  createTreatmentRecord,
+  createWalkIn,
   findAll,
   findById,
+  findDentistById,
+  findDentistInProgress,
+  findPatientById,
+  findRoomById,
+  removeTreatmentRecord,
+  updateById,
 };

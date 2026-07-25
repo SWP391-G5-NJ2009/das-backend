@@ -180,6 +180,31 @@ async function findTreatmentHistoryByPatientId(patientId) {
     .order("book_time", { ascending: false });
 }
 
+async function findWalkInTreatmentHistoryByPatientId(patientId) {
+  return supabase
+    .from("queue_treatment_record")
+    .select(`
+      record_id,
+      clinical_examination,
+      diagnosis,
+      treatment_note,
+      post_treatment_instructions,
+      created_at,
+      dentist:dentist_id (
+        dentist_id,
+        full_name
+      ),
+      queue:queue_id (
+        id,
+        status,
+        check_in_time,
+        note
+      )
+    `)
+    .eq("patient_id", patientId)
+    .order("created_at", { ascending: false });
+}
+
 module.exports = {
   createPatient,
   searchPatients,
@@ -187,6 +212,7 @@ module.exports = {
   findPatientById,
   resolveNoShowAppointments,
   findTreatmentHistoryByPatientId,
+  findWalkInTreatmentHistoryByPatientId,
   insertProfile,
   linkProfileAccount,
 };

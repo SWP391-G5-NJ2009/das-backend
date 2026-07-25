@@ -6,8 +6,58 @@ const createFollowUpSchema = Joi.object({
   reason: Joi.string().trim().min(2).max(500).required(),
 });
 
+const createWalkInSchema = Joi.object({
+  patientId: Joi.number().integer().positive().required(),
+  dentistId: Joi.number().integer().positive().allow(null).optional(),
+  roomId: Joi.number().integer().positive().allow(null).optional(),
+  note: Joi.string().trim().max(1000).allow("", null).optional(),
+});
+
+const assignQueueSchema = Joi.object({
+  dentistId: Joi.number().integer().positive().allow(null).optional(),
+  roomId: Joi.number().integer().positive().allow(null).optional(),
+  note: Joi.string().trim().max(1000).allow("", null).optional(),
+}).or("dentistId", "roomId", "note");
+
+const updateStatusSchema = Joi.object({
+  status: Joi.string().valid("IN_PROGRESS", "CANCELLED").required(),
+});
+
+const createTreatmentRecordSchema = Joi.object({
+  clinicalExamination: Joi.string().trim().max(2000).allow("", null).optional(),
+  diagnosis: Joi.string().trim().min(1).max(1000).required(),
+  treatmentNote: Joi.string().trim().min(1).max(2000).required(),
+  postTreatmentInstructions: Joi.string()
+    .trim()
+    .max(2000)
+    .allow("", null)
+    .optional(),
+});
+
 function validateCreateFollowUp(payload) {
   return validate(createFollowUpSchema, payload);
 }
 
-module.exports = { validateCreateFollowUp };
+function validateCreateWalkIn(payload) {
+  return validate(createWalkInSchema, payload);
+}
+
+function validateAssignQueue(payload) {
+  return validate(assignQueueSchema, payload);
+}
+
+function validateUpdateStatus(payload) {
+  return validate(updateStatusSchema, payload);
+}
+
+function validateCreateTreatmentRecord(payload) {
+  return validate(createTreatmentRecordSchema, payload);
+}
+
+module.exports = {
+  validateAssignQueue,
+  validateCreateFollowUp,
+  validateCreateTreatmentRecord,
+  validateCreateWalkIn,
+  validateUpdateStatus,
+};
