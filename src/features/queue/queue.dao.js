@@ -10,8 +10,6 @@ const QUEUE_SELECT = `
   queue_type,
   status,
   check_in_time,
-  started_at,
-  completed_at,
   note,
   created_at,
   updated_at,
@@ -70,7 +68,7 @@ const QUEUE_SELECT = `
   )
 `.trim();
 
-function findAll({ statuses, dentistId, roomId } = {}) {
+function findAll({ statuses, dentistId } = {}) {
   let query = supabase
     .from("queue")
     .select(QUEUE_SELECT)
@@ -80,7 +78,6 @@ function findAll({ statuses, dentistId, roomId } = {}) {
     query = query.in("status", statuses);
   }
   if (dentistId) query = query.eq("dentist_id", dentistId);
-  if (roomId) query = query.eq("room_id", roomId);
 
   return query;
 }
@@ -117,11 +114,13 @@ function findDentistById(dentistId) {
     .maybeSingle();
 }
 
-function findRoomById(roomId) {
+function findActiveByPatientId(patientId) {
   return supabase
-    .from("room_info")
-    .select("room_id, room_name, dentist_id, status")
-    .eq("room_id", roomId)
+    .from("queue")
+    .select("id, status")
+    .eq("patient_id", patientId)
+    .in("status", ["WAITING", "ASSIGNED", "IN_PROGRESS"])
+    .limit(1)
     .maybeSingle();
 }
 
@@ -238,10 +237,10 @@ module.exports = {
   createWalkIn,
   findAll,
   findById,
+  findActiveByPatientId,
   findDentistById,
   findDentistInProgress,
   findPatientById,
-  findRoomById,
   removeTreatmentRecord,
   updateById,
 };

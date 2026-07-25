@@ -35,8 +35,25 @@ function normalizeQueue(row) {
     .filter(Boolean)
     .sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
   const lastConfig = orderedConfigs[orderedConfigs.length - 1];
-  const waitUntil =
-    row.started_at || row.completed_at || new Date().toISOString();
+  const normalizedStatus =
+    row.status === QUEUE_STATUSES.ASSIGNED
+      ? QUEUE_STATUSES.WAITING
+      : row.status;
+  const waitingMinutes = [
+    QUEUE_STATUSES.WAITING,
+    QUEUE_STATUSES.IN_PROGRESS,
+  ].includes(normalizedStatus)
+    ? Math.max(
+        0,
+        Math.floor(
+          ((normalizedStatus === QUEUE_STATUSES.WAITING
+            ? Date.now()
+            : new Date(row.updated_at).getTime()) -
+            new Date(row.check_in_time).getTime()) /
+            60000,
+        ),
+      )
+    : null;
 
   return {
     queueId: String(row.id),
@@ -74,18 +91,9 @@ function normalizeQueue(row) {
     roomId: row.room?.room_id || row.room_id || null,
     roomName: row.room?.room_name || null,
     roomStatus: row.room?.status || null,
-    status: row.status,
+    status: normalizedStatus,
     checkInTime: row.check_in_time,
-    startedAt: row.started_at || null,
-    completedAt: row.completed_at || null,
-    waitingMinutes: Math.max(
-      0,
-      Math.floor(
-        (new Date(waitUntil).getTime() -
-          new Date(row.check_in_time).getTime()) /
-          60000,
-      ),
-    ),
+    waitingMinutes,
     note: row.note || appointment?.note || "",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -107,7 +115,9 @@ function resolveStatuses(status) {
       "VALIDATION_ERROR",
     );
   }
-  return requested;
+  return requested.includes(QUEUE_STATUSES.WAITING)
+    ? [...new Set([...requested, QUEUE_STATUSES.ASSIGNED])]
+    : requested;
 }
 
 function applySearch(rows, search) {
@@ -147,38 +157,12 @@ async function getDentist(dentistId) {
   return data;
 }
 
-async function getAvailableRoom(roomId) {
-  const { data, error } = await queueDao.findRoomById(roomId);
-  if (error) throw new AppError(error.message, 500, "DB_ERROR");
-  if (!data) {
-    throw new AppError("Không tìm thấy phòng khám.", 404, "ROOM_NOT_FOUND");
-  }
-  if (data.status === "Unavailable") {
-    throw new AppError(
-      "Phòng khám đang không khả dụng.",
-      409,
-      "ROOM_UNAVAILABLE",
-    );
-  }
-  return data;
-}
-
-async function resolveAssignment(dentistId, roomId) {
-  if (!dentistId) {
-    return { dentistId: null, roomId: null };
-  }
-
+async function resolveDentistRoom(dentistId) {
   const dentist = await getDentist(dentistId);
-  let resolvedRoomId = roomId || null;
-  if (!resolvedRoomId) {
-    const assignedRoom = (dentist.room_info || []).find(
-      (room) => room.status !== "Unavailable",
-    );
-    resolvedRoomId = assignedRoom?.room_id || null;
-  } else {
-    await getAvailableRoom(resolvedRoomId);
-  }
-  if (!resolvedRoomId) {
+  const assignedRoom = (dentist.room_info || []).find(
+    (room) => room.status !== "Unavailable",
+  );
+  if (!assignedRoom) {
     throw new AppError(
       "Nha sĩ chưa có phòng khám khả dụng.",
       409,
@@ -188,7 +172,7 @@ async function resolveAssignment(dentistId, roomId) {
 
   return {
     dentistId: Number(dentist.dentist_id),
-    roomId: resolvedRoomId ? Number(resolvedRoomId) : null,
+    roomId: Number(assignedRoom.room_id),
   };
 }
 
@@ -196,7 +180,6 @@ async function getAllQueues(filters = {}) {
   const { data, error } = await queueDao.findAll({
     statuses: resolveStatuses(filters.status),
     dentistId: filters.dentistId,
-    roomId: filters.roomId,
   });
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
   return applySearch((data || []).map(normalizeQueue), filters.search);
@@ -215,7 +198,7 @@ async function getDentistQueues(dentistId, filters = {}) {
     statuses:
       filters.status && filters.status !== "active"
         ? resolveStatuses(filters.status)
-        : [QUEUE_STATUSES.ASSIGNED, QUEUE_STATUSES.IN_PROGRESS],
+        : ACTIVE_QUEUE_STATUSES,
   });
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
   return applySearch((data || []).map(normalizeQueue), filters.search);
@@ -249,85 +232,30 @@ async function createWalkIn(payload) {
     );
   }
 
-  const assignment = await resolveAssignment(
-    payload.dentistId,
-    payload.roomId,
-  );
+  const { data: activeQueue, error: activeQueueError } =
+    await queueDao.findActiveByPatientId(payload.patientId);
+  if (activeQueueError) {
+    throw new AppError(activeQueueError.message, 500, "DB_ERROR");
+  }
+  if (activeQueue) {
+    throw new AppError(
+      "Bệnh nhân đang có lượt trong hàng đợi.",
+      409,
+      "ACTIVE_QUEUE_EXISTS",
+    );
+  }
+
+  const dentistRoom = await resolveDentistRoom(payload.dentistId);
   const created = await queueDao.createWalkIn({
     appointment_id: null,
     patient_id: Number(payload.patientId),
-    dentist_id: assignment.dentistId,
-    room_id: assignment.roomId,
+    dentist_id: dentistRoom.dentistId,
+    room_id: dentistRoom.roomId,
     queue_type: QUEUE_TYPES.WALK_IN,
-    status: assignment.dentistId
-      ? QUEUE_STATUSES.ASSIGNED
-      : QUEUE_STATUSES.WAITING,
+    status: QUEUE_STATUSES.WAITING,
     note: payload.note || null,
   });
   return normalizeQueue(created);
-}
-
-async function assignQueue(queueId, payload) {
-  const queue = await getQueueRow(queueId);
-  if (queue.queue_type !== QUEUE_TYPES.WALK_IN) {
-    throw new AppError(
-      "Lượt có lịch hẹn phải được phân công qua lịch hẹn.",
-      409,
-      "APPOINTMENT_QUEUE_READ_ONLY",
-    );
-  }
-  if (
-    ![QUEUE_STATUSES.WAITING, QUEUE_STATUSES.ASSIGNED].includes(queue.status)
-  ) {
-    throw new AppError(
-      "Không thể phân công lượt đã kết thúc.",
-      409,
-      "QUEUE_FINISHED",
-    );
-  }
-
-  const hasDentist = Object.prototype.hasOwnProperty.call(
-    payload,
-    "dentistId",
-  );
-  const hasRoom = Object.prototype.hasOwnProperty.call(payload, "roomId");
-  const nextDentistId = hasDentist ? payload.dentistId : queue.dentist_id;
-  let assignment;
-
-  if (!nextDentistId) {
-    assignment = { dentistId: null, roomId: null };
-  } else if (hasDentist) {
-    assignment = await resolveAssignment(
-      nextDentistId,
-      hasRoom ? payload.roomId : null,
-    );
-  } else if (hasRoom) {
-    assignment = await resolveAssignment(nextDentistId, payload.roomId);
-  } else {
-    assignment = {
-      dentistId: Number(nextDentistId),
-      roomId: queue.room_id ? Number(queue.room_id) : null,
-    };
-  }
-
-  const updated = await queueDao.updateById(queueId, {
-    dentist_id: assignment.dentistId,
-    room_id: assignment.roomId,
-    status: assignment.dentistId
-      ? QUEUE_STATUSES.ASSIGNED
-      : QUEUE_STATUSES.WAITING,
-    ...(Object.prototype.hasOwnProperty.call(payload, "note")
-      ? { note: payload.note || null }
-      : {}),
-  }, queue.status);
-  if (!updated) {
-    throw new AppError(
-      "Không tìm thấy lượt trong hàng đợi.",
-      404,
-      "NOT_FOUND",
-    );
-  }
-  return normalizeQueue(updated);
 }
 
 async function updateStatus(queueId, nextStatus, actor = {}) {
@@ -401,18 +329,11 @@ async function updateStatus(queueId, nextStatus, actor = {}) {
     }
   }
 
-  const now = new Date().toISOString();
-  const updated = await queueDao.updateById(queueId, {
-    status: nextStatus,
-    ...(nextStatus === QUEUE_STATUSES.IN_PROGRESS
-      ? { started_at: now }
-      : {}),
-    ...([QUEUE_STATUSES.COMPLETED, QUEUE_STATUSES.CANCELLED].includes(
-      nextStatus,
-    )
-      ? { completed_at: now }
-      : {}),
-  }, queue.status);
+  const updated = await queueDao.updateById(
+    queueId,
+    { status: nextStatus },
+    queue.status,
+  );
   if (!updated) {
     throw new AppError(
       "Không tìm thấy lượt trong hàng đợi.",
@@ -463,13 +384,9 @@ async function createTreatmentRecord(queueId, payload, actor = {}) {
   });
 
   try {
-    const completedAt = new Date().toISOString();
     const completedQueue = await queueDao.updateById(
       queueId,
-      {
-        status: QUEUE_STATUSES.COMPLETED,
-        completed_at: completedAt,
-      },
+      { status: QUEUE_STATUSES.COMPLETED },
       QUEUE_STATUSES.IN_PROGRESS,
     );
     if (!completedQueue) {
@@ -527,7 +444,6 @@ async function createFollowUp(queueId, payload, actor = {}) {
 }
 
 module.exports = {
-  assignQueue,
   createFollowUp,
   createTreatmentRecord,
   createWalkIn,

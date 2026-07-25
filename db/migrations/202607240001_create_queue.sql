@@ -6,27 +6,19 @@ create table if not exists public.queue (
   room_id bigint null references public.room_info(room_id),
   queue_type text not null check (queue_type in ('APPOINTMENT', 'WALK_IN')),
   status text not null default 'WAITING'
-    check (status in ('WAITING', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
+    check (status in ('WAITING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
   check_in_time timestamptz not null default now(),
-  started_at timestamptz null,
-  completed_at timestamptz null,
   note text null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
-alter table public.queue
-  add column if not exists started_at timestamptz null,
-  add column if not exists completed_at timestamptz null;
-
 create unique index if not exists queue_active_appointment_unique
   on public.queue (appointment_id)
   where appointment_id is not null
-    and status in ('WAITING', 'ASSIGNED', 'IN_PROGRESS');
+    and status in ('WAITING', 'IN_PROGRESS');
 
-create unique index if not exists queue_active_patient_unique
-  on public.queue (patient_id)
-  where status in ('WAITING', 'ASSIGNED', 'IN_PROGRESS');
+drop index if exists public.queue_active_patient_unique;
 
 create unique index if not exists queue_one_in_progress_per_dentist
   on public.queue (dentist_id)
@@ -103,29 +95,26 @@ begin
       v_dentist_id,
       v_room_id,
       'APPOINTMENT',
-      case when v_dentist_id is null then 'WAITING' else 'ASSIGNED' end,
+      'WAITING',
       now()
     )
     on conflict do nothing;
   elsif new.status = 'In-Treatment'
     and old.status is distinct from new.status then
     update public.queue
-    set status = 'IN_PROGRESS',
-        started_at = coalesce(started_at, now())
+    set status = 'IN_PROGRESS'
     where appointment_id = new.appt_id
       and status in ('WAITING', 'ASSIGNED');
   elsif new.status = 'Completed'
     and old.status is distinct from new.status then
     update public.queue
-    set status = 'COMPLETED',
-        completed_at = coalesce(completed_at, now())
+    set status = 'COMPLETED'
     where appointment_id = new.appt_id
       and status in ('WAITING', 'ASSIGNED', 'IN_PROGRESS');
   elsif new.status = 'Cancelled'
     and old.status is distinct from new.status then
     update public.queue
-    set status = 'CANCELLED',
-        completed_at = coalesce(completed_at, now())
+    set status = 'CANCELLED'
     where appointment_id = new.appt_id
       and status in ('WAITING', 'ASSIGNED', 'IN_PROGRESS');
   end if;
@@ -158,7 +147,6 @@ select
   'APPOINTMENT',
   case
     when a.status = 'In-Treatment' then 'IN_PROGRESS'
-    when assignment.dentist_id is not null then 'ASSIGNED'
     else 'WAITING'
   end,
   coalesce(a.book_time, now())
@@ -176,6 +164,10 @@ left join lateral (
 ) assignment on true
 where a.status in ('Checked-in', 'In-Treatment')
 on conflict do nothing;
+
+update public.queue
+set status = 'WAITING'
+where status = 'ASSIGNED';
 
 create or replace function public.set_queue_updated_at()
 returns trigger

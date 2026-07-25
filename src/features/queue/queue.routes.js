@@ -32,12 +32,6 @@ router.get(
 );
 
 router.patch(
-  "/:id/assignment",
-  requireRole("receptionist"),
-  queueController.assignQueue,
-);
-
-router.patch(
   "/:id/status",
   requireRole("receptionist", "dentist"),
   queueController.updateStatus,

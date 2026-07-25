@@ -1,7 +1,6 @@
 const queueService = require("./queue.service");
 const { sendSuccess } = require("../../utils/response");
 const {
-  validateAssignQueue,
   validateCreateFollowUp,
   validateCreateTreatmentRecord,
   validateCreateWalkIn,
@@ -62,16 +61,6 @@ async function createWalkIn(req, res, next) {
   }
 }
 
-async function assignQueue(req, res, next) {
-  try {
-    const payload = validateAssignQueue(req.body);
-    const data = await queueService.assignQueue(req.params.id, payload);
-    return sendSuccess(res, 200, data, "Cập nhật phân công thành công.");
-  } catch (error) {
-    return next(error);
-  }
-}
-
 async function updateStatus(req, res, next) {
   try {
     const { status } = validateUpdateStatus(req.body);
@@ -106,7 +95,6 @@ async function createTreatmentRecord(req, res, next) {
 }
 
 module.exports = {
-  assignQueue,
   createFollowUp,
   createTreatmentRecord,
   createWalkIn,
