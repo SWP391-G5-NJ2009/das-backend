@@ -2,7 +2,6 @@ const queueService = require("./queue.service");
 const { sendSuccess } = require("../../utils/response");
 const {
   validateCreateFollowUp,
-  validateCreateTreatmentRecord,
   validateCreateWalkIn,
   validateUpdateStatus,
 } = require("./queue.validator");
@@ -75,28 +74,8 @@ async function updateStatus(req, res, next) {
   }
 }
 
-async function createTreatmentRecord(req, res, next) {
-  try {
-    const payload = validateCreateTreatmentRecord(req.body);
-    const data = await queueService.createTreatmentRecord(
-      req.params.id,
-      payload,
-      req.user,
-    );
-    return sendSuccess(
-      res,
-      201,
-      data,
-      "Đã lưu kết quả điều trị và hoàn tất lượt walk-in.",
-    );
-  } catch (error) {
-    return next(error);
-  }
-}
-
 module.exports = {
   createFollowUp,
-  createTreatmentRecord,
   createWalkIn,
   getAllQueues,
   getMyQueue,

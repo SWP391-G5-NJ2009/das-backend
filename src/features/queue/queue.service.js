@@ -287,9 +287,13 @@ async function updateStatus(queueId, nextStatus, actor = {}) {
         "FORBIDDEN",
       );
     }
-    if (nextStatus !== QUEUE_STATUSES.IN_PROGRESS) {
+    if (
+      ![QUEUE_STATUSES.IN_PROGRESS, QUEUE_STATUSES.COMPLETED].includes(
+        nextStatus,
+      )
+    ) {
       throw new AppError(
-        "Nha sĩ chỉ có thể bắt đầu lượt walk-in; lưu kết quả điều trị sẽ hoàn tất lượt.",
+        "Nha sĩ chỉ có thể bắt đầu hoặc hoàn tất lượt walk-in.",
         403,
         "FORBIDDEN",
       );
@@ -344,70 +348,6 @@ async function updateStatus(queueId, nextStatus, actor = {}) {
   return normalizeQueue(updated);
 }
 
-async function createTreatmentRecord(queueId, payload, actor = {}) {
-  const queue = await getQueueRow(queueId);
-  if (queue.queue_type !== QUEUE_TYPES.WALK_IN) {
-    throw new AppError(
-      "Lượt có lịch hẹn dùng hồ sơ điều trị của lịch hẹn.",
-      409,
-      "APPOINTMENT_TREATMENT_REQUIRED",
-    );
-  }
-  if (
-    actor.role !== "dentist" ||
-    !actor.profileId ||
-    String(queue.dentist_id) !== String(actor.profileId)
-  ) {
-    throw new AppError(
-      "Bạn không được ghi kết quả cho lượt của nha sĩ khác.",
-      403,
-      "FORBIDDEN",
-    );
-  }
-  if (queue.status !== QUEUE_STATUSES.IN_PROGRESS) {
-    throw new AppError(
-      "Chỉ có thể ghi kết quả khi bệnh nhân đang khám.",
-      409,
-      "INVALID_QUEUE_STATUS",
-    );
-  }
-
-  const record = await queueDao.createTreatmentRecord({
-    queue_id: Number(queue.id),
-    patient_id: Number(queue.patient_id),
-    dentist_id: Number(actor.profileId),
-    clinical_examination: payload.clinicalExamination || null,
-    diagnosis: payload.diagnosis,
-    treatment_note: payload.treatmentNote,
-    post_treatment_instructions:
-      payload.postTreatmentInstructions || null,
-  });
-
-  try {
-    const completedQueue = await queueDao.updateById(
-      queueId,
-      { status: QUEUE_STATUSES.COMPLETED },
-      QUEUE_STATUSES.IN_PROGRESS,
-    );
-    if (!completedQueue) {
-      throw new AppError(
-        "Trạng thái lượt vừa thay đổi. Vui lòng tải lại hàng đợi.",
-        409,
-        "QUEUE_STATUS_CHANGED",
-      );
-    }
-    return {
-      recordId: String(record.record_id),
-      queueId: String(record.queue_id),
-      status: QUEUE_STATUSES.COMPLETED,
-      createdAt: record.created_at,
-    };
-  } catch (error) {
-    await queueDao.removeTreatmentRecord(record.record_id);
-    throw error;
-  }
-}
-
 async function createFollowUp(queueId, payload, actor = {}) {
   const queue = await getQueueDetail(queueId, actor);
   if (actor.role !== "dentist" || !actor.profileId) {
@@ -445,7 +385,6 @@ async function createFollowUp(queueId, payload, actor = {}) {
 
 module.exports = {
   createFollowUp,
-  createTreatmentRecord,
   createWalkIn,
   getAllQueues,
   getDentistQueues,

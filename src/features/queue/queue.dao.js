@@ -203,37 +203,8 @@ async function createFollowUp({
   return data;
 }
 
-async function createTreatmentRecord(payload) {
-  const { data, error } = await supabase
-    .from("queue_treatment_record")
-    .insert(payload)
-    .select(
-      "record_id, queue_id, patient_id, dentist_id, clinical_examination, diagnosis, treatment_note, post_treatment_instructions, created_at",
-    )
-    .single();
-  if (error) {
-    if (error.code === "23505") {
-      throw new AppError(
-        "Lượt walk-in đã có kết quả điều trị.",
-        409,
-        "TREATMENT_EXISTS",
-      );
-    }
-    throw new AppError(error.message, 500, "DB_ERROR");
-  }
-  return data;
-}
-
-async function removeTreatmentRecord(recordId) {
-  await supabase
-    .from("queue_treatment_record")
-    .delete()
-    .eq("record_id", recordId);
-}
-
 module.exports = {
   createFollowUp,
-  createTreatmentRecord,
   createWalkIn,
   findAll,
   findById,
@@ -241,6 +212,5 @@ module.exports = {
   findDentistById,
   findDentistInProgress,
   findPatientById,
-  removeTreatmentRecord,
   updateById,
 };

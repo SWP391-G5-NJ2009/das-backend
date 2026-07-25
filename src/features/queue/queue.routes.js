@@ -43,10 +43,4 @@ router.post(
   queueController.createFollowUp,
 );
 
-router.post(
-  "/:id/treatment-record",
-  requireRole("dentist"),
-  queueController.createTreatmentRecord,
-);
-
 module.exports = router;

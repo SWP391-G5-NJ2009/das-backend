@@ -106,39 +106,6 @@ function getTreatmentDentistId(row) {
   return primarySlotEntry?.work_slot?.schedules?.dentist?.dentist_id || null;
 }
 
-function normalizeWalkInTreatment(row) {
-  const queue = row.queue || {};
-  return {
-    recordId: row.record_id,
-    id: `walk-in-${row.record_id}`,
-    appointmentId: null,
-    treatmentPlanId: null,
-    visitNumber: null,
-    treatmentPlanStatus: null,
-    treatmentPlanCreatedAt: null,
-    treatmentPlanCompletedAt: null,
-    date: (queue.check_in_time || row.created_at || "").slice(0, 10),
-    startTime: queue.check_in_time
-      ? new Date(queue.check_in_time).toTimeString().slice(0, 5)
-      : "",
-    endTime: "",
-    treatment: "Walk-in",
-    diagnosis: row.diagnosis || "",
-    clinicalExamination: row.clinical_examination || "",
-    treatmentNote: row.treatment_note || "",
-    postTreatmentInstructions: row.post_treatment_instructions || "",
-    notes: row.treatment_note || "",
-    appointmentNote: queue.note || "",
-    dentist: row.dentist
-      ? `BS. ${row.dentist.full_name || "Nha sĩ"}`
-      : "",
-    cost: null,
-    status: queue.status || "COMPLETED",
-    paymentStatus: "",
-    paymentTime: "",
-  };
-}
-
 function filterTreatmentHistoryByActor(
   rows,
   { actorProfileId, actorRole } = {},
@@ -227,40 +194,15 @@ async function createPatientAccount({
 }
 
 async function getTreatmentHistory(patientId, actor = {}) {
-  const [
-    { data, error },
-    { data: walkInData, error: walkInError },
-  ] = await Promise.all([
-    patientDao.findTreatmentHistoryByPatientId(patientId),
-    patientDao.findWalkInTreatmentHistoryByPatientId(patientId),
-  ]);
+  const { data, error } =
+    await patientDao.findTreatmentHistoryByPatientId(patientId);
 
-  if (error || walkInError) {
-    throw new AppError(
-      error?.message || walkInError?.message,
-      500,
-      "DB_ERROR",
-    );
+  if (error) {
+    throw new AppError(error.message, 500, "DB_ERROR");
   }
 
-  const appointmentHistory = filterTreatmentHistoryByActor(
-    data || [],
-    actor,
-  ).map(
+  return filterTreatmentHistoryByActor(data || [], actor).map(
     normalizeTreatment,
-  );
-  const walkInHistory = (walkInData || [])
-    .filter(
-      (row) =>
-        normalizeRole(actor.actorRole) !== "dentist" ||
-        String(row.dentist?.dentist_id) === String(actor.actorProfileId),
-    )
-    .map(normalizeWalkInTreatment);
-
-  return [...appointmentHistory, ...walkInHistory].sort((first, second) =>
-    `${second.date || ""} ${second.startTime || ""}`.localeCompare(
-      `${first.date || ""} ${first.startTime || ""}`,
-    ),
   );
 }
 
