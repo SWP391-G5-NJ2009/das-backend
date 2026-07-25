@@ -6,7 +6,7 @@ create table if not exists public.queue (
   room_id bigint null references public.room_info(room_id),
   queue_type text not null check (queue_type in ('APPOINTMENT', 'WALK_IN')),
   status text not null default 'WAITING'
-    check (status in ('WAITING', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
+    check (status in ('WAITING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
   check_in_time timestamptz not null default now(),
   note text null,
   created_at timestamptz not null default now(),
@@ -16,7 +16,13 @@ create table if not exists public.queue (
 create unique index if not exists queue_active_appointment_unique
   on public.queue (appointment_id)
   where appointment_id is not null
-    and status in ('WAITING', 'ASSIGNED', 'IN_PROGRESS');
+    and status in ('WAITING', 'IN_PROGRESS');
+
+drop index if exists public.queue_active_patient_unique;
+
+create unique index if not exists queue_one_in_progress_per_dentist
+  on public.queue (dentist_id)
+  where status = 'IN_PROGRESS' and dentist_id is not null;
 
 create index if not exists queue_status_check_in_time_idx
   on public.queue (status, check_in_time);
@@ -77,7 +83,7 @@ begin
       v_dentist_id,
       v_room_id,
       'APPOINTMENT',
-      case when v_dentist_id is null then 'WAITING' else 'ASSIGNED' end,
+      'WAITING',
       now()
     )
     on conflict do nothing;
@@ -129,7 +135,6 @@ select
   'APPOINTMENT',
   case
     when a.status = 'In-Treatment' then 'IN_PROGRESS'
-    when assignment.dentist_id is not null then 'ASSIGNED'
     else 'WAITING'
   end,
   coalesce(a.book_time, now())
@@ -147,6 +152,10 @@ left join lateral (
 ) assignment on true
 where a.status in ('Checked-in', 'In-Treatment')
 on conflict do nothing;
+
+update public.queue
+set status = 'WAITING'
+where status = 'ASSIGNED';
 
 create or replace function public.set_queue_updated_at()
 returns trigger

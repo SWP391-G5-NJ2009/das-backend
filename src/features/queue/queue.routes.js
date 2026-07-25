@@ -19,10 +19,22 @@ router.get(
   queueController.getMyQueue,
 );
 
+router.post(
+  "/walk-in",
+  requireRole("receptionist"),
+  queueController.createWalkIn,
+);
+
 router.get(
   "/:id",
   requireRole("receptionist", "dentist"),
   queueController.getQueueDetail,
+);
+
+router.patch(
+  "/:id/status",
+  requireRole("receptionist", "dentist"),
+  queueController.updateStatus,
 );
 
 router.post(

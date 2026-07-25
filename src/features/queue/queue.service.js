@@ -1,6 +1,11 @@
 const queueDao = require("./queue.dao");
 const AppError = require("../../utils/AppError");
-const { ACTIVE_QUEUE_STATUSES, QUEUE_STATUSES } = require("./queue.constants");
+const {
+  ACTIVE_QUEUE_STATUSES,
+  QUEUE_STATUSES,
+  QUEUE_STATUS_TRANSITIONS,
+  QUEUE_TYPES,
+} = require("./queue.constants");
 
 function normalizeTime(value) {
   return value ? value.substring(0, 5) : null;
@@ -25,12 +30,30 @@ function normalizeQueue(row) {
   const slotConfig = primarySlot?.time_slot_config;
   const schedule = primarySlot?.schedules;
   const services = appointment?.appointment_service || [];
-
   const orderedConfigs = (appointment?.appointment_slot || [])
     .map((entry) => entry.work_slot?.time_slot_config)
     .filter(Boolean)
     .sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
   const lastConfig = orderedConfigs[orderedConfigs.length - 1];
+  const normalizedStatus =
+    row.status === QUEUE_STATUSES.ASSIGNED
+      ? QUEUE_STATUSES.WAITING
+      : row.status;
+  const waitingMinutes = [
+    QUEUE_STATUSES.WAITING,
+    QUEUE_STATUSES.IN_PROGRESS,
+  ].includes(normalizedStatus)
+    ? Math.max(
+        0,
+        Math.floor(
+          ((normalizedStatus === QUEUE_STATUSES.WAITING
+            ? Date.now()
+            : new Date(row.updated_at).getTime()) -
+            new Date(row.check_in_time).getTime()) /
+            60000,
+        ),
+      )
+    : null;
 
   return {
     queueId: String(row.id),
@@ -54,7 +77,7 @@ function normalizeQueue(row) {
       services
         .map((item) => item.dental_service?.service_name)
         .filter(Boolean)
-        .join(", ") || (row.queue_type === "WALK_IN" ? "Walk-in" : ""),
+        .join(", ") || (row.queue_type === QUEUE_TYPES.WALK_IN ? "Walk-in" : ""),
     services: services.map((item) => ({
       serviceId: item.dental_service?.service_id,
       serviceName: item.dental_service?.service_name,
@@ -68,12 +91,9 @@ function normalizeQueue(row) {
     roomId: row.room?.room_id || row.room_id || null,
     roomName: row.room?.room_name || null,
     roomStatus: row.room?.status || null,
-    status: row.status,
+    status: normalizedStatus,
     checkInTime: row.check_in_time,
-    waitingMinutes: Math.max(
-      0,
-      Math.floor((Date.now() - new Date(row.check_in_time).getTime()) / 60000),
-    ),
+    waitingMinutes,
     note: row.note || appointment?.note || "",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -88,7 +108,16 @@ function resolveStatuses(status) {
     .map((item) => item.trim())
     .filter(Boolean);
   const allowed = Object.values(QUEUE_STATUSES);
-  return requested.filter((item) => allowed.includes(item));
+  if (requested.some((item) => !allowed.includes(item))) {
+    throw new AppError(
+      "Trạng thái hàng đợi không hợp lệ.",
+      400,
+      "VALIDATION_ERROR",
+    );
+  }
+  return requested.includes(QUEUE_STATUSES.WAITING)
+    ? [...new Set([...requested, QUEUE_STATUSES.ASSIGNED])]
+    : requested;
 }
 
 function applySearch(rows, search) {
@@ -106,11 +135,51 @@ function applySearch(rows, search) {
   );
 }
 
+async function getQueueRow(queueId) {
+  const { data, error } = await queueDao.findById(queueId);
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  if (!data) {
+    throw new AppError(
+      "Không tìm thấy lượt trong hàng đợi.",
+      404,
+      "NOT_FOUND",
+    );
+  }
+  return data;
+}
+
+async function getDentist(dentistId) {
+  const { data, error } = await queueDao.findDentistById(dentistId);
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  if (!data) {
+    throw new AppError("Không tìm thấy nha sĩ.", 404, "DENTIST_NOT_FOUND");
+  }
+  return data;
+}
+
+async function resolveDentistRoom(dentistId) {
+  const dentist = await getDentist(dentistId);
+  const assignedRoom = (dentist.room_info || []).find(
+    (room) => room.status !== "Unavailable",
+  );
+  if (!assignedRoom) {
+    throw new AppError(
+      "Nha sĩ chưa có phòng khám khả dụng.",
+      409,
+      "DENTIST_ROOM_NOT_FOUND",
+    );
+  }
+
+  return {
+    dentistId: Number(dentist.dentist_id),
+    roomId: Number(assignedRoom.room_id),
+  };
+}
+
 async function getAllQueues(filters = {}) {
   const { data, error } = await queueDao.findAll({
     statuses: resolveStatuses(filters.status),
     dentistId: filters.dentistId,
-    roomId: filters.roomId,
   });
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
   return applySearch((data || []).map(normalizeQueue), filters.search);
@@ -118,33 +187,182 @@ async function getAllQueues(filters = {}) {
 
 async function getDentistQueues(dentistId, filters = {}) {
   if (!dentistId) {
-    throw new AppError("Không tìm thấy hồ sơ nha sĩ.", 403, "FORBIDDEN");
+    throw new AppError(
+      "Không tìm thấy hồ sơ nha sĩ.",
+      403,
+      "FORBIDDEN",
+    );
   }
   const { data, error } = await queueDao.findAll({
     dentistId,
-    statuses: resolveStatuses(filters.status),
+    statuses:
+      filters.status && filters.status !== "active"
+        ? resolveStatuses(filters.status)
+        : ACTIVE_QUEUE_STATUSES,
   });
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
   return applySearch((data || []).map(normalizeQueue), filters.search);
 }
 
 async function getQueueDetail(queueId, actor = {}) {
-  const { data, error } = await queueDao.findById(queueId);
-  if (error) throw new AppError(error.message, 500, "DB_ERROR");
-  if (!data) throw new AppError("Không tìm thấy lượt hàng đợi.", 404, "NOT_FOUND");
+  const data = await getQueueRow(queueId);
   if (
     actor.role === "dentist" &&
     String(data.dentist_id) !== String(actor.profileId)
   ) {
-    throw new AppError("Bạn không có quyền xem lượt này.", 403, "FORBIDDEN");
+    throw new AppError(
+      "Bạn không có quyền xem lượt này.",
+      403,
+      "FORBIDDEN",
+    );
   }
   return normalizeQueue(data);
+}
+
+async function createWalkIn(payload) {
+  const { data: patient, error } = await queueDao.findPatientById(
+    payload.patientId,
+  );
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+  if (!patient) {
+    throw new AppError(
+      "Không tìm thấy hồ sơ bệnh nhân.",
+      404,
+      "PATIENT_NOT_FOUND",
+    );
+  }
+
+  const { data: activeQueue, error: activeQueueError } =
+    await queueDao.findActiveByPatientId(payload.patientId);
+  if (activeQueueError) {
+    throw new AppError(activeQueueError.message, 500, "DB_ERROR");
+  }
+  if (activeQueue) {
+    throw new AppError(
+      "Bệnh nhân đang có lượt trong hàng đợi.",
+      409,
+      "ACTIVE_QUEUE_EXISTS",
+    );
+  }
+
+  const dentistRoom = await resolveDentistRoom(payload.dentistId);
+  const created = await queueDao.createWalkIn({
+    appointment_id: null,
+    patient_id: Number(payload.patientId),
+    dentist_id: dentistRoom.dentistId,
+    room_id: dentistRoom.roomId,
+    queue_type: QUEUE_TYPES.WALK_IN,
+    status: QUEUE_STATUSES.WAITING,
+    note: payload.note || null,
+  });
+  return normalizeQueue(created);
+}
+
+async function updateStatus(queueId, nextStatus, actor = {}) {
+  const queue = await getQueueRow(queueId);
+  if (queue.queue_type !== QUEUE_TYPES.WALK_IN) {
+    throw new AppError(
+      "Trạng thái lượt có lịch hẹn được đồng bộ từ lịch hẹn.",
+      409,
+      "APPOINTMENT_QUEUE_READ_ONLY",
+    );
+  }
+
+  if (actor.role === "receptionist") {
+    if (nextStatus !== QUEUE_STATUSES.CANCELLED) {
+      throw new AppError(
+        "Lễ tân chỉ có thể hủy lượt walk-in.",
+        403,
+        "FORBIDDEN",
+      );
+    }
+  } else if (actor.role === "dentist") {
+    if (
+      !actor.profileId ||
+      String(queue.dentist_id) !== String(actor.profileId)
+    ) {
+      throw new AppError(
+        "Bạn không được cập nhật lượt của nha sĩ khác.",
+        403,
+        "FORBIDDEN",
+      );
+    }
+    if (
+      ![QUEUE_STATUSES.IN_PROGRESS, QUEUE_STATUSES.COMPLETED].includes(
+        nextStatus,
+      )
+    ) {
+      throw new AppError(
+        "Nha sĩ chỉ có thể bắt đầu hoặc hoàn tất lượt walk-in.",
+        403,
+        "FORBIDDEN",
+      );
+    }
+  } else {
+    throw new AppError("Bạn không có quyền cập nhật lượt này.", 403, "FORBIDDEN");
+  }
+
+  const allowed = QUEUE_STATUS_TRANSITIONS[queue.status] || [];
+  if (!allowed.includes(nextStatus)) {
+    throw new AppError(
+      `Không thể chuyển trạng thái từ ${queue.status} sang ${nextStatus}.`,
+      409,
+      "INVALID_QUEUE_TRANSITION",
+    );
+  }
+
+  if (nextStatus === QUEUE_STATUSES.IN_PROGRESS) {
+    if (!queue.dentist_id) {
+      throw new AppError(
+        "Cần phân công nha sĩ trước khi bắt đầu khám.",
+        409,
+        "DENTIST_REQUIRED",
+      );
+    }
+    const { data, error } = await queueDao.findDentistInProgress(
+      queue.dentist_id,
+      queue.id,
+    );
+    if (error) throw new AppError(error.message, 500, "DB_ERROR");
+    if (data) {
+      throw new AppError(
+        "Nha sĩ đang điều trị một bệnh nhân khác.",
+        409,
+        "DENTIST_BUSY",
+      );
+    }
+  }
+
+  const updated = await queueDao.updateById(
+    queueId,
+    { status: nextStatus },
+    queue.status,
+  );
+  if (!updated) {
+    throw new AppError(
+      "Không tìm thấy lượt trong hàng đợi.",
+      404,
+      "NOT_FOUND",
+    );
+  }
+  return normalizeQueue(updated);
 }
 
 async function createFollowUp(queueId, payload, actor = {}) {
   const queue = await getQueueDetail(queueId, actor);
   if (actor.role !== "dentist" || !actor.profileId) {
-    throw new AppError("Chỉ nha sĩ được tạo thông báo tái khám.", 403, "FORBIDDEN");
+    throw new AppError(
+      "Chỉ nha sĩ được tạo thông báo tái khám.",
+      403,
+      "FORBIDDEN",
+    );
+  }
+  if (queue.status === QUEUE_STATUSES.CANCELLED) {
+    throw new AppError(
+      "Không thể tạo tái khám cho lượt đã hủy.",
+      409,
+      "QUEUE_CANCELLED",
+    );
   }
 
   const created = await queueDao.createFollowUp({
@@ -167,7 +385,9 @@ async function createFollowUp(queueId, payload, actor = {}) {
 
 module.exports = {
   createFollowUp,
+  createWalkIn,
   getAllQueues,
   getDentistQueues,
   getQueueDetail,
+  updateStatus,
 };
