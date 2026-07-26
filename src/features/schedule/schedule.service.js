@@ -428,7 +428,7 @@ async function listDentistsForSchedule() {
     { data: rooms, error: roomError },
   ] = await Promise.all([
     scheduleDao.findDentists(),
-    scheduleDao.findAvailableRooms(),
+    scheduleDao.findAssignedRooms(),
   ]);
 
   if (dentistError || roomError) {
@@ -441,10 +441,11 @@ async function listDentistsForSchedule() {
       .map((room) => [Number(room.dentist_id), room]),
   );
 
-  return (dentists || []).map((dentist) => {
+  return (dentists || []).flatMap((dentist) => {
     const assignedRoom = roomsByDentist.get(Number(dentist.dentist_id));
+    if (!assignedRoom) return [];
 
-    return {
+    return [{
       dentist_id: dentist.dentist_id,
       id: String(dentist.dentist_id),
       full_name: dentist.full_name,
@@ -456,7 +457,7 @@ async function listDentistsForSchedule() {
       roomName: assignedRoom?.room_name
         ? `Room ${assignedRoom.room_name}`
         : "No assigned room",
-    };
+    }];
   });
 }
 

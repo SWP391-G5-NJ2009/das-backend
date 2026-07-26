@@ -33,6 +33,52 @@ function getAppointmentInfo(appointment) {
   };
 }
 
+function getInvoiceSourceInfo(invoice) {
+  if (invoice?.appointment) {
+    return {
+      ...getAppointmentInfo(invoice.appointment),
+      queueId: null,
+      source: "APPOINTMENT",
+      room: null,
+    };
+  }
+  const queue = invoice?.queue;
+  return {
+    appointmentId: null,
+    queueId: queue?.id || null,
+    source: "WALK_IN",
+    patient: queue?.patient || null,
+    dentist: queue?.dentist || null,
+    room: queue?.room || null,
+    appointmentDate: queue?.check_in_time?.substring(0, 10) || null,
+    appointmentTime: queue?.check_in_time || null,
+  };
+}
+
+function getInvoiceItems(invoice) {
+  if (invoice?.appointment) {
+    const services = invoice.appointment.appointment_service || [];
+    return services.map((item) => ({
+      id: item.dental_service?.service_id,
+      name: item.dental_service?.service_name || "Dịch vụ nha khoa",
+      type: "Dịch vụ",
+      unitPrice:
+        services.length === 1 ? invoice.total_amount : item.actual_price,
+      quantity: 1,
+      total: services.length === 1 ? invoice.total_amount : item.actual_price,
+    }));
+  }
+  if (!invoice?.queue?.service) return [];
+  return [{
+    id: invoice.queue.service.service_id,
+    name: invoice.queue.service.service_name || "Dịch vụ nha khoa",
+    type: "Dịch vụ",
+    unitPrice: invoice.queue.actual_price ?? invoice.total_amount,
+    quantity: 1,
+    total: invoice.queue.actual_price ?? invoice.total_amount,
+  }];
+}
+
 function normalizePaymentRow(invoice) {
   return {
     payment_id: invoice.invoice_id,
@@ -42,7 +88,7 @@ function normalizePaymentRow(invoice) {
     payment_date: invoice.payment_time,
     transaction_code: invoice.transaction_code,
     status: invoice.payment_status,
-    ...getAppointmentInfo(invoice.appointment),
+    ...getInvoiceSourceInfo(invoice),
   };
 }
 
@@ -55,7 +101,7 @@ async function getUnpaidInvoices() {
     amount: invoice.total_amount,
     payment_date: invoice.payment_time,
     status: invoice.payment_status || "Unpaid",
-    ...getAppointmentInfo(invoice.appointment),
+    ...getInvoiceSourceInfo(invoice),
   }));
 }
 
@@ -69,30 +115,16 @@ async function getPaymentDetail(paymentId) {
     throw new AppError("Không tìm thấy hóa đơn.", 404, "NOT_FOUND");
   }
 
-  const appointment = data.appointment;
-  const appointmentInfo = getAppointmentInfo(appointment);
-
   return {
     paymentId: data.invoice_id,
     invoiceId: data.invoice_id,
-    ...appointmentInfo,
+    ...getInvoiceSourceInfo(data),
     amount: data.total_amount,
     paymentMethod: data.payment_method,
     paymentDate: data.payment_time,
     transactionCode: data.transaction_code,
     status: data.payment_status,
-    items: (appointment?.appointment_service || []).map((item) => ({
-        id: item.dental_service?.service_id,
-        name: item.dental_service?.service_name || "Dịch vụ nha khoa",
-        type: "Dịch vụ",
-        unitPrice: appointment.appointment_service.length === 1
-          ? data.total_amount
-          : item.actual_price,
-        quantity: 1,
-        total: appointment.appointment_service.length === 1
-          ? data.total_amount
-          : item.actual_price,
-      })),
+    items: getInvoiceItems(data),
   };
 }
 
@@ -109,27 +141,15 @@ async function getInvoiceDetail(invoiceId) {
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
   if (!data) throw new AppError("Không tìm thấy hóa đơn.", 404, "NOT_FOUND");
 
-  const appointment = data.appointment;
   return {
     invoiceId: data.invoice_id,
-    ...getAppointmentInfo(appointment),
+    ...getInvoiceSourceInfo(data),
     amount: data.total_amount,
     paymentMethod: data.payment_method,
     paymentDate: data.payment_time,
     transactionCode: data.transaction_code,
     status: data.payment_status || "Unpaid",
-    items: (appointment?.appointment_service || []).map((item) => ({
-        id: item.dental_service?.service_id,
-        name: item.dental_service?.service_name || "Dịch vụ nha khoa",
-        type: "Dịch vụ",
-        unitPrice: appointment.appointment_service.length === 1
-          ? data.total_amount
-          : item.actual_price,
-        quantity: 1,
-        total: appointment.appointment_service.length === 1
-          ? data.total_amount
-          : item.actual_price,
-      })),
+    items: getInvoiceItems(data),
   };
 }
 

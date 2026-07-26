@@ -25,6 +25,12 @@ router.post(
   queueController.createWalkIn,
 );
 
+router.post(
+  "/:id/treatment",
+  requireRole("dentist"),
+  queueController.recordWalkInTreatment,
+);
+
 router.get(
   "/:id",
   requireRole("receptionist", "dentist"),

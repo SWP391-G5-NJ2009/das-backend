@@ -7,6 +7,15 @@ const INVOICE_PAYMENT_SELECT = `
   payment_time,
   payment_method,
   transaction_code,
+  queue:queue_id (
+    id,
+    check_in_time,
+    actual_price,
+    patient:patient_id (patient_id, full_name, phone),
+    dentist:dentist_id (dentist_id, full_name),
+    room:room_id (room_id, room_name),
+    service:service_id (service_id, service_name)
+  ),
   appointment:appt_id (
     appt_id,
     patient:patient_id (patient_id, full_name, phone),
@@ -38,13 +47,33 @@ function findAllPayments() {
     .order("payment_time", { ascending: false });
 }
 
-function findPaymentsByPatientId(patientId) {
-  return supabase
+async function findPaymentsByPatientId(patientId) {
+  const appointmentQuery = supabase
     .from("invoice")
     .select(PATIENT_INVOICE_SELECT)
     .eq("payment_status", "Paid")
     .eq("appointment.patient.patient_id", patientId)
     .order("payment_time", { ascending: false });
+
+  const queueQuery = supabase
+    .from("invoice")
+    .select(INVOICE_PAYMENT_SELECT)
+    .eq("payment_status", "Paid")
+    .eq("queue.patient.patient_id", patientId)
+    .not("queue_id", "is", null)
+    .order("payment_time", { ascending: false });
+
+  const [appointmentResult, queueResult] = await Promise.all([
+    appointmentQuery,
+    queueQuery,
+  ]);
+  if (appointmentResult.error) return appointmentResult;
+  if (queueResult.error) return queueResult;
+  return {
+    data: [...(appointmentResult.data || []), ...(queueResult.data || [])]
+      .sort((a, b) => new Date(b.payment_time) - new Date(a.payment_time)),
+    error: null,
+  };
 }
 
 function findUnpaidInvoices() {
