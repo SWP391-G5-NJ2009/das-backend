@@ -2,27 +2,16 @@ const supabase = require("../../config/supabase");
 const AppError = require("../../utils/AppError");
 
 async function currentMonthRevenue() {
-
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const startOfMonth = `${year}-${month}-01`;
-
-    const startOfNextMonth = now.getMonth() + 1 === 12
-        ? `${year + 1}-01-01` : `${year}-${String(now.getMonth() + 2).padStart(2, "0")}-01`;
-
     const { data, error } = await supabase
-        .rpc("get_current_month_revenue", {
-            p_start: startOfMonth,
-            p_end: startOfNextMonth,
-        });
+        .rpc('get_revenue_summary')
+        .single();
     if (error) throw new AppError(error.message, 500, "DB_ERROR");
-    return data ?? 0;
+    return data ?? { current_revenue: 0, percentage_change: null };
 }
 
-async function revenueByMonth() {
+async function revenueByMonth(mCurrent, mOffset) {
     const { data, error } = await supabase
-        .rpc('get_monthly_revenue', { p_months: 12 });
+        .rpc('get_monthly_revenue', { m_current: mCurrent, m_offset: mOffset });
     if (error) throw new AppError(error.message, 500, "DB_ERROR");
     return data ?? [];
 }

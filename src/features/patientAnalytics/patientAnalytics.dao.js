@@ -22,23 +22,23 @@ async function getReturningPatient() {
     return data ?? 0;
 }
 
-async function getMonthlyNewPatient() {
+async function getMonthlyNewPatient(mCurrent, mOffset) {
     const { data, error } = await supabase
-        .rpc('get_monthly_new_patient', { p_months: 12 });
+        .rpc('get_monthly_new_patient', { p_current: mCurrent, p_offset: mOffset });
     if (error) throw new AppError(error.message, 500, "DB_ERROR");
     return data ?? [];
 }
 
-async function getMonthlyReturningPatient() {
+async function getMonthlyReturningPatient(mCurrent, mOffset) {
     const { data, error } = await supabase
-        .rpc('get_monthly_returning_patient', { p_months: 12 });
+        .rpc('get_monthly_returning_patient', { p_current: mCurrent, p_offset: mOffset });
     if (error) throw new AppError(error.message, 500, "DB_ERROR");
     return data ?? [];
 }
 
-async function getMonthlyNoShowRate() {
+async function getMonthlyNoShowRate(mCurrent, mOffset) {
     const { data, error } = await supabase
-        .rpc('get_monthly_no_show_rate', { p_months: 12 });
+        .rpc('get_monthly_no_show_rate', { p_current: mCurrent, p_offset: mOffset });
     if (error) throw new AppError(error.message, 500, "DB_ERROR");
     return data ?? [];
 }

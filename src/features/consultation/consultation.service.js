@@ -18,16 +18,25 @@ async function createConsultationRequest({
   phone,
   email,
   description,
+  service_id,
+  consultation_date,
 }) {
   const { data, error } = await consultationDao.insertConsultationRequest({
     full_name,
     phone,
-    email,
+    email: email || null,
     description,
+    service_id: service_id || null,
+    consultation_date: consultation_date || null,
   });
 
   if (error) {
-    logger.error("Failed to insert consultation request", error);
+    logger.error("Failed to insert consultation request", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
     throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 

@@ -24,7 +24,7 @@ const createAccountSchema = Joi.object({
         "Mật khẩu cần có ít nhất 1 kí tự in hoa, 1 kí tự in thường, 1 chữ số và 1 kí tự đặc biệt.",
       "any.required": "Mật khẩu là bắt buộc.",
     }),
-  role_name: Joi.string().trim().valid("Admin", "Dentist", "Receptionist", "Manager")
+  role_name: Joi.string().trim().valid("Admin", "Dentist", "Receptionist", "Manager", "Patient")
     .required().messages({
       "any.required": "Vai trò là bắt buộc.",
     }),
@@ -52,7 +52,7 @@ const updateAccountSchema = Joi.object({
       "string.pattern.base":
         "Mật khẩu cần có ít nhất 1 kí tự in hoa, 1 kí tự in thường, 1 chữ số và 1 kí tự đặc biệt.",
     }),
-  role_name: Joi.string().trim().valid("Admin", "Dentist", "Receptionist", "Manager")
+  role_name: Joi.string().trim().valid("Admin", "Dentist", "Receptionist", "Manager", "Patient")
     .required().messages({
       "any.required": "Vai trò là bắt buộc.",
     }),

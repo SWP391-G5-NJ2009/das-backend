@@ -12,16 +12,16 @@ async function getReturningPatient() {
     return patientAnalytics.getReturningPatient();
 }
 
-async function getMonthlyNewPatient() {
-    return patientAnalytics.getMonthlyNewPatient();
+async function getMonthlyNewPatient(mCurrent, mOffset) {
+    return patientAnalytics.getMonthlyNewPatient(mCurrent, mOffset);
 }
 
-async function getMonthlyReturningPatient() {
-    return patientAnalytics.getMonthlyReturningPatient();
+async function getMonthlyReturningPatient(mCurrent, mOffset) {
+    return patientAnalytics.getMonthlyReturningPatient(mCurrent, mOffset);
 }
 
-async function getMonthlyNoShowRate() {
-    return patientAnalytics.getMonthlyNoShowRate();
+async function getMonthlyNoShowRate(mCurrent, mOffset) {
+    return patientAnalytics.getMonthlyNoShowRate(mCurrent, mOffset);
 }
 
 

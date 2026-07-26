@@ -54,23 +54,6 @@ async function findAccountByUsernameExcept(username, accountId) {
     .maybeSingle();
 }
 
-async function findAccountByEmail(email) {
-  return supabase
-    .from("account")
-    .select("account_id")
-    .eq("email", email)
-    .maybeSingle();
-}
-
-async function findAccountByEmailExcept(email, accountId) {
-  return supabase
-    .from("account")
-    .select("account_id")
-    .eq("email", email)
-    .neq("account_id", accountId)
-    .maybeSingle();
-}
-
 async function findAccountById(accountId) {
   return supabase
     .from("account")
@@ -118,8 +101,6 @@ module.exports = {
   findAccountById,
   findAccountByUsername,
   findAccountByUsernameExcept,
-  findAccountByEmail,
-  findAccountByEmailExcept,
   findAllAccounts,
   findRoleByName,
   insertAccount,
