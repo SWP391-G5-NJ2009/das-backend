@@ -4,6 +4,22 @@ const AppError = require("../../utils/AppError");
 const { hashPassword } = require("../../utils/password");
 const profileDao = require("../profile/profile.dao");
 
+const ROLE_TABLE_MAP = {
+  Admin: "admin",
+  Manager: "manager",
+  Receptionist: "receptionist",
+  Dentist: "dentist",
+  Patient: "patient",
+};
+
+const ROLE_DISPLAY_NAME = {
+  Admin: "admin",
+  Manager: "quản lý",
+  Receptionist: "lễ tân",
+  Dentist: "nha sĩ",
+  Patient: "bệnh nhân",
+};
+
 async function getAllAccounts(filters = {}) {
   let queryFilters = { ...filters };
 
@@ -118,6 +134,23 @@ async function updateAccount(
   }
 
   if (role_name !== undefined) {
+    const { data: account } = await accountDao.findAccountById(accountId);
+    const currentRoleName = account?.role?.role_name;
+
+    if (currentRoleName && currentRoleName !== role_name) {
+      const table = ROLE_TABLE_MAP[currentRoleName];
+      if (table) {
+        const hasProfile = await profileDao.checkProfileExists(table, accountId);
+        if (hasProfile) {
+          throw new AppError(
+            `Không thể thay đổi vai trò vì tài khoản đã có hồ sơ ${ROLE_DISPLAY_NAME[currentRoleName] || currentRoleName}.`,
+            409,
+            "ROLE_PROFILE_EXISTS",
+          );
+        }
+      }
+    }
+
     updateFields.role_id = await getRoleId(role_name);
   }
 
@@ -153,22 +186,6 @@ async function deleteAccount(accountId, requestingAccountId) {
   if (!data) {
     throw new AppError("Không tìm thấy tài khoản.", 404, "NOT_FOUND");
   }
-
-  const ROLE_TABLE_MAP = {
-    Admin: "admin",
-    Manager: "manager",
-    Receptionist: "receptionist",
-    Dentist: "dentist",
-    Patient: "patient",
-  };
-
-  const ROLE_DISPLAY_NAME = {
-    Admin: "admin",
-    Manager: "quản lý",
-    Receptionist: "lễ tân",
-    Dentist: "nha sĩ",
-    Patient: "bệnh nhân",
-  };
 
   const table = ROLE_TABLE_MAP[data.role.role_name];
   if (table) {
