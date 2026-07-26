@@ -239,21 +239,20 @@ async function createWalkInPatient({ fullName, phone }) {
     throw new AppError(existingError.message, 500, "DB_ERROR");
   }
 
-  if (existing?.account_id) {
-    throw new AppError(
-      "Số điện thoại này đã được đăng ký tài khoản. Vui lòng tìm kiếm bệnh nhân.",
-      409,
-      "DUPLICATE_PHONE",
-    );
-  }
-
-  // Walk-in record cũ chưa có account → trả về luôn
   if (existing) {
-    return {
-      id: String(existing.patient_id),
-      fullName: existing.full_name || fullName,
-      phone: existing.phone || phone,
-    };
+    if (existing.account_id) {
+      throw new AppError(
+        "Số điện thoại này đã được đăng ký tài khoản. Vui lòng tìm kiếm bệnh nhân.",
+        409,
+        "DUPLICATE_PHONE",
+      );
+    } else {
+      throw new AppError(
+        `Số điện thoại này đã tồn tại trong hệ thống dưới tên "${existing.full_name}". Vui lòng tìm kiếm bệnh nhân.`,
+        409,
+        "DUPLICATE_PHONE",
+      );
+    }
   }
 
   const data = await patientDao.createPatient({ fullName, phone });

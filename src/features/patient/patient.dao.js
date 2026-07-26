@@ -108,7 +108,7 @@ const TREATMENT_HISTORY_SELECT = `
 async function findProfileByPhone(phone) {
   return supabase
     .from("patient")
-    .select("patient_id, account_id")
+    .select("patient_id, account_id, full_name")
     .eq("phone", phone)
     .maybeSingle();
 }
