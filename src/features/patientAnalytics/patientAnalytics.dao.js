@@ -29,9 +29,9 @@ async function getMonthlyNewPatient(mCurrent, mOffset) {
     return data ?? [];
 }
 
-async function getMonthlyReturningPatient() {
+async function getMonthlyReturningPatient(mCurrent, mOffset) {
     const { data, error } = await supabase
-        .rpc('get_monthly_returning_patient', { p_months: 12 });
+        .rpc('get_monthly_returning_patient', { p_current: mCurrent, p_offset: mOffset });
     if (error) throw new AppError(error.message, 500, "DB_ERROR");
     return data ?? [];
 }

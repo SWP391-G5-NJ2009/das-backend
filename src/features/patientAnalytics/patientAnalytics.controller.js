@@ -30,7 +30,7 @@ async function getReturningPatient(req, res, next) {
 
 async function getMonthlyNewPatient(req, res, next) {
     try {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" });
         const m_current = req.query.m_current || today;
         const m_offset = parseInt(req.query.m_offset, 10) || 0;
         const data = await patientAnalytics.getMonthlyNewPatient(m_current, m_offset);
@@ -42,7 +42,10 @@ async function getMonthlyNewPatient(req, res, next) {
 
 async function getMonthlyReturningPatient(req, res, next) {
     try {
-        const data = await patientAnalytics.getMonthlyReturningPatient();
+        const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" });
+        const m_current = req.query.m_current || today;
+        const m_offset = parseInt(req.query.m_offset, 10) || 0;
+        const data = await patientAnalytics.getMonthlyReturningPatient(m_current, m_offset);
         return sendSuccess(res, 200, data, "Lấy số lượng bệnh nhân quay lại theo tháng thành công.");
     } catch (err) {
         return next(err);
