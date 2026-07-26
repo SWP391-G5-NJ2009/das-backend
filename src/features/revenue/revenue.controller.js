@@ -12,7 +12,7 @@ async function revenueAnalytics(req, res, next) {
 
 async function monthlyRevenueAnalytics(req, res, next) {
     try {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" });
         const m_current = req.query.m_current || today;
         const m_offset = parseInt(req.query.m_offset, 10) || 0;
         const data = await revenueService.revenueByMonth(m_current, m_offset);
