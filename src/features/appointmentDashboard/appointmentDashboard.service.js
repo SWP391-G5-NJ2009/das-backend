@@ -20,27 +20,25 @@ async function getDailyAppointments(date) {
   const appointments = await appointmentDashboardDao.findAppointmentsByDate(date);
 
   const timeSlots = [];
-  for (let h = 8; h < 18; h++) {
-    const startLabel = `${String(h).padStart(2, "0")}:00`;
-    const endLabel = `${String(h).padStart(2, "0")}:30`;
-    const startLabel2 = `${String(h).padStart(2, "0")}:30`;
-    const endLabel2 = `${String(h + 1).padStart(2, "0")}:00`;
+  const START_MIN = 7 * 60 + 30;
+  const END_MIN = 18 * 60; 
+
+  for (let min = START_MIN; min < END_MIN; min += 30) {
+    const h1 = Math.floor(min / 60);
+    const m1 = min % 60;
+    const min2 = min + 30;
+    const h2 = Math.floor(min2 / 60);
+    const m2 = min2 % 60;
+
+    const start = `${String(h1).padStart(2, "0")}:${String(m1).padStart(2, "0")}`;
+    const end = `${String(h2).padStart(2, "0")}:${String(m2).padStart(2, "0")}`;
 
     timeSlots.push({
-      start: startLabel,
-      end: endLabel,
-      label: `${startLabel} - ${endLabel}`,
-      appointments: appointments.filter((a) => a.start_time === startLabel),
+      start,
+      end,
+      label: `${start} - ${end}`,
+      appointments: appointments.filter((a) => a.start_time === start),
     });
-
-    if (h < 17) {
-      timeSlots.push({
-        start: startLabel2,
-        end: endLabel2,
-        label: `${startLabel2} - ${endLabel2}`,
-        appointments: appointments.filter((a) => a.start_time === startLabel2),
-      });
-    }
   }
 
   return {
