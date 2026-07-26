@@ -12,7 +12,12 @@ async function createTreatment(req, res, next) {
       postTreatmentInstructions: req.body.postTreatmentInstructions,
       completePlan: req.body.completePlan === true,
     });
-    return sendSuccess(res, 201, data, "Lưu kết quả điều trị thành công.");
+    return sendSuccess(
+      res,
+      201,
+      data,
+      "Đã lưu kết quả và hoàn tất điều trị.",
+    );
   } catch (err) {
     return next(err);
   }
