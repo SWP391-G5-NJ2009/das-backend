@@ -20,8 +20,8 @@ async function getMonthlyReturningPatient(mCurrent, mOffset) {
     return patientAnalytics.getMonthlyReturningPatient(mCurrent, mOffset);
 }
 
-async function getMonthlyNoShowRate() {
-    return patientAnalytics.getMonthlyNoShowRate();
+async function getMonthlyNoShowRate(mCurrent, mOffset) {
+    return patientAnalytics.getMonthlyNoShowRate(mCurrent, mOffset);
 }
 
 
