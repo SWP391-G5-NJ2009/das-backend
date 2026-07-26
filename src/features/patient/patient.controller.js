@@ -59,6 +59,22 @@ async function getTreatmentHistoryByPatient(req, res, next) {
   }
 }
 
+async function getMyTreatedPatients(req, res, next) {
+  try {
+    const data = await patientService.getTreatedPatientsByDentist(
+      req.user.profileId,
+    );
+    return sendSuccess(
+      res,
+      200,
+      data,
+      "Lấy danh sách bệnh nhân đã điều trị thành công.",
+    );
+  } catch (err) {
+    return next(err);
+  }
+}
+
 /**
  * PATCH /api/patients/:patientId/lift-ban
  * Receptionist: Lift booking ban — resolves all No-Show appointments for the patient.
@@ -102,6 +118,7 @@ module.exports = {
   createPatientAccount,
   createWalkInPatient,
   getMyTreatmentHistory,
+  getMyTreatedPatients,
   getTreatmentHistoryByPatient,
   liftBookingBan,
 };

@@ -206,6 +206,43 @@ async function getTreatmentHistory(patientId, actor = {}) {
   );
 }
 
+function normalizeTreatedPatient(row) {
+  const primarySlot = (row.appointment_slot || []).find(
+    (entry) => entry.is_primary,
+  )?.work_slot;
+  const services = row.appointment_service || [];
+
+  return {
+    patientId: row.patient?.patient_id || row.patient_id,
+    patientName: row.patient?.full_name || "Chưa cập nhật",
+    patientPhone: row.patient?.phone || "",
+    serviceName:
+      services
+        .map((item) => item.dental_service?.service_name)
+        .filter(Boolean)
+        .join(", ") || "Điều trị nha khoa",
+    latestDate:
+      primarySlot?.schedules?.work_date || row.book_time?.slice(0, 10) || "",
+    latestTime: primarySlot?.slot_config?.start_time?.substring(0, 5) || "",
+    latestTimeEnd: primarySlot?.slot_config?.end_time?.substring(0, 5) || "",
+    status: row.status || "Completed",
+  };
+}
+
+async function getTreatedPatientsByDentist(dentistId) {
+  const { data, error } =
+    await patientDao.findTreatedPatientsByDentistId(dentistId);
+  if (error) throw new AppError(error.message, 500, "DB_ERROR");
+
+  const patients = new Map();
+  (data || []).forEach((row) => {
+    const patient = normalizeTreatedPatient(row);
+    const key = String(patient.patientId);
+    if (!patients.has(key)) patients.set(key, patient);
+  });
+  return [...patients.values()];
+}
+
 /**
  * BR-12: Lift a booking ban for a patient:
  *  1. Resolve all No-Show appointments → "Resolved No-Show"
@@ -268,5 +305,6 @@ module.exports = {
   createPatientAccount,
   createWalkInPatient,
   getTreatmentHistory,
+  getTreatedPatientsByDentist,
   liftBookingBan,
 };
