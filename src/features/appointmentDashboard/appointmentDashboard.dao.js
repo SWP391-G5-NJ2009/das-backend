@@ -10,7 +10,7 @@ function getMonthBounds(year, month) {
 async function countAppointmentsByDay(year, month) {
   const { startDate, endDate } = getMonthBounds(year, month);
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("work_slot")
     .select(`
       slot_id,
@@ -21,7 +21,11 @@ async function countAppointmentsByDay(year, month) {
         appt_id
       )
     `)
-    .eq("status", "Booked");
+    .eq("status", "Booked")
+    .gte("schedules.work_date", startDate)
+    .lte("schedules.work_date", endDate);
+
+  const { data, error } = await query;
 
   if (error) throw error;
 
@@ -89,16 +93,14 @@ async function findAppointmentsByDate(date) {
         )
       )
     `)
-    .eq("status", "Booked");
+    .eq("status", "Booked")
+    .eq("schedules.work_date", date);
 
   if (error) throw error;
 
   const appointments = [];
 
   (data || []).forEach((slot) => {
-    const workDate = slot.schedules?.work_date;
-    if (workDate !== date) return;
-
     const apptSlot = (slot.appointment_slot || []).find((as) => as.is_primary);
     const appt = apptSlot?.appointment;
     if (!appt) return;
