@@ -35,7 +35,7 @@ const createConsultationSchema = Joi.object({
 
 const updateConsultationSchema = Joi.object({
   status: Joi.string()
-    .valid("Pending", "Resolved", "Follow-up", "Spam", "Fail-to-contact", "Booked", "Other")
+    .valid("Pending", "Booked", "Resolved", "Unreachable", "Closed")
     .required().messages({
     "any.required": "Trạng thái là bắt buộc.",
   }),
