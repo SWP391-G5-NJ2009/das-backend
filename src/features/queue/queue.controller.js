@@ -3,6 +3,7 @@ const { sendSuccess } = require("../../utils/response");
 const {
   validateCreateFollowUp,
   validateCreateWalkIn,
+  validateRecordWalkInTreatment,
   validateUpdateStatus,
 } = require("./queue.validator");
 
@@ -15,6 +16,33 @@ async function getAllQueues(req, res, next) {
   }
 }
 
+//them record
+async function recordWalkInTreatment(
+  req,
+  res,
+  next,
+) {
+  try {
+    const payload =
+      validateRecordWalkInTreatment(req.body);
+
+    const data =
+      await queueService.recordWalkInTreatment(
+        req.params.id,
+        payload,
+        req.user,
+      );
+
+    return sendSuccess(
+      res,
+      201,
+      data,
+      "Đã lưu kết quả, tạo hóa đơn và hoàn tất lượt khám.",
+    );
+  } catch (error) {
+    return next(error);
+  }
+}
 async function getMyQueue(req, res, next) {
   try {
     const data = await queueService.getDentistQueues(
@@ -80,5 +108,6 @@ module.exports = {
   getAllQueues,
   getMyQueue,
   getQueueDetail,
+  recordWalkInTreatment,
   updateStatus,
 };

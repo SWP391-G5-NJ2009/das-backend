@@ -13,6 +13,8 @@ const QUEUE_SELECT = `
   note,
   created_at,
   updated_at,
+  service_id,
+  actual_price,
   patient:patient_id (
     patient_id,
     full_name,
@@ -34,6 +36,14 @@ const QUEUE_SELECT = `
     room_id,
     room_name,
     status
+  ),
+  service:service_id (
+    service_id,
+    service_name,
+    unit_price,
+    status,
+    treatment_mode,
+    slot_occupied
   ),
   appointment:appointment_id (
     appt_id,
@@ -104,6 +114,9 @@ function findDentistById(dentistId) {
     .select(`
       dentist_id,
       full_name,
+      account:account_id!inner (
+        status
+      ),
       room_info (
         room_id,
         room_name,
@@ -111,6 +124,7 @@ function findDentistById(dentistId) {
       )
     `)
     .eq("dentist_id", dentistId)
+    .eq("account.status", "Active")
     .maybeSingle();
 }
 
@@ -144,6 +158,15 @@ async function createWalkIn(payload) {
   return data;
 }
 
+function findActiveServiceById(serviceId) {
+  return supabase
+    .from("dental_services")
+    .select("service_id, service_name, unit_price, status")
+    .eq("service_id", serviceId)
+    .eq("status", "Active")
+    .maybeSingle();
+}
+
 async function updateById(queueId, payload, expectedStatus) {
   let query = supabase
     .from("queue")
@@ -161,6 +184,13 @@ async function updateById(queueId, payload, expectedStatus) {
         "Nha sĩ đang điều trị một bệnh nhân khác.",
         409,
         "DENTIST_BUSY",
+      );
+    }
+    if (error.message?.includes("QUEUE_ROOM_OCCUPIED")) {
+      throw new AppError(
+        "Phòng khám đang được sử dụng cho một lượt khám khác.",
+        409,
+        "ROOM_OCCUPIED",
       );
     }
     throw new AppError(error.message, 500, "DB_ERROR");
@@ -203,14 +233,37 @@ async function createFollowUp({
   return data;
 }
 
+
+async function recordWalkInTreatment(payload) {
+  const { data, error } = await supabase.rpc(
+    "record_walk_in_treatment",
+    {
+      p_queue_id: payload.queueId,
+      p_dentist_id: payload.dentistId,
+      p_clinical_examination:
+        payload.clinicalExamination || "",
+      p_diagnosis: payload.diagnosis,
+      p_treatment_note: payload.treatmentNote,
+      p_post_treatment_instructions:
+        payload.postTreatmentInstructions || "",
+    },
+  );
+
+  if (error) throw error;
+
+  return data?.[0] || null;
+}
+
 module.exports = {
   createFollowUp,
   createWalkIn,
   findAll,
   findById,
   findActiveByPatientId,
+  findActiveServiceById,
   findDentistById,
   findDentistInProgress,
   findPatientById,
+  recordWalkInTreatment,
   updateById,
 };

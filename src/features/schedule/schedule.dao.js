@@ -58,10 +58,27 @@ function findAvailableRooms() {
     .order("room_name", { ascending: true });
 }
 
+function findAssignedRooms() {
+  return supabase
+    .from("room_info")
+    .select("room_id, room_name, dentist_id, status")
+    .not("dentist_id", "is", null)
+    .neq("status", "Unavailable")
+    .order("room_name", { ascending: true });
+}
+
 function findDentists() {
   return supabase
     .from("dentist")
-    .select("dentist_id, full_name, speciality, email, phone")
+    .select(`
+      dentist_id,
+      full_name,
+      speciality,
+      email,
+      phone,
+      account:account_id!inner (status)
+    `)
+    .eq("account.status", "Active")
     .order("full_name", { ascending: true });
 }
 
@@ -291,6 +308,7 @@ module.exports = {
   countBookedWorkSlots,
   deleteEditableWorkSlots,
   findAvailableRooms,
+  findAssignedRooms,
   findAffectedAppointmentsBySlotIds,
   findClinicInfo,
   findDentistByAccountId,

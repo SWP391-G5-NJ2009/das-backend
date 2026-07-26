@@ -18,7 +18,7 @@ function normalizeSearchValue(value) {
     .toLowerCase()
     .trim();
 }
-
+//snake_case cua database sang camelCase
 function normalizeQueue(row) {
   if (!row) return null;
 
@@ -54,7 +54,18 @@ function normalizeQueue(row) {
         ),
       )
     : null;
+    //get service
+const walkInService = row.service || null;
 
+const normalizedServices =
+  row.queue_type === QUEUE_TYPES.WALK_IN && walkInService
+    ? [
+        {
+          actual_price: row.actual_price,
+          dental_service: walkInService,
+        },
+      ]
+    : services;
   return {
     queueId: String(row.id),
     queueType: row.queue_type,
@@ -74,17 +85,35 @@ function normalizeQueue(row) {
       lastConfig?.end_time || slotConfig?.end_time,
     ),
     serviceName:
-      services
-        .map((item) => item.dental_service?.service_name)
-        .filter(Boolean)
-        .join(", ") || (row.queue_type === QUEUE_TYPES.WALK_IN ? "Walk-in" : ""),
-    services: services.map((item) => ({
-      serviceId: item.dental_service?.service_id,
-      serviceName: item.dental_service?.service_name,
-      actualPrice: item.actual_price,
-      treatmentMode: item.dental_service?.treatment_mode || "Single-Visit",
-      slotOccupied: item.dental_service?.slot_occupied ?? 1,
-    })),
+  normalizedServices
+    .map((item) => item.dental_service?.service_name)
+    .filter(Boolean)
+    .join(", ") ||
+  (
+    row.queue_type === QUEUE_TYPES.WALK_IN
+      ? "Chưa có dịch vụ"
+      : ""
+  ),
+
+serviceId:
+  row.queue_type === QUEUE_TYPES.WALK_IN
+    ? walkInService?.service_id || row.service_id || null
+    : services[0]?.dental_service?.service_id || null,
+
+actualPrice:
+  row.queue_type === QUEUE_TYPES.WALK_IN
+    ? row.actual_price
+    : services[0]?.actual_price ?? null,
+
+services: normalizedServices.map((item) => ({
+  serviceId: item.dental_service?.service_id,
+  serviceName: item.dental_service?.service_name,
+  actualPrice: item.actual_price,
+  treatmentMode:
+    item.dental_service?.treatment_mode || "Single-Visit",
+  slotOccupied:
+    item.dental_service?.slot_occupied ?? 1,
+})),
     dentistId: row.dentist?.dentist_id || row.dentist_id || null,
     dentistName: row.dentist?.full_name || null,
     dentistSpeciality: row.dentist?.speciality || null,
@@ -223,6 +252,25 @@ async function createWalkIn(payload) {
   const { data: patient, error } = await queueDao.findPatientById(
     payload.patientId,
   );
+  //kiem tra dich vu
+  const { data: service, error: serviceError } =
+  await queueDao.findActiveServiceById(payload.serviceId);
+
+if (serviceError) {
+  throw new AppError(
+    serviceError.message,
+    500,
+    "DB_ERROR",
+  );
+}
+
+if (!service) {
+  throw new AppError(
+    "Không tìm thấy dịch vụ đang hoạt động.",
+    404,
+    "SERVICE_NOT_FOUND",
+  );
+}
   if (error) throw new AppError(error.message, 500, "DB_ERROR");
   if (!patient) {
     throw new AppError(
@@ -251,6 +299,9 @@ async function createWalkIn(payload) {
     patient_id: Number(payload.patientId),
     dentist_id: dentistRoom.dentistId,
     room_id: dentistRoom.roomId,
+    //service them
+    service_id: Number(service.service_id),
+actual_price: Number(service.unit_price),
     queue_type: QUEUE_TYPES.WALK_IN,
     status: QUEUE_STATUSES.WAITING,
     note: payload.note || null,
@@ -287,13 +338,9 @@ async function updateStatus(queueId, nextStatus, actor = {}) {
         "FORBIDDEN",
       );
     }
-    if (
-      ![QUEUE_STATUSES.IN_PROGRESS, QUEUE_STATUSES.COMPLETED].includes(
-        nextStatus,
-      )
-    ) {
+    if (nextStatus !== QUEUE_STATUSES.IN_PROGRESS) {
       throw new AppError(
-        "Nha sĩ chỉ có thể bắt đầu hoặc hoàn tất lượt walk-in.",
+        "Nha sĩ chỉ có thể bắt đầu lượt walk-in. Hãy lưu kết quả điều trị để hoàn tất.",
         403,
         "FORBIDDEN",
       );
@@ -383,6 +430,111 @@ async function createFollowUp(queueId, payload, actor = {}) {
   };
 }
 
+async function recordWalkInTreatment(
+  queueId,
+  payload,
+  actor = {},
+) {
+  if (actor.role !== "dentist" || !actor.profileId) {
+    throw new AppError(
+      "Chỉ nha sĩ được ghi kết quả điều trị.",
+      403,
+      "FORBIDDEN",
+    );
+  }
+
+  const queue = await getQueueRow(queueId);
+
+  if (queue.queue_type !== QUEUE_TYPES.WALK_IN) {
+    throw new AppError(
+      "Lượt khám không phải walk-in.",
+      409,
+      "QUEUE_NOT_WALK_IN",
+    );
+  }
+
+  if (queue.status !== QUEUE_STATUSES.IN_PROGRESS) {
+    throw new AppError(
+      "Chỉ có thể ghi kết quả khi đang khám.",
+      409,
+      "QUEUE_NOT_IN_PROGRESS",
+    );
+  }
+
+  if (
+    String(queue.dentist_id) !==
+    String(actor.profileId)
+  ) {
+    throw new AppError(
+      "Bạn không phụ trách lượt khám này.",
+      403,
+      "FORBIDDEN",
+    );
+  }
+
+  if (
+    !queue.service_id ||
+    queue.actual_price == null
+  ) {
+    throw new AppError(
+      "Lượt walk-in cũ chưa có dịch vụ hoặc giá. " +
+        "Vui lòng cập nhật trước khi ghi kết quả.",
+      409,
+      "QUEUE_SERVICE_REQUIRED",
+    );
+  }
+
+  try {
+    const result =
+      await queueDao.recordWalkInTreatment({
+        queueId: Number(queueId),
+        dentistId: Number(actor.profileId),
+        ...payload,
+      });
+
+    return {
+      recordId: result?.record_id,
+      invoiceId: result?.invoice_id,
+      queueStatus: result?.queue_status,
+    };
+  } catch (error) {
+    const code =
+      error.message?.match(/QUEUE_[A-Z_]+/)?.[0];
+
+    const conflicts = {
+      QUEUE_TREATMENT_EXISTS:
+        "Lượt khám đã có kết quả điều trị.",
+
+      QUEUE_INVOICE_EXISTS:
+        "Lượt khám đã có hóa đơn.",
+
+      QUEUE_STATUS_CHANGED:
+        "Trạng thái lượt khám vừa thay đổi. " +
+        "Vui lòng tải lại.",
+
+      QUEUE_NOT_IN_PROGRESS:
+        "Lượt khám không còn ở trạng thái đang khám.",
+
+      QUEUE_SERVICE_REQUIRED:
+        "Lượt walk-in chưa có dịch vụ hoặc giá hợp lệ.",
+    };
+
+    if (code && conflicts[code]) {
+      throw new AppError(
+        conflicts[code],
+        409,
+        code,
+      );
+    }
+
+    throw new AppError(
+      error.message,
+      500,
+      "DB_ERROR",
+    );
+  }
+}
+
 module.exports = {
   createFollowUp,
   createWalkIn,
@@ -390,4 +542,5 @@ module.exports = {
   getDentistQueues,
   getQueueDetail,
   updateStatus,
+  recordWalkInTreatment
 };
