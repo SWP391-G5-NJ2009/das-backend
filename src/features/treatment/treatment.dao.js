@@ -10,7 +10,10 @@ async function findAppointmentById(apptId) {
       status,
       treatment_plan_id,
       treatment_plan:treatment_plan_id (plan_id, status, agreed_price),
-      appointment_service (actual_price),
+      appointment_service (
+        actual_price,
+        dental_service:service_id (treatment_mode)
+      ),
       invoice (invoice_id),
       appointment_slot (
         is_primary,

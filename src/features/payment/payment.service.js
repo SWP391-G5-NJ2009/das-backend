@@ -33,17 +33,16 @@ function getAppointmentInfo(appointment) {
   };
 }
 
-function normalizePaymentRow(payment) {
-  const invoice = payment.invoice;
+function normalizePaymentRow(invoice) {
   return {
-    payment_id: payment.payment_id,
-    invoice_id: payment.invoice_id,
-    amount: payment.amount ?? invoice?.total_amount,
-    payment_method: payment.payment_method,
-    payment_date: payment.payment_date,
-    transaction_code: payment.transaction_code,
-    status: invoice?.payment_status || payment.status,
-    ...getAppointmentInfo(invoice?.appointment),
+    payment_id: invoice.invoice_id,
+    invoice_id: invoice.invoice_id,
+    amount: invoice.total_amount,
+    payment_method: invoice.payment_method,
+    payment_date: invoice.payment_time,
+    transaction_code: invoice.transaction_code,
+    status: invoice.payment_status,
+    ...getAppointmentInfo(invoice.appointment),
   };
 }
 
@@ -70,29 +69,28 @@ async function getPaymentDetail(paymentId) {
     throw new AppError("Không tìm thấy hóa đơn.", 404, "NOT_FOUND");
   }
 
-  const invoice = data.invoice;
-  const appointment = invoice?.appointment;
+  const appointment = data.appointment;
   const appointmentInfo = getAppointmentInfo(appointment);
 
   return {
-    paymentId: data.payment_id,
+    paymentId: data.invoice_id,
     invoiceId: data.invoice_id,
     ...appointmentInfo,
-    amount: data.amount,
+    amount: data.total_amount,
     paymentMethod: data.payment_method,
-    paymentDate: data.payment_date,
+    paymentDate: data.payment_time,
     transactionCode: data.transaction_code,
-    status: data.status || invoice?.payment_status,
+    status: data.payment_status,
     items: (appointment?.appointment_service || []).map((item) => ({
         id: item.dental_service?.service_id,
         name: item.dental_service?.service_name || "Dịch vụ nha khoa",
         type: "Dịch vụ",
         unitPrice: appointment.appointment_service.length === 1
-          ? data.amount
+          ? data.total_amount
           : item.actual_price,
         quantity: 1,
         total: appointment.appointment_service.length === 1
-          ? data.amount
+          ? data.total_amount
           : item.actual_price,
       })),
   };
@@ -116,6 +114,9 @@ async function getInvoiceDetail(invoiceId) {
     invoiceId: data.invoice_id,
     ...getAppointmentInfo(appointment),
     amount: data.total_amount,
+    paymentMethod: data.payment_method,
+    paymentDate: data.payment_time,
+    transactionCode: data.transaction_code,
     status: data.payment_status || "Unpaid",
     items: (appointment?.appointment_service || []).map((item) => ({
         id: item.dental_service?.service_id,
@@ -132,7 +133,7 @@ async function getInvoiceDetail(invoiceId) {
   };
 }
 
-async function payInvoice(invoiceId, paymentMethod) {
+async function payInvoice(invoiceId, paymentMethod, requestedPaymentDate) {
   const allowedMethods = ["Tiền mặt", "Chuyển khoản"];
   if (!allowedMethods.includes(paymentMethod)) {
     throw new AppError(
@@ -154,22 +155,34 @@ async function payInvoice(invoiceId, paymentMethod) {
     );
   }
 
-  const paymentDate = new Date().toISOString();
-  const transactionCode = `PAY-${invoice.invoice_id}-${Date.now()}`;
-  const { data: payment, error: paymentError } = await paymentDao.createPayment(
-    {
-      invoice_id: invoice.invoice_id,
-      amount: invoice.total_amount,
-      payment_method: paymentMethod,
-      payment_date: paymentDate,
-      transaction_code: transactionCode,
-      status: "Completed",
-    },
-  );
-  if (paymentError) throw new AppError(paymentError.message, 500, "DB_ERROR");
+  const parsedPaymentDate = requestedPaymentDate
+    ? new Date(requestedPaymentDate)
+    : new Date();
+  if (Number.isNaN(parsedPaymentDate.getTime())) {
+    throw new AppError(
+      "Ngày giao dịch không hợp lệ.",
+      400,
+      "PAYMENT_DATE_INVALID",
+    );
+  }
+  if (parsedPaymentDate.getTime() > Date.now()) {
+    throw new AppError(
+      "Ngày giao dịch không được ở tương lai.",
+      400,
+      "PAYMENT_DATE_INVALID",
+    );
+  }
+  const paymentDate = parsedPaymentDate.toISOString();
+  const transactionCode =
+    `PAY-${invoice.invoice_id}-${Date.now().toString(36).toUpperCase()}`;
 
   const { data: updatedInvoice, error: updateError } =
-    await paymentDao.markInvoicePaid(invoice.invoice_id, paymentDate);
+    await paymentDao.markInvoicePaid({
+      invoiceId: invoice.invoice_id,
+      paymentTime: paymentDate,
+      paymentMethod,
+      transactionCode,
+    });
   if (updateError || !updatedInvoice) {
     throw new AppError(
       "Không thể cập nhật trạng thái hóa đơn.",
@@ -178,7 +191,7 @@ async function payInvoice(invoiceId, paymentMethod) {
     );
   }
 
-  return { ...payment, invoice: updatedInvoice };
+  return normalizePaymentRow(updatedInvoice);
 }
 
 module.exports = {

@@ -243,9 +243,13 @@ async function createTreatment({
   const normalizedNote = treatmentNote?.trim();
   const normalizedInstructions =
     postTreatmentInstructions?.trim() || null;
-  if (!normalizedDiagnosis || !normalizedNote) {
+  if (
+    !normalizedClinicalExamination ||
+    !normalizedDiagnosis ||
+    !normalizedNote
+  ) {
     throw new AppError(
-      "Chẩn đoán và nội dung điều trị là bắt buộc.",
+      "Khám lâm sàng, chẩn đoán và nội dung điều trị là bắt buộc.",
       400,
       "VALIDATION_ERROR",
     );
@@ -264,6 +268,17 @@ async function createTreatment({
   const treatmentPlan = Array.isArray(appointment.treatment_plan)
     ? appointment.treatment_plan[0]
     : appointment.treatment_plan;
+  const treatmentMode =
+    appointment.appointment_service?.[0]?.dental_service?.treatment_mode ||
+    "Single-Visit";
+
+  if (treatmentMode === "Multi-Visit" && !appointment.treatment_plan_id) {
+    throw new AppError(
+      "Vui lòng bắt đầu lộ trình trước khi ghi kết quả điều trị.",
+      409,
+      "TREATMENT_PLAN_REQUIRED",
+    );
+  }
 
   if (completePlan && !appointment.treatment_plan_id) {
     throw new AppError(

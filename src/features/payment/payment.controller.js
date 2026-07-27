@@ -72,7 +72,11 @@ async function getInvoiceDetail(req, res, next) {
 
 async function payInvoice(req, res, next) {
   try {
-    const payment = await paymentService.payInvoice(req.params.invoiceId, req.body.paymentMethod);
+    const payment = await paymentService.payInvoice(
+      req.params.invoiceId,
+      req.body.paymentMethod,
+      req.body.paymentDate,
+    );
     return sendSuccess(res, 201, payment, "Thanh toán hóa đơn thành công.");
   } catch (err) {
     return next(err);
