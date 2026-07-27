@@ -6,11 +6,13 @@ const requireRole = require("../../middlewares/role.middleware");
 const router = express.Router();
 
 const spamLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 30 * 60 * 1000,
   max: 5,
-  message: { success: false, message: "Quá nhiều yêu cầu. Vui lòng thử lại sau." },
+  message: {
+    success: false,
+    message: "Quá nhiều yêu cầu. Vui lòng thử lại sau.",
+  },
 });
-
 
 router.post("/", spamLimiter, consultationController.createConsultationRequest);
 
