@@ -7,6 +7,8 @@ const QUEUE_SELECT = `
   patient_id,
   dentist_id,
   room_id,
+  service_id,
+  actual_price,
   queue_type,
   status,
   check_in_time,
@@ -34,6 +36,14 @@ const QUEUE_SELECT = `
     room_id,
     room_name,
     status
+  ),
+  service:service_id (
+    service_id,
+    service_name,
+    unit_price,
+    status,
+    treatment_mode,
+    slot_occupied
   ),
   appointment:appointment_id (
     appt_id,
@@ -95,6 +105,15 @@ function findPatientById(patientId) {
     .from("patient")
     .select("patient_id, full_name, phone")
     .eq("patient_id", patientId)
+    .maybeSingle();
+}
+
+function findActiveServiceById(serviceId) {
+  return supabase
+    .from("dental_services")
+    .select("service_id, service_name, unit_price, status")
+    .eq("service_id", serviceId)
+    .eq("status", "Active")
     .maybeSingle();
 }
 
@@ -163,6 +182,13 @@ async function updateById(queueId, payload, expectedStatus) {
         "DENTIST_BUSY",
       );
     }
+    if (error.message?.includes("QUEUE_ROOM_OCCUPIED")) {
+      throw new AppError(
+        "Phòng khám đang được sử dụng cho một lượt khám khác.",
+        409,
+        "ROOM_OCCUPIED",
+      );
+    }
     throw new AppError(error.message, 500, "DB_ERROR");
   }
   return data;
@@ -203,6 +229,19 @@ async function createFollowUp({
   return data;
 }
 
+async function recordWalkInTreatment(payload) {
+  const { data, error } = await supabase.rpc("record_walk_in_treatment", {
+    p_queue_id: payload.queueId,
+    p_dentist_id: payload.dentistId,
+    p_clinical_examination: payload.clinicalExamination || "",
+    p_diagnosis: payload.diagnosis,
+    p_treatment_note: payload.treatmentNote,
+    p_post_treatment_instructions: payload.postTreatmentInstructions || "",
+  });
+  if (error) throw error;
+  return data?.[0] || null;
+}
+
 module.exports = {
   createFollowUp,
   createWalkIn,
@@ -211,6 +250,8 @@ module.exports = {
   findActiveByPatientId,
   findDentistById,
   findDentistInProgress,
+  findActiveServiceById,
   findPatientById,
+  recordWalkInTreatment,
   updateById,
 };

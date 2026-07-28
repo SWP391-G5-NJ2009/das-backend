@@ -106,6 +106,37 @@ function getTreatmentDentistId(row) {
   return primarySlotEntry?.work_slot?.schedules?.dentist?.dentist_id || null;
 }
 
+function normalizeWalkInTreatment(row) {
+  const invoice = Array.isArray(row.queue?.invoice)
+    ? row.queue.invoice[0]
+    : row.queue?.invoice;
+  return {
+    recordId: row.record_id,
+    id: String(row.record_id),
+    queueId: row.queue_id,
+    appointmentId: null,
+    source: "WALK_IN",
+    treatmentPlanId: null,
+    visitNumber: null,
+    date: row.queue?.check_in_time?.slice(0, 10) || "",
+    startTime: row.queue?.check_in_time || "",
+    endTime: "",
+    treatment: row.queue?.service?.service_name || "Dịch vụ walk-in",
+    diagnosis: row.diagnosis || "",
+    clinicalExamination: row.clinical_examination || "",
+    treatmentNote: row.treatment_note || "",
+    postTreatmentInstructions: row.post_treatment_instructions || "",
+    notes: row.treatment_note || "",
+    appointmentNote: "",
+    dentist: row.dentist ? `BS. ${row.dentist.full_name || "Nha sĩ"}` : "",
+    dentistId: row.dentist_id,
+    cost: invoice?.total_amount ?? row.queue?.actual_price ?? null,
+    status: row.queue?.status || "COMPLETED",
+    paymentStatus: invoice?.payment_status || "",
+    paymentTime: invoice?.payment_time || "",
+  };
+}
+
 function filterTreatmentHistoryByActor(
   rows,
   { actorProfileId, actorRole } = {},
@@ -194,15 +225,32 @@ async function createPatientAccount({
 }
 
 async function getTreatmentHistory(patientId, actor = {}) {
-  const { data, error } =
-    await patientDao.findTreatmentHistoryByPatientId(patientId);
+  const [appointmentResult, walkInResult] = await Promise.all([
+    patientDao.findTreatmentHistoryByPatientId(patientId),
+    patientDao.findWalkInTreatmentHistoryByPatientId(patientId),
+  ]);
 
-  if (error) {
-    throw new AppError(error.message, 500, "DB_ERROR");
+  if (appointmentResult.error) {
+    throw new AppError(appointmentResult.error.message, 500, "DB_ERROR");
+  }
+  if (walkInResult.error) {
+    throw new AppError(walkInResult.error.message, 500, "DB_ERROR");
   }
 
-  return filterTreatmentHistoryByActor(data || [], actor).map(
-    normalizeTreatment,
+  const appointmentRows = filterTreatmentHistoryByActor(
+    appointmentResult.data || [],
+    actor,
+  ).map(normalizeTreatment);
+  const walkInRows = (walkInResult.data || [])
+    .filter(
+      (row) =>
+        normalizeRole(actor.actorRole) !== "dentist" ||
+        String(row.dentist_id) === String(actor.actorProfileId),
+    )
+    .map(normalizeWalkInTreatment);
+
+  return [...appointmentRows, ...walkInRows].sort(
+    (a, b) => new Date(b.date || 0) - new Date(a.date || 0),
   );
 }
 

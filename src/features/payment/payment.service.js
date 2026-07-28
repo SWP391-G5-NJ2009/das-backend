@@ -33,6 +33,23 @@ function getAppointmentInfo(appointment) {
   };
 }
 
+function getInvoiceSourceInfo(invoice) {
+  if (invoice?.appointment) {
+    return { ...getAppointmentInfo(invoice.appointment), source: "APPOINTMENT", room: null };
+  }
+  const queue = invoice?.queue;
+  return {
+    appointmentId: null,
+    queueId: queue?.id || null,
+    source: "WALK_IN",
+    patient: queue?.patient || null,
+    dentist: queue?.dentist || null,
+    room: queue?.room || null,
+    appointmentDate: queue?.check_in_time?.substring(0, 10) || null,
+    appointmentTime: queue?.check_in_time || null,
+  };
+}
+
 function normalizePaymentRow(payment) {
   const invoice = payment.invoice;
   return {
@@ -43,7 +60,7 @@ function normalizePaymentRow(payment) {
     payment_date: payment.payment_date,
     transaction_code: payment.transaction_code,
     status: invoice?.payment_status || payment.status,
-    ...getAppointmentInfo(invoice?.appointment),
+    ...getInvoiceSourceInfo(invoice),
   };
 }
 
@@ -56,7 +73,7 @@ async function getUnpaidInvoices() {
     amount: invoice.total_amount,
     payment_date: invoice.payment_time,
     status: invoice.payment_status || "Unpaid",
-    ...getAppointmentInfo(invoice.appointment),
+    ...getInvoiceSourceInfo(invoice),
   }));
 }
 
@@ -72,7 +89,17 @@ async function getPaymentDetail(paymentId) {
 
   const invoice = data.invoice;
   const appointment = invoice?.appointment;
-  const appointmentInfo = getAppointmentInfo(appointment);
+  const appointmentInfo = getInvoiceSourceInfo(invoice);
+  const walkInItems = invoice?.queue?.service
+    ? [{
+        id: invoice.queue.service.service_id,
+        name: invoice.queue.service.service_name,
+        type: "Dịch vụ",
+        unitPrice: invoice.queue.actual_price ?? data.amount,
+        quantity: 1,
+        total: invoice.queue.actual_price ?? data.amount,
+      }]
+    : [];
 
   return {
     paymentId: data.payment_id,
@@ -83,7 +110,7 @@ async function getPaymentDetail(paymentId) {
     paymentDate: data.payment_date,
     transactionCode: data.transaction_code,
     status: data.status || invoice?.payment_status,
-    items: (appointment?.appointment_service || []).map((item) => ({
+    items: appointment ? (appointment.appointment_service || []).map((item) => ({
         id: item.dental_service?.service_id,
         name: item.dental_service?.service_name || "Dịch vụ nha khoa",
         type: "Dịch vụ",
@@ -94,7 +121,7 @@ async function getPaymentDetail(paymentId) {
         total: appointment.appointment_service.length === 1
           ? data.amount
           : item.actual_price,
-      })),
+      })) : walkInItems,
   };
 }
 
@@ -112,12 +139,22 @@ async function getInvoiceDetail(invoiceId) {
   if (!data) throw new AppError("Không tìm thấy hóa đơn.", 404, "NOT_FOUND");
 
   const appointment = data.appointment;
+  const walkInItems = data.queue?.service
+    ? [{
+        id: data.queue.service.service_id,
+        name: data.queue.service.service_name,
+        type: "Dịch vụ",
+        unitPrice: data.queue.actual_price ?? data.total_amount,
+        quantity: 1,
+        total: data.queue.actual_price ?? data.total_amount,
+      }]
+    : [];
   return {
     invoiceId: data.invoice_id,
-    ...getAppointmentInfo(appointment),
+    ...getInvoiceSourceInfo(data),
     amount: data.total_amount,
     status: data.payment_status || "Unpaid",
-    items: (appointment?.appointment_service || []).map((item) => ({
+    items: appointment ? (appointment.appointment_service || []).map((item) => ({
         id: item.dental_service?.service_id,
         name: item.dental_service?.service_name || "Dịch vụ nha khoa",
         type: "Dịch vụ",
@@ -128,7 +165,7 @@ async function getInvoiceDetail(invoiceId) {
         total: appointment.appointment_service.length === 1
           ? data.total_amount
           : item.actual_price,
-      })),
+      })) : walkInItems,
   };
 }
 

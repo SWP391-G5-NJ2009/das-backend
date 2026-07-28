@@ -38,6 +38,12 @@ router.patch(
 );
 
 router.post(
+  "/:id/treatment",
+  requireRole("dentist"),
+  queueController.recordWalkInTreatment,
+);
+
+router.post(
   "/:id/follow-ups",
   requireRole("dentist"),
   queueController.createFollowUp,

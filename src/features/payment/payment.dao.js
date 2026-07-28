@@ -16,6 +16,13 @@ async function findAllPayments() {
         invoice_id,
         total_amount,
         payment_status,
+        queue:queue_id (
+          id, check_in_time, actual_price,
+          patient:patient_id (patient_id, full_name, phone),
+          dentist:dentist_id (dentist_id, full_name),
+          room:room_id (room_id, room_name),
+          service:service_id (service_id, service_name)
+        ),
         appointment:appt_id (
           appt_id,
           patient:patient_id (patient_id, full_name, phone),
@@ -37,7 +44,7 @@ async function findAllPayments() {
 }
 
 async function findPaymentsByPatientId(patientId) {
-  return supabase
+  const appointmentQuery = supabase
     .from("payment")
     .select(
       `
@@ -71,6 +78,37 @@ async function findPaymentsByPatientId(patientId) {
     )
     .eq("invoice.appointment.patient.patient_id", patientId)
     .order("payment_date", { ascending: false });
+
+  const walkInQuery = supabase
+    .from("payment")
+    .select(`
+      payment_id, invoice_id, amount, payment_method, payment_date,
+      transaction_code, status,
+      invoice:invoice_id!inner (
+        invoice_id, total_amount, payment_status,
+        queue:queue_id!inner (
+          id, check_in_time, actual_price,
+          patient:patient_id!inner (patient_id, full_name, phone),
+          dentist:dentist_id (dentist_id, full_name),
+          room:room_id (room_id, room_name),
+          service:service_id (service_id, service_name)
+        )
+      )
+    `)
+    .eq("invoice.queue.patient.patient_id", patientId)
+    .order("payment_date", { ascending: false });
+
+  const [appointmentResult, walkInResult] = await Promise.all([
+    appointmentQuery,
+    walkInQuery,
+  ]);
+  if (appointmentResult.error) return appointmentResult;
+  if (walkInResult.error) return walkInResult;
+  return {
+    data: [...(appointmentResult.data || []), ...(walkInResult.data || [])]
+      .sort((a, b) => new Date(b.payment_date) - new Date(a.payment_date)),
+    error: null,
+  };
 }
 
 async function findUnpaidInvoices() {
@@ -82,6 +120,13 @@ async function findUnpaidInvoices() {
       total_amount,
       payment_status,
       payment_time,
+      queue:queue_id (
+        id, check_in_time, actual_price,
+        patient:patient_id (patient_id, full_name, phone),
+        dentist:dentist_id (dentist_id, full_name),
+        room:room_id (room_id, room_name),
+        service:service_id (service_id, service_name)
+      ),
       appointment:appt_id (
         appt_id,
         patient:patient_id (patient_id, full_name, phone),
@@ -119,6 +164,13 @@ async function findPaymentById(paymentId) {
         total_amount,
         payment_status,
         payment_time,
+        queue:queue_id (
+          id, check_in_time, actual_price,
+          patient:patient_id (patient_id, full_name, phone),
+          dentist:dentist_id (dentist_id, full_name),
+          room:room_id (room_id, room_name),
+          service:service_id (service_id, service_name)
+        ),
         appointment:appt_id (
           appt_id,
           patient:patient_id (patient_id, full_name, phone),
@@ -151,6 +203,13 @@ async function findInvoiceById(invoiceId) {
       invoice_id,
       total_amount,
       payment_status,
+      queue:queue_id (
+        id, check_in_time, actual_price,
+        patient:patient_id (patient_id, full_name, phone),
+        dentist:dentist_id (dentist_id, full_name),
+        room:room_id (room_id, room_name),
+        service:service_id (service_id, service_name)
+      ),
       appointment:appt_id (
         appt_id,
         patient:patient_id (patient_id, full_name, phone),
