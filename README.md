@@ -40,7 +40,7 @@ TEXTBEE_DEVICE_ID=your-textbee-device-id
 TEXTBEE_API_KEY=your-textbee-api-key
 
 FRONTEND_URL=http://localhost:5173
-FRONTEND_URLS=https://das-frontend-ebon.vercel.app
+FRONTEND_URLS=http://localhost:5173
 ```
 
 Keep `.env` private. `SUPABASE_SERVICE_ROLE_KEY` must never be used in the frontend or committed to Git.
@@ -59,7 +59,7 @@ JWT_SECRET=use-a-long-random-secret-at-least-32-characters
 JWT_EXPIRES_IN=7d
 TEXTBEE_DEVICE_ID=your-textbee-device-id
 TEXTBEE_API_KEY=your-textbee-api-key
-FRONTEND_URL=https://your-frontend-app
+FRONTEND_URL=https://your-frontend-app.com
 FRONTEND_URLS=https://your-frontend-app.com
 ```
 
@@ -76,7 +76,7 @@ Deploy order:
 
 1. Deploy the backend to Railway with a temporary `FRONTEND_URL`, such as `http://localhost:5173`.
 2. Copy the Railway backend URL.
-3. Deploy the frontend to Vercel with `VITE_API_URL=https://your-railway-backend-url/api`.
+3. Deploy the frontend to Vercel with `VITE_API_URL=https://your-backend-url/api`.
 4. Copy the final Vercel frontend URL.
 5. Update Railway `FRONTEND_URL` to the Vercel URL with no trailing slash.
 6. Redeploy or restart the Railway backend.
