@@ -1,12 +1,13 @@
-# DAS Backend Setup
+# DAS Backend
 
-Express API for the DentalCare Dentist Appointment System. The backend is the only layer that talks to Supabase; the React app calls this API only.
+Express API for the DentalCare Dentist Appointment System. The backend is the only layer that talks to Supabase; the React frontend calls this API only.
 
 ## Requirements
 
-- Node.js 18 or newer
+- Node.js 20.19 or newer
 - npm
-- A Supabase project with the DAS tables
+- A Supabase project with the DAS database schema
+- TextBee credentials for OTP and SMS delivery
 
 ## Install
 
@@ -23,7 +24,7 @@ Create a local `.env` file from the example:
 copy .env.example .env
 ```
 
-Configure these values:
+Local development values:
 
 ```env
 PORT=3000
@@ -31,7 +32,6 @@ NODE_ENV=development
 
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-SUPABASE_ANON_KEY=your-anon-key
 
 JWT_SECRET=replace-with-at-least-32-characters
 JWT_EXPIRES_IN=7d
@@ -42,38 +42,42 @@ TEXTBEE_API_KEY=your-textbee-api-key
 FRONTEND_URL=http://localhost:5173
 ```
 
-Keep `.env` private. The service role key must never be used in the frontend.
+Keep `.env` private. `SUPABASE_SERVICE_ROLE_KEY` must never be used in the frontend or committed to Git.
 
-## Database Notes
+The backend now fails at startup if `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, or a strong `JWT_SECRET` is missing.
 
-The backend expects the current DAS schema in Supabase, including:
+## Railway Deployment
 
-- `role`
-- `account`
-- `patient`
-- `dentist`
-- `receptionist`
-- `manager`
-- `otp_tokens`
+Set these variables in Railway, not in a committed file:
 
-Phase 2 auth also expects these account fields:
+```env
+NODE_ENV=production
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+JWT_SECRET=use-a-long-random-secret-at-least-32-characters
+JWT_EXPIRES_IN=7d
+TEXTBEE_DEVICE_ID=your-textbee-device-id
+TEXTBEE_API_KEY=your-textbee-api-key
+FRONTEND_URL=https://your-vercel-app.vercel.app
+```
 
-- `account.username`
-- `account.password_hash`
-- `account.status`
-- `account.role_id`
+Railway should use:
 
-Current role names supported by the API:
+```text
+Root Directory: das-backend
+Start Command: npm start
+```
 
-- `patient`
-- `receptionist`
-- `dentist`
-- `manager`
-- `admin`
+Do not manually set `PORT` on Railway unless Railway explicitly requires it. The server uses Railway's provided `PORT` automatically.
 
-Forgot password OTP is stored in `otp_tokens` and sent by TextBee SMS. SpeedSMS is intentionally not integrated yet. In development, the forgot-password endpoint also returns `devOtp` for testing.
+Deploy order:
 
-Staff forgot password looks up accounts by `account.username` case-insensitively, then sends the OTP to that specific row's `account.phone`. Supabase enforces case-insensitive username uniqueness with `account_username_ci_unique` on `lower(username)`.
+1. Deploy the backend to Railway with a temporary `FRONTEND_URL`, such as `http://localhost:5173`.
+2. Copy the Railway backend URL.
+3. Deploy the frontend to Vercel with `VITE_API_URL=https://your-railway-backend-url/api`.
+4. Copy the final Vercel frontend URL.
+5. Update Railway `FRONTEND_URL` to the Vercel URL with no trailing slash.
+6. Redeploy or restart the Railway backend.
 
 ## Run
 
@@ -89,7 +93,7 @@ Production-style start:
 npm start
 ```
 
-The API runs on:
+Local API base URL:
 
 ```text
 http://localhost:3000/api
@@ -98,7 +102,7 @@ http://localhost:3000/api
 ## Health Check
 
 ```http
-GET http://localhost:3000/api/health
+GET /api/health
 ```
 
 Expected response:
@@ -109,8 +113,36 @@ Expected response:
   "data": {
     "status": "ok"
   },
-  "message": "OK"
+  "message": "Thanh cong"
 }
+```
+
+## Test Accounts
+
+Patient login:
+
+```text
+URL: /login
+phone: 0900000002
+password: Test12345!
+```
+
+Staff login:
+
+```text
+URL: /staff/login
+password for all staff accounts: Test12345!
+```
+
+Staff usernames:
+
+```text
+admin
+recep
+owner
+dentist
+dentist2
+dentist3
 ```
 
 ## Auth Endpoints
@@ -122,8 +154,8 @@ POST /api/auth/patient/login
 Content-Type: application/json
 
 {
-  "phone": "0901000001",
-  "password": "Test12345"
+  "phone": "0900000002",
+  "password": "Test12345!"
 }
 ```
 
@@ -135,7 +167,7 @@ Content-Type: application/json
 
 {
   "username": "admin",
-  "password": "Admin12345"
+  "password": "Test12345!"
 }
 ```
 
@@ -146,11 +178,9 @@ POST /api/auth/forgot-password
 Content-Type: application/json
 
 {
-  "identifier": "0901000001"
+  "identifier": "0900000002"
 }
 ```
-
-In development, this request sends the OTP through TextBee and also returns the OTP in `data.devOtp`. In production, `devOtp` is omitted.
 
 Staff forgot password:
 
@@ -163,7 +193,7 @@ Content-Type: application/json
 }
 ```
 
-Both forgot-password endpoints return `data.accountId`; send that value to OTP verification and password reset.
+In development, forgot-password responses include `data.devOtp`. In production, `devOtp` is omitted.
 
 Reset password:
 
@@ -174,7 +204,7 @@ Content-Type: application/json
 {
   "accountId": "account-id-from-forgot-password",
   "otp": "123456",
-  "newPassword": "NewPassword123"
+  "newPassword": "NewPassword123!"
 }
 ```
 
@@ -186,32 +216,42 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "oldPassword": "OldPassword123",
-  "newPassword": "NewPassword123"
+  "oldPassword": "Test12345!",
+  "newPassword": "NewPassword123!"
 }
 ```
 
-## Current Test Accounts
+## Database Notes
 
-Admin account:
+The backend expects the current DAS schema in Supabase, including these core tables:
 
-```text
-username: admin
-password: Admin12345
-```
+- `role`
+- `account`
+- `patient`
+- `dentist`
+- `receptionist`
+- `manager`
+- `admin`
+- `otp_tokens`
+- `appointment`
+- `work_slot`
+- `schedule`
+- `dental_service`
+- `consultation_request`
+- `treatment_record`
+- `invoice`
 
-Patient account used during smoke testing:
+Supported role names:
 
-```text
-phone: 0901000001
-password: Test12345
-```
-
-Other staff accounts may exist in Supabase, but they need a real `password_hash` value before login will work reliably.
+- `patient`
+- `receptionist`
+- `dentist`
+- `manager`
+- `admin`
 
 ## API Response Format
 
-All responses use the same envelope:
+Success:
 
 ```json
 {
@@ -221,24 +261,19 @@ All responses use the same envelope:
 }
 ```
 
-Errors:
+Error:
 
 ```json
 {
   "success": false,
   "data": null,
   "message": "Invalid credentials.",
-  "code": "INVALID_CREDENTIALS"
+  "code": "INVALID_CREDENTIALS",
+  "details": null
 }
 ```
 
 ## Useful Commands
-
-Lint:
-
-```bash
-npm run lint
-```
 
 Check that the app can load:
 
@@ -246,10 +281,19 @@ Check that the app can load:
 node -e "require('./src/app'); console.log('backend app loaded')"
 ```
 
+Run lint:
+
+```bash
+npm run lint
+```
+
+Note: lint currently requires an `eslint.config.js` file because this project uses ESLint 10.
+
 ## Troubleshooting
 
+- If the server fails on startup, check `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `JWT_SECRET`.
+- If browser requests are blocked by CORS, check that Railway `FRONTEND_URL` exactly matches the Vercel origin and has no trailing slash.
 - If login returns `INVALID_CREDENTIALS`, confirm the account has a valid bcrypt `password_hash`.
 - If forgot password returns `TEXTBEE_NOT_CONFIGURED`, confirm `TEXTBEE_DEVICE_ID` and `TEXTBEE_API_KEY`.
 - If TextBee does not deliver SMS, confirm your TextBee device is online and the phone number can receive SMS.
-- If Supabase requests fail, check `SUPABASE_URL` and the service role key.
 - `SUPABASE_URL` should normally be `https://your-project-ref.supabase.co`; do not include `/rest/v1`.
