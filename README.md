@@ -40,6 +40,7 @@ TEXTBEE_DEVICE_ID=your-textbee-device-id
 TEXTBEE_API_KEY=your-textbee-api-key
 
 FRONTEND_URL=http://localhost:5173
+FRONTEND_URLS=https://das-frontend-ebon.vercel.app
 ```
 
 Keep `.env` private. `SUPABASE_SERVICE_ROLE_KEY` must never be used in the frontend or committed to Git.
@@ -58,7 +59,8 @@ JWT_SECRET=use-a-long-random-secret-at-least-32-characters
 JWT_EXPIRES_IN=7d
 TEXTBEE_DEVICE_ID=your-textbee-device-id
 TEXTBEE_API_KEY=your-textbee-api-key
-FRONTEND_URL=https://your-vercel-app.vercel.app
+FRONTEND_URL=https://your-frontend-app
+FRONTEND_URLS=https://your-frontend-app.com
 ```
 
 Railway should use:
@@ -292,7 +294,7 @@ Note: lint currently requires an `eslint.config.js` file because this project us
 ## Troubleshooting
 
 - If the server fails on startup, check `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `JWT_SECRET`.
-- If browser requests are blocked by CORS, check that Railway `FRONTEND_URL` exactly matches the Vercel origin and has no trailing slash.
+- If browser requests are blocked by CORS, check that Railway `FRONTEND_URL` exactly matches the Vercel origin and has no trailing slash. For multiple frontend origins, set `FRONTEND_URLS` as a comma-separated list.
 - If login returns `INVALID_CREDENTIALS`, confirm the account has a valid bcrypt `password_hash`.
 - If forgot password returns `TEXTBEE_NOT_CONFIGURED`, confirm `TEXTBEE_DEVICE_ID` and `TEXTBEE_API_KEY`.
 - If TextBee does not deliver SMS, confirm your TextBee device is online and the phone number can receive SMS.

@@ -28,13 +28,21 @@ const {
 const { sendSuccess } = require("./utils/response");
 
 const app = express();
-const allowedOrigins = new Set(
-  [
-    process.env.FRONTEND_URL,
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-  ].filter(Boolean),
-);
+
+function parseOrigins(value) {
+  return String(value || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
+const allowedOrigins = new Set([
+  ...parseOrigins(process.env.FRONTEND_URL),
+  ...parseOrigins(process.env.FRONTEND_URLS),
+  "https://das-frontend-ebon.vercel.app",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+]);
 
 app.use(
   cors({
