@@ -2,7 +2,6 @@ const authDao = require("./auth.dao");
 const textbeeService = require("../../integrations/textbee/textbee.service");
 const AppError = require("../../utils/AppError");
 const { signJWT } = require("../../utils/jwt");
-const logger = require("../../utils/logger");
 const {
   compareOtp,
   generateOtp,
@@ -226,13 +225,8 @@ async function createPasswordResetOtp({ account, recipient }) {
       recipient,
       message: textbeeService.resetPasswordOtp({ otp }),
     });
-  } catch (smsError) {
+  } catch {
     otpDelivery = "textbee_failed";
-    logger.error("TextBee OTP delivery failed.", {
-      accountId: account.account_id,
-      error: smsError.message,
-      code: smsError.code,
-    });
 
     if (process.env.NODE_ENV === "production") {
       throw new AppError(

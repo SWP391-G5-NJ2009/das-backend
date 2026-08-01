@@ -1,7 +1,6 @@
 const scheduleDao = require("./schedule.dao");
 const AppError = require("../../utils/AppError");
 const textbeeService = require("../../integrations/textbee/textbee.service");
-const logger = require("../../utils/logger");
 
 const MAX_RANGE_DAYS = 31;
 const REQUEST_STATUS = "Pending";
@@ -553,33 +552,13 @@ async function notifyAffectedAppointments(affectedAppointments, reason) {
         smsStatus = "sent";
       } catch (error) {
         smsStatus = error.code || "failed";
-        logger.warn("MSG26 SMS notification failed.", {
-          appointmentId: appointment.appointmentId,
-          patientPhone: appointment.patientPhone,
-          error: error.message,
-        });
       }
-    }
-
-    if (appointment.patientEmail) {
-      logger.info("MSG26 email notification queued by log.", {
-        appointmentId: appointment.appointmentId,
-        patientEmail: appointment.patientEmail,
-        reason,
-      });
     }
 
     delivery.push({
       appointmentId: appointment.appointmentId,
       smsStatus,
       emailStatus: appointment.patientEmail ? "logged" : "skipped",
-    });
-  }
-
-  if (affectedAppointments.length > 0) {
-    logger.warn("Urgent receptionist rescheduling task generated.", {
-      reason,
-      affectedAppointments,
     });
   }
 
@@ -618,11 +597,6 @@ async function markAffectedAppointmentsConflict(affectedAppointments, reason) {
     affectedAppointments,
     reason,
   );
-
-  logger.warn("ActivityLog: Dentist availability force-blocked appointments.", {
-    affectedAppointmentIds: apptIds,
-    reason,
-  });
 
   return { updated: data || [], notifications };
 }
@@ -996,14 +970,6 @@ async function updateAvailabilityStatus(user, payload = {}) {
       "DB_ERROR",
     );
   }
-
-  logger.info("ActivityLog: Dentist updated availability status.", {
-    dentistId,
-    slotIds,
-    reason,
-    force,
-    affectedAppointments,
-  });
 
   return {
     message:

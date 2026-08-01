@@ -1,12 +1,10 @@
 const consultationDao = require("./consultation.dao");
-const logger = require("../../utils/logger");
 const AppError = require("../../utils/AppError");
 
 async function getAllConsultationRequests(filters = {}) {
   const { data, error, count } = await consultationDao.findAllConsultationRequests(filters);
 
   if (error) {
-    logger.error("Failed to retrieve consultation request", error);
     throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
@@ -31,12 +29,6 @@ async function createConsultationRequest({
   });
 
   if (error) {
-    logger.error("Failed to insert consultation request", {
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code,
-    });
     throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
@@ -53,7 +45,6 @@ async function updateConsultationRequest(id, { status, note }) {
   );
 
   if (error) {
-    logger.error("Failed to update consultation request", error);
     throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 

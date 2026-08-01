@@ -1,5 +1,4 @@
 const accountDao = require("./account.dao");
-const logger = require("../../utils/logger");
 const AppError = require("../../utils/AppError");
 const { hashPassword } = require("../../utils/password");
 const profileDao = require("../profile/profile.dao");
@@ -31,7 +30,6 @@ async function getAllAccounts(filters = {}) {
   const { data, error, count } = await accountDao.findAllAccounts(queryFilters);
 
   if (error) {
-    logger.error("Failed to retrieve accounts", error);
     throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
@@ -45,7 +43,6 @@ async function ensureUsernameAvailable(username, accountId = null) {
   const { data, error } = await lookup;
 
   if (error) {
-    logger.error("Failed to check username availability", error);
     throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
@@ -58,12 +55,10 @@ async function getRoleId(roleName) {
   const { data: role, error } = await accountDao.findRoleByName(roleName);
 
   if (error) {
-    logger.error("Failed to retrieve role name", error);
     throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
   if (!role) {
-    logger.error(`Role '${roleName}' not found`);
     throw new AppError("Đã xảy ra lỗi khi tìm vai trò", 400, "INVALID_ROLE");
   }
 
@@ -91,7 +86,6 @@ async function createAccount({
   });
 
   if (error) {
-    logger.error("Failed to insert account", error);
     throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
@@ -164,7 +158,6 @@ async function updateAccount(
   );
 
   if (error) {
-    logger.error("Failed to update account", error);
     throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
@@ -179,7 +172,6 @@ async function deleteAccount(accountId, requestingAccountId) {
   const { data, error: findAccountError } = await accountDao.findAccountById(accountId);
 
   if (findAccountError) {
-    logger.error("Failed to find account to delete", findAccountError);
     throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 
@@ -204,7 +196,6 @@ async function deleteAccount(accountId, requestingAccountId) {
   const { error: deleteError } = await accountDao.deleteAccount(accountId);
 
   if (deleteError) {
-    logger.error("Failed to delete account", deleteError);
     throw new AppError("Đã xảy ra lỗi. Vui lòng thử lại sau.", 500, "DB_ERROR");
   }
 

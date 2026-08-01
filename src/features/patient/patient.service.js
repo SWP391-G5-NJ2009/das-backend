@@ -2,7 +2,6 @@ const patientDao = require("./patient.dao");
 const accountService = require("../account/account.service");
 const textbeeService = require("../../integrations/textbee/textbee.service");
 const AppError = require("../../utils/AppError");
-const logger = require("../../utils/logger");
 const normalizeRole = require("../../utils/normalizeRole");
 
 /**
@@ -158,12 +157,7 @@ async function sendPatientPasswordSms({ accountId, phone, password }) {
       message: textbeeService.patientAccountPassword({ phone, password }),
     });
     return "textbee";
-  } catch (smsError) {
-    logger.error("TextBee patient account delivery failed.", {
-      accountId,
-      error: smsError.message,
-      code: smsError.code,
-    });
+  } catch {
     return "textbee_failed";
   }
 }

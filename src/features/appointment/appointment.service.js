@@ -17,10 +17,6 @@ function sendReceptionistBookingSms({
   const recipient = patient?.phone;
 
   if (!recipient) {
-    console.warn("[appointment.service] SMS skipped: patient phone missing.", {
-      appointmentId,
-      patientId: patient?.patient_id,
-    });
     return;
   }
 
@@ -36,12 +32,7 @@ function sendReceptionistBookingSms({
         }),
       }),
     )
-    .catch((err) => {
-      console.error(
-        "[appointment.service] booking confirmation SMS failed:",
-        err.message,
-      );
-    });
+    .catch(() => {});
 }
 
 async function bookAppointment({
@@ -604,12 +595,7 @@ async function cancelAppointment(
     if (patientId) {
       try {
         await appointmentDao.reconcileNoShowAfterCheckIn(patientId);
-      } catch (err) {
-        console.error(
-          "[appointment.service] no_show_count decrement failed:",
-          err.message,
-        );
-      }
+      } catch {}
     }
   }
 
@@ -624,9 +610,7 @@ async function cancelAppointment(
         return appointmentDao.releaseSlotsByIds([primarySlotId]);
       }
     })
-    .catch((err) =>
-      console.error("[appointment.service] slot release failed:", err.message),
-    );
+    .catch(() => {});
 
   return cancelled;
 }

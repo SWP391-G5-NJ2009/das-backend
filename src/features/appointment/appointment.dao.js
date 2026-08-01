@@ -1,6 +1,5 @@
 const supabase = require("../../config/supabase");
 const AppError = require("../../utils/AppError");
-const logger = require("../../utils/logger");
 
 const APPOINTMENT_SELECT = `
   appt_id,
@@ -285,9 +284,7 @@ async function releaseSlotsByIds(slotIds) {
     .in("slot_id", slotIds)
     .eq("status", "Booked");
 
-  if (error) {
-    console.error("[appointment.dao] releaseSlotsByIds failed:", error.message);
-  }
+  if (error) return;
 }
 
 async function releaseSlot(slotId) {
@@ -297,9 +294,7 @@ async function releaseSlot(slotId) {
     .eq("slot_id", slotId)
     .eq("status", "Booked"); // only release if currently Booked
 
-  if (error) {
-    console.error("[appointment.dao] releaseSlot failed:", error.message);
-  }
+  if (error) return;
 }
 
 async function findSlotInfo(slotId) {
@@ -509,7 +504,6 @@ async function markOverdueAsNoShow() {
     .in("status", ["Confirmed"]);
 
   if (fetchError) {
-    logger.error("[noShow] Failed to fetch candidates:", fetchError.message);
     return [];
   }
 
@@ -545,10 +539,6 @@ async function markOverdueAsNoShow() {
     .select("appt_id, patient_id");
 
   if (updateError) {
-    logger.error(
-      "[noShow] Failed to update appointments:",
-      updateError.message,
-    );
     return [];
   }
 
